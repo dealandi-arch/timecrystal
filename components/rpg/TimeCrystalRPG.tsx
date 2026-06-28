@@ -1,9 +1,27 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ABILITIES } from './abilities';
+import { SoundEngine } from './audio';
 import { COLS, FLOOR, ROWS, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
 import { getEffectiveLevel } from './levelOverrides';
+import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
+import {
+  BOSS_PALETTE,
+  BOSS_SPRITE,
+  ENEMY_FROZEN_PALETTE,
+  ENEMY_PALETTE,
+  ENEMY_SPRITE,
+  FLOOR_A,
+  FLOOR_A_PALETTE,
+  FLOOR_B,
+  FLOOR_B_PALETTE,
+  PLAYER_PALETTE,
+  PLAYER_SPRITE,
+  WALL,
+  WALL_PALETTE,
+  getSpriteCanvas
+} from './pixelArt';
 import { type AbilityId, type Save, loadSave, persistSave } from './save';
 
 const WIDTH = COLS * TILE;
@@ -18,6 +36,7 @@ const CRYSTAL_MOVE_MS = 550;
 const ENEMY_WANDER_MS = 900;
 const BULLET_SPEED = 9;
 const BULLET_RADIUS = 5;
+const PIXEL_SIZE = TILE / 12;
 
 type Dir = 'up' | 'down' | 'left' | 'right';
 const DIR_VECTORS: Record<Dir, { dx: number; dy: number }> = {
@@ -149,11 +168,12 @@ function makeCrystal(level: LevelDef): RuntimeCrystal {
 interface LevelRunnerProps {
   level: LevelDef;
   save: Save;
+  sound: SoundEngine;
   onLevelComplete: () => void;
   onAbilityUsed: () => void;
 }
 
-function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: LevelRunnerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hp, setHp] = useState(PLAYER_MAX_HP);
   const [enemiesLeft, setEnemiesLeft] = useState(level.enemies.length);
@@ -165,6 +185,9 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
     enemies: makeEnemies(level),
     crystal: makeCrystal(level),
     bullets: [] as RuntimeBullet[],
+    particles: [] as Particle[],
+    discoveredSecrets: new Set<string>(),
+    shake: 0,
     keys: new Set<string>(),
     abilityActive: { navigate: false, invisibility: false, iceAge: false } as AbilityActive,
     toastTimer: 0,
@@ -177,6 +200,7 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
     s.enemies = makeEnemies(level);
     s.crystal = makeCrystal(level);
     s.bullets = [];
+    s.shake = 0.3;
     s.won = false;
     setHp(PLAYER_MAX_HP);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
@@ -202,6 +226,7 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
         e.frozen = true;
       });
     }
+    sound.playMenuClick();
     onAbilityUsed();
   }
 
@@ -210,10 +235,12 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
     if (!canvas) return;
     const rawCtx = canvas.getContext('2d');
     if (!rawCtx) return;
+    rawCtx.imageSmoothingEnabled = false;
     const ctx: CanvasRenderingContext2D = rawCtx;
     const s = stateRef.current;
 
     function onKeyDown(e: KeyboardEvent) {
+      sound.resume();
       s.keys.add(e.key.toLowerCase());
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
     }
@@ -279,10 +306,12 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
         p.attackCooldown = ATTACK_COOLDOWN_MS;
         const { dx, dy } = DIR_VECTORS[p.facing];
         s.bullets.push({ x: p.gx + 0.5 + dx * 0.5, y: p.gy + 0.5 + dy * 0.5, dx, dy, alive: true });
+        sound.playShoot();
       }
       attackWasPressed = attackKey;
       if (p.attackTimer > 0) p.attackTimer -= dt * 1000;
       if (p.invuln > 0) p.invuln -= dt;
+      if (s.shake > 0) s.shake -= dt;
 
       let enemyDiedFromBullet = false;
       for (const bullet of s.bullets) {
@@ -298,11 +327,18 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
         for (const enemy of s.enemies) {
           if (enemy.alive && enemy.gx === cellX && enemy.gy === cellY) {
             enemy.hp -= 1;
+            bullet.alive = false;
+            const hitX = (cellX + 0.5) * TILE;
+            const hitY = (cellY + 0.5) * TILE;
             if (enemy.hp <= 0) {
               enemy.alive = false;
               enemyDiedFromBullet = true;
+              spawnBurst(s.particles, hitX, hitY, ['#f472b6', '#fbcfe8', '#831843'], 14, 140, 220);
+              sound.playEnemyDeath();
+            } else {
+              spawnBurst(s.particles, hitX, hitY, ['#fde047', '#fff'], 6, 90, 160);
+              sound.playHit();
             }
-            bullet.alive = false;
             break;
           }
         }
@@ -344,6 +380,9 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
         ) {
           p.hp -= 1;
           p.invuln = HIT_INVULN_S;
+          s.shake = 0.2;
+          spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#f87171', '#fecaca'], 10, 110, 180);
+          sound.playPlayerHurt();
           setHp(p.hp);
           if (p.hp <= 0) {
             resetLevelRuntime();
@@ -351,6 +390,17 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
           }
         }
       }
+
+      if (level.grid[p.gy][p.gx] === SECRET) {
+        const key = `${p.gx},${p.gy}`;
+        if (!s.discoveredSecrets.has(key)) {
+          s.discoveredSecrets.add(key);
+          spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#67e8f9', '#a5f3fc', '#fff'], 16, 110, -40);
+          sound.playSecretFound();
+        }
+      }
+
+      updateParticles(s.particles, dt);
 
       const crystal = s.crystal;
       if (!crystal.moving) {
@@ -371,11 +421,17 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
         if (!crystal.moving) crystal.dwell = CRYSTAL_DWELL_MS;
       }
 
+      if (Math.random() < 0.05) {
+        spawnBurst(s.particles, (lerp(crystal.fromX, crystal.gx, crystal.moveT) + 0.5) * TILE, (lerp(crystal.fromY, crystal.gy, crystal.moveT) + 0.5) * TILE, ['#67e8f9', '#a5f3fc'], 1, 20, -10);
+      }
+
       if (crystal.gx === p.gx && crystal.gy === p.gy) {
         const remaining = s.enemies.filter((e) => e.alive).length;
         if (remaining === 0) {
           s.won = true;
           setWon(true);
+          spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#67e8f9', '#fde047', '#fff'], 30, 160, 60);
+          sound.playLevelComplete();
         } else if (s.toastTimer <= 0) {
           s.toastTimer = 1800;
           setToast('Defeat every enemy before the crystal will let you near.');
@@ -395,20 +451,27 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
 
     function draw() {
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
-      ctx.fillStyle = '#0b1330';
-      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.save();
+      if (s.shake > 0) {
+        ctx.translate((Math.random() - 0.5) * s.shake * 18, (Math.random() - 0.5) * s.shake * 18);
+      }
+
+      const floorA = getSpriteCanvas('floorA', FLOOR_A, FLOOR_A_PALETTE, PIXEL_SIZE);
+      const floorB = getSpriteCanvas('floorB', FLOOR_B, FLOOR_B_PALETTE, PIXEL_SIZE);
+      const wall = getSpriteCanvas('wall', WALL, WALL_PALETTE, PIXEL_SIZE);
 
       for (let y = 0; y < ROWS; y++) {
         for (let x = 0; x < COLS; x++) {
           const tile = level.grid[y][x];
           if (tile === FLOOR) {
-            ctx.fillStyle = (x + y) % 2 === 0 ? '#1a2356' : '#172050';
-          } else if (tile === SECRET && s.abilityActive.iceAge) {
-            ctx.fillStyle = '#1e4d6b';
+            ctx.drawImage((x + y) % 2 === 0 ? floorA : floorB, x * TILE, y * TILE);
           } else {
-            ctx.fillStyle = '#312e81';
+            ctx.drawImage(wall, x * TILE, y * TILE);
+            if (tile === SECRET && s.abilityActive.iceAge) {
+              ctx.fillStyle = 'rgba(103, 232, 249, 0.3)';
+              ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+            }
           }
-          ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
         }
       }
 
@@ -420,21 +483,20 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
       for (const enemy of s.enemies) {
         if (!enemy.alive) continue;
         const pos = entityPixelPos(enemy);
-        const cx = pos.x + TILE / 2;
-        const cy = pos.y + TILE / 2;
-        ctx.beginPath();
-        ctx.fillStyle = enemy.frozen ? '#93c5fd' : enemy.isBoss ? '#dc2626' : '#f472b6';
-        ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = enemy.isBoss ? 18 : 10;
-        ctx.arc(cx, cy, enemy.isBoss ? 18 : 12, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        const key = enemy.isBoss ? 'boss' : enemy.frozen ? 'enemyFrozen' : 'enemy';
+        const grid = enemy.isBoss ? BOSS_SPRITE : ENEMY_SPRITE;
+        const palette = enemy.isBoss ? BOSS_PALETTE : enemy.frozen ? ENEMY_FROZEN_PALETTE : ENEMY_PALETTE;
+        const sprite = getSpriteCanvas(key, grid, palette, PIXEL_SIZE);
+        const bobY = Math.sin(time * 4 + pos.x) * 2;
+        ctx.drawImage(sprite, pos.x, pos.y + bobY);
         if (enemy.maxHp > 1) {
           const barW = 28;
+          const cx = pos.x + TILE / 2;
+          const cy = pos.y - 6;
           ctx.fillStyle = 'rgba(15,23,42,0.7)';
-          ctx.fillRect(cx - barW / 2, cy - 28, barW, 5);
+          ctx.fillRect(cx - barW / 2, cy, barW, 5);
           ctx.fillStyle = '#22c55e';
-          ctx.fillRect(cx - barW / 2, cy - 28, barW * (enemy.hp / enemy.maxHp), 5);
+          ctx.fillRect(cx - barW / 2, cy, barW * (enemy.hp / enemy.maxHp), 5);
         }
       }
 
@@ -442,24 +504,26 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
       const ppos = entityPixelPos(p);
       const px = ppos.x;
       const py = ppos.y;
+      const playerSprite = getSpriteCanvas('player', PLAYER_SPRITE, PLAYER_PALETTE, PIXEL_SIZE);
+      const walkBob = p.moving ? Math.sin(time * 16) * 1.5 : 0;
+      ctx.drawImage(playerSprite, px, py + walkBob);
       const flashing = p.invuln > 0 && Math.floor(time * 10) % 2 === 0;
-      ctx.fillStyle = flashing ? 'rgba(250, 204, 21, 0.4)' : '#facc15';
-      ctx.fillRect(px + 6, py + 6, TILE - 12, TILE - 12);
+      if (flashing) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = 'rgba(248, 113, 113, 0.6)';
+        ctx.fillRect(px, py + walkBob, TILE, TILE);
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
       const { dx, dy } = DIR_VECTORS[p.facing];
-      ctx.fillStyle = '#0b1330';
-      ctx.beginPath();
-      ctx.arc(px + TILE / 2 + dx * 10, py + TILE / 2 + dy * 10, 4, 0, Math.PI * 2);
-      ctx.fill();
-
       ctx.fillStyle = '#1f2937';
-      ctx.fillRect(px + TILE / 2 + dx * 14 - 4, py + TILE / 2 + dy * 14 - 4, 8, 8);
+      ctx.fillRect(px + TILE / 2 + dx * 14 - 4, py + TILE / 2 + dy * 14 - 4 + walkBob, 8, 8);
 
       if (p.attackTimer > 0) {
         const flashAlpha = p.attackTimer / ATTACK_DURATION_MS;
         ctx.fillStyle = `rgba(253, 224, 71, ${flashAlpha})`;
         ctx.beginPath();
-        ctx.arc(px + TILE / 2 + dx * 24, py + TILE / 2 + dy * 24, 8, 0, Math.PI * 2);
+        ctx.arc(px + TILE / 2 + dx * 24, py + TILE / 2 + dy * 24 + walkBob, 8, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -489,6 +553,9 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
         ctx.stroke();
         ctx.setLineDash([]);
       }
+
+      drawParticles(ctx, s.particles);
+      ctx.restore();
     }
 
     function drawDiamond(c: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
@@ -545,7 +612,14 @@ function LevelRunner({ level, save, onLevelComplete, onAbilityUsed }: LevelRunne
           <div className="game-overlay">
             <h2>{level.isBoss ? 'The Time Crystal Is Whole Again' : 'Crystal Secured'}</h2>
             <p>{level.isBoss ? 'You defeated the guardian and restored the final shard.' : 'On to the next level.'}</p>
-            <button onClick={onLevelComplete}>{level.isBoss ? 'Finish' : 'Next level'}</button>
+            <button
+              onClick={() => {
+                sound.playMenuClick();
+                onLevelComplete();
+              }}
+            >
+              {level.isBoss ? 'Finish' : 'Next level'}
+            </button>
           </div>
         )}
       </div>
@@ -586,63 +660,91 @@ function FinaleScreen({ onRestart }: { onRestart: () => void }) {
   );
 }
 
+const MUTE_STORAGE_KEY = 'timeCrystalMuted';
+
 export default function TimeCrystalRPG() {
   const [save, setSave] = useState<Save | null>(null);
+  const [muted, setMutedFlag] = useState(false);
+  const soundRef = useRef<SoundEngine | null>(null);
+  if (!soundRef.current) soundRef.current = new SoundEngine();
+  const sound = soundRef.current;
 
   useEffect(() => {
     setSave(loadSave());
-  }, []);
-
-  if (!save) return null;
+    const storedMuted = window.localStorage.getItem(MUTE_STORAGE_KEY) === 'true';
+    setMutedFlag(storedMuted);
+    sound.setMuted(storedMuted);
+  }, [sound]);
 
   function updateSave(next: Save) {
     setSave(next);
     persistSave(next);
   }
 
-  if (!save.ability) {
-    return (
-      <AbilitySelectScreen
-        onChoose={(id) => updateSave({ ...save, ability: id })}
-      />
-    );
+  function toggleMuted() {
+    const next = !muted;
+    setMutedFlag(next);
+    sound.setMuted(next);
+    window.localStorage.setItem(MUTE_STORAGE_KEY, String(next));
   }
 
-  if (save.currentLevel > TOTAL_LEVELS) {
-    return (
+  let body: ReactNode = null;
+  if (save && !save.ability) {
+    body = (
+      <AbilitySelectScreen
+        onChoose={(id) => {
+          sound.resume();
+          sound.playMenuClick();
+          updateSave({ ...save, ability: id });
+        }}
+      />
+    );
+  } else if (save && save.currentLevel > TOTAL_LEVELS) {
+    body = (
       <FinaleScreen
         onRestart={() => updateSave({ ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0 })}
       />
     );
+  } else if (save) {
+    const level = getEffectiveLevel(save.currentLevel);
+    if (level) {
+      body = (
+        <div>
+          <div className="journey-bar">
+            <span>
+              Time Crystals: {save.crystalsCollected}/{TOTAL_LEVELS}
+            </span>
+            <div className="journey-track">
+              <div className="journey-fill" style={{ width: `${(save.crystalsCollected / TOTAL_LEVELS) * 100}%` }} />
+            </div>
+          </div>
+          <LevelRunner
+            key={level.id}
+            level={level}
+            save={save}
+            sound={sound}
+            onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
+            onLevelComplete={() =>
+              updateSave({
+                ...save,
+                crystalsCollected: save.crystalsCollected + 1,
+                currentLevel: save.currentLevel + 1
+              })
+            }
+          />
+        </div>
+      );
+    }
   }
-
-  const level = getEffectiveLevel(save.currentLevel);
-  if (!level) return null;
 
   return (
     <div>
-      <div className="journey-bar">
-        <span>Time Crystals: {save.crystalsCollected}/{TOTAL_LEVELS}</span>
-        <div className="journey-track">
-          <div
-            className="journey-fill"
-            style={{ width: `${(save.crystalsCollected / TOTAL_LEVELS) * 100}%` }}
-          />
-        </div>
-      </div>
-      <LevelRunner
-        key={level.id}
-        level={level}
-        save={save}
-        onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
-        onLevelComplete={() =>
-          updateSave({
-            ...save,
-            crystalsCollected: save.crystalsCollected + 1,
-            currentLevel: save.currentLevel + 1
-          })
-        }
-      />
+      {save && (
+        <button className="mute-btn" onClick={toggleMuted} aria-label={muted ? 'Unmute' : 'Mute'}>
+          {muted ? '🔇' : '🔊'}
+        </button>
+      )}
+      {body}
     </div>
   );
 }
