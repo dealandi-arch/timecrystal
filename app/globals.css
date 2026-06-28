@@ -1,0 +1,389 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #29b7d3;
+  color: #65138e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  padding: 0;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.hero {
+  text-align: center;
+  padding: 4rem 0;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(3rem, 5vw, 4.5rem);
+  letter-spacing: -0.05em;
+}
+
+.hero p {
+  margin: 1.5rem auto;
+  max-width: 700px;
+  line-height: 1.75;
+  color: #cbd5e1;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.actions a {
+  display: inline-block;
+  margin-top: 1.5rem;
+  padding: 0.9rem 1.8rem;
+  border-radius: 999px;
+  background: #38bdf8;
+  color: #0f172a;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.journey-bar {
+  margin-top: 1.5rem;
+  font-weight: 700;
+}
+
+.journey-track {
+  margin-top: 0.4rem;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+.journey-fill {
+  height: 100%;
+  background: #38bdf8;
+  transition: width 0.3s ease;
+}
+
+.rpg-shell {
+  margin-top: 1rem;
+}
+
+.rpg-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.ability-btn {
+  margin-left: auto;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+
+.ability-btn:disabled {
+  background: rgba(148, 163, 184, 0.35);
+  color: rgba(15, 23, 42, 0.6);
+  cursor: not-allowed;
+}
+
+.rpg-canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  aspect-ratio: 720 / 480;
+}
+
+.rpg-canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 0.75rem;
+  outline: 2px solid rgba(148, 163, 184, 0.25);
+}
+
+.rpg-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  background: rgba(2, 6, 23, 0.85);
+  color: #f8fafc;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.ability-select {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.ability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.ability-card {
+  background: rgba(148, 163, 184, 0.12);
+  border: 2px solid transparent;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.ability-card:hover {
+  border-color: #38bdf8;
+}
+
+.ability-card h3 {
+  margin: 0 0 0.5rem;
+}
+
+.ability-card p {
+  margin: 0;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: rgba(2, 6, 23, 0.78);
+  color: #f8fafc;
+  border-radius: 0.75rem;
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.game-overlay button {
+  padding: 0.7rem 1.6rem;
+  border-radius: 999px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+
+.game-controls {
+  margin-top: 1rem;
+  opacity: 0.8;
+  font-size: 0.95rem;
+}
+
+.section {
+  margin-top: 3rem;
+  padding: 2rem;
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: 1rem;
+}
+
+.section h2 {
+  margin-top: 0;
+}
+
+.section ul {
+  padding-left: 1.2rem;
+}
+
+.section li {
+  margin-bottom: 0.8rem;
+}
+
+.editor-shell {
+  margin-top: 1.5rem;
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.editor-toolbar input[type='text'] {
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.editor-tools {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tool-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: rgba(148, 163, 184, 0.2);
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tool-btn-active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.25);
+}
+
+.editor-hint {
+  margin: 0 0 0.75rem;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.editor-canvas-wrap {
+  width: 100%;
+  max-width: 720px;
+}
+
+.editor-canvas-wrap canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 720 / 480;
+  display: block;
+  border-radius: 0.75rem;
+  outline: 2px solid rgba(148, 163, 184, 0.25);
+  cursor: crosshair;
+}
+
+.editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.editor-actions button {
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+  background: #38bdf8;
+  color: #0f172a;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+}
+
+.editor-actions button:disabled {
+  background: rgba(148, 163, 184, 0.35);
+  color: rgba(15, 23, 42, 0.6);
+  cursor: not-allowed;
+}
+
+.editor-message {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.editor-json {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 1rem;
+  height: 240px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.editor-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  max-width: 900px;
+}
+
+.editor-list h3 {
+  margin: 0 0 0.5rem;
+}
+
+.editor-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.editor-list-row input[type='number'] {
+  width: 4rem;
+  margin-left: 0.3rem;
+  padding: 0.2rem;
+}
+
+.editor-list-row button {
+  margin-left: auto;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(248, 113, 113, 0.25);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.editor-empty {
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+.editor-clear-path {
+  margin-top: 0.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(248, 113, 113, 0.25);
+  cursor: pointer;
+  font-weight: 600;
+}
