@@ -23,6 +23,12 @@ import {
   getSpriteCanvas
 } from './pixelArt';
 import { type AbilityId, type Save, loadSave, persistSave } from './save';
+import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
+import { useProfile } from '../profile/ProfileContext';
+import AuthWidget from '../profile/AuthWidget';
+import SignInBanner from '../profile/SignInBanner';
+import LeaderboardPanel from '../profile/LeaderboardPanel';
+import { formatTime } from '../profile/formatTime';
 
 const WIDTH = COLS * TILE;
 const HEIGHT = ROWS * TILE;
@@ -169,7 +175,7 @@ interface LevelRunnerProps {
   level: LevelDef;
   save: Save;
   sound: SoundEngine;
-  onLevelComplete: () => void;
+  onLevelComplete: (stats: LevelRunStats) => void;
   onAbilityUsed: () => void;
 }
 
@@ -179,6 +185,7 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
   const [enemiesLeft, setEnemiesLeft] = useState(level.enemies.length);
   const [toast, setToast] = useState<string | null>(null);
   const [won, setWon] = useState(false);
+  const [runStats, setRunStats] = useState<LevelRunStats | null>(null);
 
   const stateRef = useRef({
     player: makePlayer(level),
@@ -191,7 +198,8 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
     keys: new Set<string>(),
     abilityActive: { navigate: false, invisibility: false, iceAge: false } as AbilityActive,
     toastTimer: 0,
-    won: false
+    won: false,
+    startTime: performance.now()
   });
 
   function resetLevelRuntime() {
@@ -202,6 +210,7 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
     s.bullets = [];
     s.shake = 0.3;
     s.won = false;
+    s.startTime = performance.now();
     setHp(PLAYER_MAX_HP);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
   }
@@ -430,6 +439,11 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
         if (remaining === 0) {
           s.won = true;
           setWon(true);
+          setRunStats({
+            timeMs: Math.round(performance.now() - s.startTime),
+            kills: level.enemies.length,
+            secrets: s.discoveredSecrets.size
+          });
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#67e8f9', '#fde047', '#fff'], 30, 160, 60);
           sound.playLevelComplete();
         } else if (s.toastTimer <= 0) {
@@ -608,14 +622,22 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
       <div className="rpg-canvas-wrap">
         <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} />
         {toast && <div className="rpg-toast">{toast}</div>}
-        {won && (
+        {won && runStats && (
           <div className="game-overlay">
             <h2>{level.isBoss ? 'The Time Crystal Is Whole Again' : 'Crystal Secured'}</h2>
             <p>{level.isBoss ? 'You defeated the guardian and restored the final shard.' : 'On to the next level.'}</p>
+            <p>
+              Time: {formatTime(runStats.timeMs)} &nbsp;·&nbsp; Secrets found: {runStats.secrets}
+              {(() => {
+                const best = getLocalBest(level.id);
+                return best ? <> &nbsp;·&nbsp; Your best: {formatTime(best.timeMs)}</> : null;
+              })()}
+            </p>
+            <LeaderboardPanel levelId={level.id} />
             <button
               onClick={() => {
                 sound.playMenuClick();
-                onLevelComplete();
+                onLevelComplete(runStats);
               }}
             >
               {level.isBoss ? 'Finish' : 'Next level'}
@@ -635,6 +657,7 @@ function AbilitySelectScreen({ onChoose }: { onChoose: (id: AbilityId) => void }
   return (
     <div className="ability-select">
       <h1>Choose Your Help</h1>
+      <SignInBanner />
       <p>You may pick one. Once you use it, it is gone for the rest of the journey.</p>
       <div className="ability-grid">
         {ABILITIES.map((a) => (
@@ -668,6 +691,17 @@ export default function TimeCrystalRPG() {
   const soundRef = useRef<SoundEngine | null>(null);
   if (!soundRef.current) soundRef.current = new SoundEngine();
   const sound = soundRef.current;
+  const { profile, submitRun } = useProfile();
+
+  function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
+    saveLocalBestIfBetter(level.id, stats);
+    if (profile) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets);
+    updateSave({
+      ...currentSave,
+      crystalsCollected: currentSave.crystalsCollected + 1,
+      currentLevel: currentSave.currentLevel + 1
+    });
+  }
 
   useEffect(() => {
     setSave(loadSave());
@@ -724,13 +758,7 @@ export default function TimeCrystalRPG() {
             save={save}
             sound={sound}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
-            onLevelComplete={() =>
-              updateSave({
-                ...save,
-                crystalsCollected: save.crystalsCollected + 1,
-                currentLevel: save.currentLevel + 1
-              })
-            }
+            onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
           />
         </div>
       );
@@ -739,6 +767,7 @@ export default function TimeCrystalRPG() {
 
   return (
     <div>
+      <AuthWidget />
       {save && (
         <button className="mute-btn" onClick={toggleMuted} aria-label={muted ? 'Unmute' : 'Mute'}>
           {muted ? '🔇' : '🔊'}

@@ -152,6 +152,237 @@ body {
   box-shadow: 0 4px 14px rgba(2, 6, 23, 0.4);
 }
 
+.auth-widget {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auth-signin-btn,
+.auth-submit-btn {
+  background: #38bdf8;
+  color: #02131f;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-widget .avatar-bar {
+  display: inline-block;
+  width: 1.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+.auth-nickname {
+  font-weight: 700;
+  background: rgba(15, 23, 42, 0.75);
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+}
+
+.auth-id {
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+
+.auth-link {
+  background: rgba(15, 23, 42, 0.75);
+  color: #f8fafc;
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.auth-popover {
+  position: absolute;
+  top: 3.2rem;
+  left: 0;
+  width: 17rem;
+  background: rgba(2, 6, 23, 0.95);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 1rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.6);
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.auth-tabs button {
+  flex: 1;
+  background: rgba(148, 163, 184, 0.12);
+  border: 2px solid transparent;
+  border-radius: 0.6rem;
+  padding: 0.4rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+.auth-tabs button.active {
+  border-color: #38bdf8;
+}
+
+.auth-popover input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.6);
+  color: #f8fafc;
+}
+
+.auth-avatar-label {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.avatar-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.avatar-swatch {
+  width: 1.8rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.avatar-swatch.selected {
+  border-color: #f8fafc;
+  transform: scale(1.1);
+}
+
+.auth-error {
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+
+.auth-note {
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+.signin-banner {
+  margin: 1rem 0;
+  padding: 0.8rem 1.1rem;
+  border-radius: 0.9rem;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.leaderboard-panel {
+  margin-top: 1rem;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.leaderboard-panel h4 {
+  margin: 0 0 0.5rem;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.85rem;
+}
+
+.leaderboard-row .avatar-bar {
+  width: 1.2rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.leaderboard-rank {
+  width: 1.4rem;
+  opacity: 0.7;
+}
+
+.leaderboard-time {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.profiles-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+.profile-search input {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.6);
+  color: #f8fafc;
+  margin-bottom: 1rem;
+}
+
+.profile-result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.7rem;
+  background: rgba(148, 163, 184, 0.08);
+  margin-bottom: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile-runs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.profile-runs-table th,
+.profile-runs-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
 .rpg-toast {
   position: absolute;
   left: 50%;
