@@ -21,6 +21,14 @@ const BASS_NOTES: { step: number; freq: number; duration: number; slideTo?: numb
   { step: 8, freq: 41.2, duration: 0.55 },
   { step: 12, freq: 36.7, duration: 0.45, slideTo: 30.9 }
 ];
+// Sparse, syncopated "vocal chop" stabs -- an instrumental texture imitating the
+// staccato, pitched sample-chop hits phonk producers layer over the beat. No words,
+// just a short formant-ish honk synthesized from an oscillator swept through a
+// bandpass filter.
+const VOCAL_CHOP: { step: number; freq: number }[] = [
+  { step: 1, freq: 520 },
+  { step: 9, freq: 390 }
+];
 
 export class SoundEngine {
   private ctx: AudioContext | null = null;
@@ -140,6 +148,28 @@ export class SoundEngine {
     osc.stop(time + 0.2);
   }
 
+  private vocalChop(time: number, freq: number) {
+    const ctx = this.getCtx();
+    if (!ctx || !this.musicGain) return;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, time);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.55, time + 0.15);
+    const formant = ctx.createBiquadFilter();
+    formant.type = 'bandpass';
+    formant.frequency.setValueAtTime(freq * 1.8, time);
+    formant.frequency.exponentialRampToValueAtTime(freq * 0.9, time + 0.15);
+    formant.Q.value = 6;
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = this.getDistortionCurve(1.6);
+    const gain = this.envGain(ctx, shaper, 0.4, 0.003, 0.14, time);
+    osc.connect(formant);
+    formant.connect(gain);
+    shaper.connect(this.musicGain);
+    osc.start(time);
+    osc.stop(time + 0.18);
+  }
+
   private cowbell(time: number) {
     const ctx = this.getCtx();
     if (!ctx || !this.musicGain) return;
@@ -206,6 +236,9 @@ export class SoundEngine {
     if (HAT_STEPS.has(step)) this.hihat(time, OPEN_HAT_STEPS.has(step));
     for (const roll of TOM_ROLL) {
       if (roll.step === step) this.tom(time, roll.freq);
+    }
+    for (const chop of VOCAL_CHOP) {
+      if (chop.step === step) this.vocalChop(time, chop.freq);
     }
     for (const note of BASS_NOTES) {
       if (note.step === step) this.bassNote(time, note.freq, note.duration, note.slideTo);
