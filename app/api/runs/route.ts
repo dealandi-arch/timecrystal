@@ -15,12 +15,17 @@ export async function POST(req: NextRequest) {
   const timeMs = Number(body?.timeMs);
   const kills = Number.isFinite(Number(body?.kills)) ? Number(body?.kills) : 0;
   const secrets = Number.isFinite(Number(body?.secrets)) ? Number(body?.secrets) : 0;
+  const usedAbility = Boolean(body?.usedAbility);
 
   if (!Number.isInteger(levelId) || levelId < 1 || levelId > 11) {
     return NextResponse.json({ error: 'Invalid levelId.' }, { status: 400 });
   }
   if (!Number.isFinite(timeMs) || timeMs <= 0 || timeMs > 1000 * 60 * 60) {
     return NextResponse.json({ error: 'Invalid timeMs.' }, { status: 400 });
+  }
+
+  if (usedAbility) {
+    return NextResponse.json({ savedAsPersonalBest: false, isWorldBest: false, skipped: true, reason: 'A help ability was used on this run.' });
   }
 
   const supabase = getSupabase();

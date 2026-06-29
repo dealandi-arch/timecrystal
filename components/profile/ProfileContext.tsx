@@ -19,7 +19,7 @@ interface ProfileContextValue {
   signUp: (nickname: string, password: string, avatarColor: string) => Promise<AuthResult>;
   logIn: (nickname: string, password: string) => Promise<AuthResult>;
   logOut: () => Promise<void>;
-  submitRun: (levelId: number, timeMs: number, kills: number, secrets: number) => Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean } | null>;
+  submitRun: (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean) => Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean } | null>;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -78,14 +78,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const submitRun = useCallback(
-    async (levelId: number, timeMs: number, kills: number, secrets: number) => {
+    async (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean) => {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ levelId, timeMs, kills, secrets })
+        body: JSON.stringify({ levelId, timeMs, kills, secrets, usedAbility })
       });
       if (!res.ok) return null;
-      return parseJson(res) as Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean }>;
+      return parseJson(res) as Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean }>;
     },
     []
   );

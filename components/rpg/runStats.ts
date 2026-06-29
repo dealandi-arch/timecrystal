@@ -2,6 +2,7 @@ export interface LevelRunStats {
   timeMs: number;
   kills: number;
   secrets: number;
+  usedAbility: boolean;
 }
 
 interface LocalBest extends LevelRunStats {

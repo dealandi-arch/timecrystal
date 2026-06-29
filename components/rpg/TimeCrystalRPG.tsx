@@ -199,7 +199,8 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
     abilityActive: { navigate: false, invisibility: false, iceAge: false } as AbilityActive,
     toastTimer: 0,
     won: false,
-    startTime: performance.now()
+    startTime: performance.now(),
+    usedAbilityThisRun: false
   });
 
   function resetLevelRuntime() {
@@ -219,6 +220,7 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
     if (!save.ability || save.abilityUsed) return;
     if (save.ability === 'killAll' && level.isBoss) return;
     const s = stateRef.current;
+    s.usedAbilityThisRun = true;
     if (save.ability === 'navigate') {
       s.abilityActive.navigate = true;
     } else if (save.ability === 'killAll') {
@@ -442,7 +444,8 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
           setRunStats({
             timeMs: Math.round(performance.now() - s.startTime),
             kills: level.enemies.length,
-            secrets: s.discoveredSecrets.size
+            secrets: s.discoveredSecrets.size,
+            usedAbility: s.usedAbilityThisRun
           });
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#67e8f9', '#fde047', '#fff'], 30, 160, 60);
           sound.playLevelComplete();
@@ -633,6 +636,7 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
                 return best ? <> &nbsp;·&nbsp; Your best: {formatTime(best.timeMs)}</> : null;
               })()}
             </p>
+            {runStats.usedAbility && <p className="ability-disqualified-note">A help ability was used on this level, so this run will not count toward the world record.</p>}
             <LeaderboardPanel levelId={level.id} />
             <button
               onClick={() => {
@@ -695,7 +699,7 @@ export default function TimeCrystalRPG() {
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
-    if (profile) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets);
+    if (profile) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
     updateSave({
       ...currentSave,
       crystalsCollected: currentSave.crystalsCollected + 1,

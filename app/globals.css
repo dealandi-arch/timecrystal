@@ -469,6 +469,12 @@ body {
   cursor: pointer;
 }
 
+.ability-disqualified-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #fcd34d;
+}
+
 .game-controls {
   margin-top: 1rem;
   opacity: 0.8;
