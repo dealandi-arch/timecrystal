@@ -22,7 +22,7 @@ import {
   WALL_PALETTE,
   getSpriteCanvas
 } from './pixelArt';
-import { type AbilityId, type Save, loadSave, persistSave } from './save';
+import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
 import { useProfile } from '../profile/ProfileContext';
 import AuthWidget from '../profile/AuthWidget';
@@ -43,6 +43,15 @@ const ENEMY_WANDER_MS = 900;
 const BULLET_SPEED = 9;
 const BULLET_RADIUS = 5;
 const PIXEL_SIZE = TILE / 12;
+
+const BASELINE_STATS = {
+  maxHp: PLAYER_MAX_HP,
+  moveMs: MOVE_MS,
+  attackCooldownMs: ATTACK_COOLDOWN_MS,
+  attackDurationMs: ATTACK_DURATION_MS,
+  invulnS: HIT_INVULN_S,
+  bulletSpeed: BULLET_SPEED,
+};
 
 type Dir = 'up' | 'down' | 'left' | 'right';
 const DIR_VECTORS: Record<Dir, { dx: number; dy: number }> = {
@@ -178,21 +187,28 @@ interface LevelRunnerProps {
   characterId: string;
   onLevelComplete: (stats: LevelRunStats) => void;
   onAbilityUsed: () => void;
+  onPowerActivated: () => void;
 }
 
-function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbilityUsed }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbilityUsed, onPowerActivated }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
 
+  // Ref updated every render so the game loop always reads the latest value
+  const powerActiveRef = useRef(save.powerActivated);
+  powerActiveRef.current = save.powerActivated;
+
+  const effectiveMaxHp = save.powerActivated ? charStats.maxHp : BASELINE_STATS.maxHp;
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [hp, setHp] = useState(charStats.maxHp);
+  const [hp, setHp] = useState(effectiveMaxHp);
   const [enemiesLeft, setEnemiesLeft] = useState(level.enemies.length);
   const [toast, setToast] = useState<string | null>(null);
   const [won, setWon] = useState(false);
   const [runStats, setRunStats] = useState<LevelRunStats | null>(null);
 
   const stateRef = useRef({
-    player: makePlayer(level, charStats.maxHp),
+    player: makePlayer(level, effectiveMaxHp),
     enemies: makeEnemies(level),
     crystal: makeCrystal(level),
     bullets: [] as RuntimeBullet[],
@@ -209,14 +225,15 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
 
   function resetLevelRuntime() {
     const s = stateRef.current;
-    s.player = makePlayer(level, charStats.maxHp);
+    const maxHp = powerActiveRef.current ? charStats.maxHp : BASELINE_STATS.maxHp;
+    s.player = makePlayer(level, maxHp);
     s.enemies = makeEnemies(level);
     s.crystal = makeCrystal(level);
     s.bullets = [];
     s.shake = 0.3;
     s.won = false;
     s.startTime = performance.now();
-    setHp(charStats.maxHp);
+    setHp(maxHp);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
   }
 
@@ -291,6 +308,7 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
 
     function update(dt: number) {
       if (s.won) return;
+      const effectiveStats = powerActiveRef.current ? charStats : BASELINE_STATS;
       const p = s.player;
 
       const dir = heldDirection();
@@ -311,14 +329,14 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
           }
         }
       } else {
-        stepEntityMove(p, dt, charStats.moveMs);
+        stepEntityMove(p, dt, effectiveStats.moveMs);
       }
 
       const attackKey = s.keys.has(' ') || s.keys.has('j');
       if (p.attackCooldown > 0) p.attackCooldown -= dt * 1000;
       if (attackKey && !attackWasPressed && p.attackCooldown <= 0) {
-        p.attackTimer = charStats.attackDurationMs;
-        p.attackCooldown = charStats.attackCooldownMs;
+        p.attackTimer = effectiveStats.attackDurationMs;
+        p.attackCooldown = effectiveStats.attackCooldownMs;
         const { dx, dy } = DIR_VECTORS[p.facing];
         s.bullets.push({ x: p.gx + 0.5 + dx * 0.5, y: p.gy + 0.5 + dy * 0.5, dx, dy, alive: true });
         sound.playShoot();
@@ -331,8 +349,8 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
       let enemyDiedFromBullet = false;
       for (const bullet of s.bullets) {
         if (!bullet.alive) continue;
-        bullet.x += bullet.dx * charStats.bulletSpeed * dt;
-        bullet.y += bullet.dy * BULLET_SPEED * dt;
+        bullet.x += bullet.dx * effectiveStats.bulletSpeed * dt;
+        bullet.y += bullet.dy * effectiveStats.bulletSpeed * dt;
         const cellX = Math.floor(bullet.x);
         const cellY = Math.floor(bullet.y);
         if (!isWalkable(level, cellX, cellY, false)) {
@@ -394,7 +412,7 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
           enemy.gy === p.gy
         ) {
           p.hp -= 1;
-          p.invuln = charStats.invulnS;
+          p.invuln = effectiveStats.invulnS;
           s.shake = 0.2;
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#f87171', '#fecaca'], 10, 110, 180);
           sound.playPlayerHurt();
@@ -471,6 +489,7 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
     }
 
     function draw() {
+      const effectiveStats = powerActiveRef.current ? charStats : BASELINE_STATS;
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
       ctx.save();
       if (s.shake > 0) {
@@ -542,7 +561,7 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
       ctx.fillRect(px + TILE / 2 + dx * 14 - 4, py + TILE / 2 + dy * 14 - 4 + walkBob, 8, 8);
 
       if (p.attackTimer > 0) {
-        const flashAlpha = p.attackTimer / charStats.attackDurationMs;
+        const flashAlpha = p.attackTimer / effectiveStats.attackDurationMs;
         ctx.fillStyle = `rgba(253, 224, 71, ${flashAlpha})`;
         ctx.beginPath();
         ctx.arc(px + TILE / 2 + dx * 24, py + TILE / 2 + dy * 24 + walkBob, 8, 0, Math.PI * 2);
@@ -619,9 +638,15 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
     <div className="rpg-shell">
       <div className="rpg-hud">
         <span>{level.name}</span>
-        <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, charStats.maxHp - hp))}</span>
+        <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, effectiveMaxHp - hp))}</span>
         <span>Enemies left: {enemiesLeft}</span>
-        <span className="passive-badge">{charDef.name} · {charStats.passiveName}</span>
+        <button
+          className="ability-btn power-btn"
+          disabled={save.powerActivated}
+          onClick={() => { sound.playMenuClick(); onPowerActivated(); }}
+        >
+          {save.powerActivated ? `${charStats.passiveName} (active)` : `Activate ${charStats.passiveName}`}
+        </button>
         {abilityDef && (
           <button className="ability-btn" disabled={!canUseAbility} onClick={activateAbility}>
             {save.abilityUsed ? `${abilityDef.name} (used)` : `Use ${abilityDef.name}`}
@@ -792,7 +817,7 @@ export default function TimeCrystalRPG() {
   } else if (save && save.currentLevel > TOTAL_LEVELS) {
     body = (
       <FinaleScreen
-        onRestart={() => updateSave({ ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0, characterId: null })}
+        onRestart={() => updateSave({ ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0, characterId: null, powerActivated: false })}
       />
     );
   } else if (save) {
@@ -815,11 +840,17 @@ export default function TimeCrystalRPG() {
             sound={sound}
             characterId={save.characterId ?? 'wanderer'}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
+            onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
           />
         </div>
       );
     }
+  }
+
+  function handleRestart() {
+    clearSave();
+    setSave(defaultSave());
   }
 
   return (
@@ -828,6 +859,11 @@ export default function TimeCrystalRPG() {
       {save && (
         <button className="mute-btn" onClick={toggleMuted} aria-label={muted ? 'Unmute' : 'Mute'}>
           {muted ? '🔇' : '🔊'}
+        </button>
+      )}
+      {save && save.characterId !== null && (
+        <button className="restart-btn" onClick={handleRestart} aria-label="Restart">
+          ↺
         </button>
       )}
       {body}
