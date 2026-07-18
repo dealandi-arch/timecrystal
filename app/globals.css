@@ -652,3 +652,27 @@ body {
   cursor: pointer;
   font-weight: 600;
 }
+
+.passive-badge {
+  font-size: 0.78rem;
+  opacity: 0.7;
+  background: rgba(148, 163, 184, 0.15);
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+}
+
+.char-desc {
+  margin: 0 0 0.6rem;
+  opacity: 0.85;
+  line-height: 1.55;
+  font-size: 0.9rem;
+}
+
+.char-passive {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  line-height: 1.4;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  padding-top: 0.5rem;
+}

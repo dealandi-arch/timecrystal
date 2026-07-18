@@ -122,7 +122,7 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function makePlayer(level: LevelDef): RuntimePlayer {
+function makePlayer(level: LevelDef, maxHp: number): RuntimePlayer {
   return {
     gx: level.start.x,
     gy: level.start.y,
@@ -131,7 +131,7 @@ function makePlayer(level: LevelDef): RuntimePlayer {
     moveT: 1,
     moving: false,
     facing: 'down',
-    hp: PLAYER_MAX_HP,
+    hp: maxHp,
     invuln: 0,
     attackTimer: 0,
     attackCooldown: 0
@@ -181,15 +181,18 @@ interface LevelRunnerProps {
 }
 
 function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbilityUsed }: LevelRunnerProps) {
+  const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
+  const charStats = charDef.stats;
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [hp, setHp] = useState(PLAYER_MAX_HP);
+  const [hp, setHp] = useState(charStats.maxHp);
   const [enemiesLeft, setEnemiesLeft] = useState(level.enemies.length);
   const [toast, setToast] = useState<string | null>(null);
   const [won, setWon] = useState(false);
   const [runStats, setRunStats] = useState<LevelRunStats | null>(null);
 
   const stateRef = useRef({
-    player: makePlayer(level),
+    player: makePlayer(level, charStats.maxHp),
     enemies: makeEnemies(level),
     crystal: makeCrystal(level),
     bullets: [] as RuntimeBullet[],
@@ -206,14 +209,14 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
 
   function resetLevelRuntime() {
     const s = stateRef.current;
-    s.player = makePlayer(level);
+    s.player = makePlayer(level, charStats.maxHp);
     s.enemies = makeEnemies(level);
     s.crystal = makeCrystal(level);
     s.bullets = [];
     s.shake = 0.3;
     s.won = false;
     s.startTime = performance.now();
-    setHp(PLAYER_MAX_HP);
+    setHp(charStats.maxHp);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
   }
 
@@ -308,14 +311,14 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
           }
         }
       } else {
-        stepEntityMove(p, dt, MOVE_MS);
+        stepEntityMove(p, dt, charStats.moveMs);
       }
 
       const attackKey = s.keys.has(' ') || s.keys.has('j');
       if (p.attackCooldown > 0) p.attackCooldown -= dt * 1000;
       if (attackKey && !attackWasPressed && p.attackCooldown <= 0) {
-        p.attackTimer = ATTACK_DURATION_MS;
-        p.attackCooldown = ATTACK_COOLDOWN_MS;
+        p.attackTimer = charStats.attackDurationMs;
+        p.attackCooldown = charStats.attackCooldownMs;
         const { dx, dy } = DIR_VECTORS[p.facing];
         s.bullets.push({ x: p.gx + 0.5 + dx * 0.5, y: p.gy + 0.5 + dy * 0.5, dx, dy, alive: true });
         sound.playShoot();
@@ -328,7 +331,7 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
       let enemyDiedFromBullet = false;
       for (const bullet of s.bullets) {
         if (!bullet.alive) continue;
-        bullet.x += bullet.dx * BULLET_SPEED * dt;
+        bullet.x += bullet.dx * charStats.bulletSpeed * dt;
         bullet.y += bullet.dy * BULLET_SPEED * dt;
         const cellX = Math.floor(bullet.x);
         const cellY = Math.floor(bullet.y);
@@ -391,7 +394,7 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
           enemy.gy === p.gy
         ) {
           p.hp -= 1;
-          p.invuln = HIT_INVULN_S;
+          p.invuln = charStats.invulnS;
           s.shake = 0.2;
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#f87171', '#fecaca'], 10, 110, 180);
           sound.playPlayerHurt();
@@ -539,7 +542,7 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
       ctx.fillRect(px + TILE / 2 + dx * 14 - 4, py + TILE / 2 + dy * 14 - 4 + walkBob, 8, 8);
 
       if (p.attackTimer > 0) {
-        const flashAlpha = p.attackTimer / ATTACK_DURATION_MS;
+        const flashAlpha = p.attackTimer / charStats.attackDurationMs;
         ctx.fillStyle = `rgba(253, 224, 71, ${flashAlpha})`;
         ctx.beginPath();
         ctx.arc(px + TILE / 2 + dx * 24, py + TILE / 2 + dy * 24 + walkBob, 8, 0, Math.PI * 2);
@@ -616,8 +619,9 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
     <div className="rpg-shell">
       <div className="rpg-hud">
         <span>{level.name}</span>
-        <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, PLAYER_MAX_HP - hp))}</span>
+        <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, charStats.maxHp - hp))}</span>
         <span>Enemies left: {enemiesLeft}</span>
+        <span className="passive-badge">{charDef.name} · {charStats.passiveName}</span>
         {abilityDef && (
           <button className="ability-btn" disabled={!canUseAbility} onClick={activateAbility}>
             {save.abilityUsed ? `${abilityDef.name} (used)` : `Use ${abilityDef.name}`}
@@ -686,7 +690,8 @@ function CharacterSelectScreen({ onChoose }: { onChoose: (id: string) => void })
           <button key={c.id} className="ability-card" onClick={() => onChoose(c.id)}>
             <SpritePreview char={c} />
             <h3>{c.name}</h3>
-            <p>{c.description}</p>
+            <p className="char-desc">{c.description}</p>
+            <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
           </button>
         ))}
       </div>
