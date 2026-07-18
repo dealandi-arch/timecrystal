@@ -916,15 +916,13 @@ export default function TimeCrystalRPG() {
     }
   }
 
-  const pageTheme = LEVEL_THEMES[Math.min((save?.currentLevel ?? 1) - 1, LEVEL_THEMES.length - 1)];
-
   function handleRestart() {
     clearSave();
     setSave(defaultSave());
   }
 
   return (
-    <div style={{ background: pageTheme.pageGradient, minHeight: '100vh', transition: 'background 0.6s ease' }}>
+    <div>
       <AuthWidget />
       {save && (
         <button className="mute-btn" onClick={toggleMuted} aria-label={muted ? 'Unmute' : 'Mute'}>
