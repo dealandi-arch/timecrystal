@@ -702,7 +702,7 @@ function SpritePreview({ char }: { char: CharacterDef }) {
     ctx.clearRect(0, 0, size, size);
     ctx.drawImage(getSpriteCanvas(`preview:${char.id}`, char.sprite, char.palette, PREVIEW_PS), 0, 0);
   }, [char, size]);
-  return <canvas ref={ref} width={size} height={size} style={{ imageRendering: 'pixelated', display: 'block', margin: '0 auto 0.2rem' }} />;
+  return <canvas ref={ref} width={size} height={size} style={{ imageRendering: 'pixelated', display: 'block', margin: '0 auto' }} />;
 }
 
 function CharacterSelectScreen({ onChoose }: { onChoose: (id: string) => void }) {
@@ -713,8 +713,10 @@ function CharacterSelectScreen({ onChoose }: { onChoose: (id: string) => void })
       <div className="ability-grid">
         {CHARACTERS.map((c) => (
           <button key={c.id} className="ability-card" onClick={() => onChoose(c.id)}>
-            <SpritePreview char={c} />
-            <h3 style={{ margin: '0 0 0.5rem', textAlign: 'center' }}>{c.name}</h3>
+            <div className="char-portrait">
+              <SpritePreview char={c} />
+              <div className="char-portrait-name">{c.name}</div>
+            </div>
             <p className="char-desc">{c.description}</p>
             <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
           </button>
