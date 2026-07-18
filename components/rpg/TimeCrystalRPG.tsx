@@ -9,6 +9,8 @@ import { type Particle, drawParticles, spawnBurst, updateParticles } from './par
 import {
   BOSS_PALETTE,
   BOSS_SPRITE,
+  CHARACTERS,
+  type CharacterDef,
   ENEMY_FROZEN_PALETTE,
   ENEMY_PALETTE,
   ENEMY_SPRITE,
@@ -16,8 +18,6 @@ import {
   FLOOR_A_PALETTE,
   FLOOR_B,
   FLOOR_B_PALETTE,
-  PLAYER_PALETTE,
-  PLAYER_SPRITE,
   WALL,
   WALL_PALETTE,
   getSpriteCanvas
@@ -175,11 +175,12 @@ interface LevelRunnerProps {
   level: LevelDef;
   save: Save;
   sound: SoundEngine;
+  characterId: string;
   onLevelComplete: (stats: LevelRunStats) => void;
   onAbilityUsed: () => void;
 }
 
-function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbilityUsed }: LevelRunnerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hp, setHp] = useState(PLAYER_MAX_HP);
   const [enemiesLeft, setEnemiesLeft] = useState(level.enemies.length);
@@ -521,7 +522,8 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
       const ppos = entityPixelPos(p);
       const px = ppos.x;
       const py = ppos.y;
-      const playerSprite = getSpriteCanvas('player', PLAYER_SPRITE, PLAYER_PALETTE, PIXEL_SIZE);
+      const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
+      const playerSprite = getSpriteCanvas(`player:${characterId}`, charDef.sprite, charDef.palette, PIXEL_SIZE);
       const walkBob = p.moving ? Math.sin(time * 16) * 1.5 : 0;
       ctx.drawImage(playerSprite, px, py + walkBob);
       const flashing = p.invuln > 0 && Math.floor(time * 10) % 2 === 0;
@@ -657,6 +659,41 @@ function LevelRunner({ level, save, sound, onLevelComplete, onAbilityUsed }: Lev
   );
 }
 
+const PREVIEW_PS = 6;
+
+function SpritePreview({ char }: { char: CharacterDef }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  const size = 12 * PREVIEW_PS;
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(getSpriteCanvas(`preview:${char.id}`, char.sprite, char.palette, PREVIEW_PS), 0, 0);
+  }, [char, size]);
+  return <canvas ref={ref} width={size} height={size} style={{ imageRendering: 'pixelated', display: 'block', margin: '0 auto 0.75rem' }} />;
+}
+
+function CharacterSelectScreen({ onChoose }: { onChoose: (id: string) => void }) {
+  return (
+    <div className="ability-select">
+      <h1>Choose Your Character</h1>
+      <p>Pick who travels through time. This choice is yours to keep.</p>
+      <div className="ability-grid">
+        {CHARACTERS.map((c) => (
+          <button key={c.id} className="ability-card" onClick={() => onChoose(c.id)}>
+            <SpritePreview char={c} />
+            <h3>{c.name}</h3>
+            <p>{c.description}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AbilitySelectScreen({ onChoose }: { onChoose: (id: AbilityId) => void }) {
   return (
     <div className="ability-select">
@@ -727,7 +764,17 @@ export default function TimeCrystalRPG() {
   }
 
   let body: ReactNode = null;
-  if (save && !save.ability) {
+  if (save && save.characterId === null) {
+    body = (
+      <CharacterSelectScreen
+        onChoose={(id) => {
+          sound.resume();
+          sound.playMenuClick();
+          updateSave({ ...save, characterId: id });
+        }}
+      />
+    );
+  } else if (save && !save.ability) {
     body = (
       <AbilitySelectScreen
         onChoose={(id) => {
@@ -740,7 +787,7 @@ export default function TimeCrystalRPG() {
   } else if (save && save.currentLevel > TOTAL_LEVELS) {
     body = (
       <FinaleScreen
-        onRestart={() => updateSave({ ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0 })}
+        onRestart={() => updateSave({ ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0, characterId: null })}
       />
     );
   } else if (save) {
@@ -761,6 +808,7 @@ export default function TimeCrystalRPG() {
             level={level}
             save={save}
             sound={sound}
+            characterId={save.characterId ?? 'wanderer'}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
           />

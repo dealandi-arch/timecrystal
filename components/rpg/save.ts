@@ -5,12 +5,13 @@ export interface Save {
   abilityUsed: boolean;
   currentLevel: number;
   crystalsCollected: number;
+  characterId: string | null;
 }
 
 const STORAGE_KEY = 'timeCrystalSave';
 
 export function defaultSave(): Save {
-  return { ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0 };
+  return { ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0, characterId: null };
 }
 
 export function loadSave(): Save {
@@ -19,7 +20,12 @@ export function loadSave(): Save {
   if (!raw) return defaultSave();
   try {
     const parsed = JSON.parse(raw) as Save;
-    return { ...defaultSave(), ...parsed };
+    const merged = { ...defaultSave(), ...parsed };
+    // Migrate saves that already have progress but predate character selection
+    if (merged.characterId === null && (merged.ability !== null || merged.crystalsCollected > 0)) {
+      merged.characterId = 'wanderer';
+    }
+    return merged;
   } catch {
     return defaultSave();
   }

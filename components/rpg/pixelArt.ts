@@ -169,3 +169,42 @@ export const BOSS_PALETTE: Palette = {
   d: '#7f1d1d',
   e: '#fde047'
 };
+
+export interface CharacterDef {
+  id: string;
+  name: string;
+  description: string;
+  sprite: PixelGrid;
+  palette: Palette;
+}
+
+export const CHARACTERS: CharacterDef[] = [
+  {
+    id: 'wanderer',
+    name: 'Wanderer',
+    description: 'A time-lost traveler. Balanced and reliable.',
+    sprite: PLAYER_SPRITE,
+    palette: PLAYER_PALETTE,
+  },
+  {
+    id: 'mage',
+    name: 'Mage',
+    description: "A student of temporal forces. Seeks the crystal's secrets.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1a0a2e', y: '#a855f7', d: '#7c3aed', e: '#fde047' },
+  },
+  {
+    id: 'knight',
+    name: 'Knight',
+    description: 'Guardian of the crystal vaults. Forged in battle.',
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#0f172a', y: '#94a3b8', d: '#475569', e: '#38bdf8' },
+  },
+  {
+    id: 'scout',
+    name: 'Scout',
+    description: 'Swift and silent. Moves like a shadow through time.',
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#052e16', y: '#4ade80', d: '#16a34a', e: '#052e16' },
+  },
+];
