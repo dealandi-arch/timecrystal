@@ -15,11 +15,9 @@ import {
   ENEMY_PALETTE,
   ENEMY_SPRITE,
   FLOOR_A,
-  FLOOR_A_PALETTE,
   FLOOR_B,
-  FLOOR_B_PALETTE,
   WALL,
-  WALL_PALETTE,
+  type Palette,
   getSpriteCanvas
 } from './pixelArt';
 import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
@@ -52,6 +50,71 @@ const BASELINE_STATS = {
   invulnS: HIT_INVULN_S,
   bulletSpeed: BULLET_SPEED,
 };
+
+interface LevelTheme {
+  pageGradient: string;
+  floorAPalette: Palette;
+  floorBPalette: Palette;
+  wallPalette: Palette;
+}
+
+const LEVEL_THEMES: LevelTheme[] = [
+  // 1 — Blue Dungeon (default)
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #07070f 100%)',
+    floorAPalette: { b: '#11173a', a: '#1a2356', h: '#232f6b', c: '#0d1230' },
+    floorBPalette: { b: '#0e1433', a: '#172050', h: '#202b63', c: '#0b0f29' },
+    wallPalette:   { m: '#211f57', a: '#312e81' } },
+  // 2 — Purple Crypt
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #2e1065 0%, #0d0520 100%)',
+    floorAPalette: { b: '#1e1040', a: '#2d1a5c', h: '#3d2270', c: '#140c2a' },
+    floorBPalette: { b: '#190d38', a: '#271550', h: '#351c64', c: '#100924' },
+    wallPalette:   { m: '#4c1d95', a: '#6d28d9' } },
+  // 3 — Mossy Ruins
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #14532d 0%, #031a0d 100%)',
+    floorAPalette: { b: '#0a2e10', a: '#0f3d18', h: '#145224', c: '#061a09' },
+    floorBPalette: { b: '#08280e', a: '#0d3514', h: '#12491e', c: '#051608' },
+    wallPalette:   { m: '#15803d', a: '#16a34a' } },
+  // 4 — Desert Ruins
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #78350f 0%, #1c0a00 100%)',
+    floorAPalette: { b: '#3d2200', a: '#5c3400', h: '#7a4600', c: '#271500' },
+    floorBPalette: { b: '#361e00', a: '#4f2c00', h: '#6b3c00', c: '#221200' },
+    wallPalette:   { m: '#92400e', a: '#b45309' } },
+  // 5 — Volcanic
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #7f1d1d 0%, #1c0000 100%)',
+    floorAPalette: { b: '#3d0a00', a: '#5c1200', h: '#7a1a00', c: '#200500' },
+    floorBPalette: { b: '#360800', a: '#4f0f00', h: '#6b1600', c: '#1a0300' },
+    wallPalette:   { m: '#7f1d1d', a: '#991b1b' } },
+  // 6 — Frozen
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #0c4a6e 0%, #020c18 100%)',
+    floorAPalette: { b: '#0c2540', a: '#0f3454', h: '#134468', c: '#071828' },
+    floorBPalette: { b: '#0a2038', a: '#0d2e4a', h: '#103c5e', c: '#061420' },
+    wallPalette:   { m: '#0369a1', a: '#0284c7' } },
+  // 7 — Teal Depths
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #134e4a 0%, #021414 100%)',
+    floorAPalette: { b: '#0d3534', a: '#134746', h: '#185c5b', c: '#082120' },
+    floorBPalette: { b: '#0b2f2e', a: '#113f3e', h: '#165251', c: '#071b1a' },
+    wallPalette:   { m: '#0f766e', a: '#0d9488' } },
+  // 8 — Void
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #18181b 0%, #030303 100%)',
+    floorAPalette: { b: '#0a0a12', a: '#0f0f1a', h: '#141424', c: '#050508' },
+    floorBPalette: { b: '#08080f', a: '#0d0d16', h: '#12121e', c: '#040406' },
+    wallPalette:   { m: '#27272a', a: '#3f3f46' } },
+  // 9 — Golden Temple
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #451a03 0%, #1a0a00 100%)',
+    floorAPalette: { b: '#3d2d00', a: '#574200', h: '#705600', c: '#251c00' },
+    floorBPalette: { b: '#362400', a: '#4f3600', h: '#6b4a00', c: '#221600' },
+    wallPalette:   { m: '#78350f', a: '#d97706' } },
+  // 10 — Crystal Chamber
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #083344 0%, #010e14 100%)',
+    floorAPalette: { b: '#0a2d3d', a: '#0d3d52', h: '#115068', c: '#061d28' },
+    floorBPalette: { b: '#082836', a: '#0b3548', h: '#0e465e', c: '#051820' },
+    wallPalette:   { m: '#0e7490', a: '#0891b2' } },
+  // 11 — Infernal Boss
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #450a0a 0%, #0f0000 100%)',
+    floorAPalette: { b: '#2d0505', a: '#440808', h: '#5c0c0c', c: '#1a0303' },
+    floorBPalette: { b: '#280404', a: '#3c0707', h: '#510a0a', c: '#160202' },
+    wallPalette:   { m: '#450a0a', a: '#7f1d1d' } },
+];
 
 type Dir = 'up' | 'down' | 'left' | 'right';
 const DIR_VECTORS: Record<Dir, { dx: number; dy: number }> = {
@@ -185,12 +248,13 @@ interface LevelRunnerProps {
   save: Save;
   sound: SoundEngine;
   characterId: string;
+  theme: LevelTheme;
   onLevelComplete: (stats: LevelRunStats) => void;
   onAbilityUsed: () => void;
   onPowerActivated: () => void;
 }
 
-function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbilityUsed, onPowerActivated }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, onLevelComplete, onAbilityUsed, onPowerActivated }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
 
@@ -496,9 +560,9 @@ function LevelRunner({ level, save, sound, characterId, onLevelComplete, onAbili
         ctx.translate((Math.random() - 0.5) * s.shake * 18, (Math.random() - 0.5) * s.shake * 18);
       }
 
-      const floorA = getSpriteCanvas('floorA', FLOOR_A, FLOOR_A_PALETTE, PIXEL_SIZE);
-      const floorB = getSpriteCanvas('floorB', FLOOR_B, FLOOR_B_PALETTE, PIXEL_SIZE);
-      const wall = getSpriteCanvas('wall', WALL, WALL_PALETTE, PIXEL_SIZE);
+      const floorA = getSpriteCanvas(`floorA:${level.id}`, FLOOR_A, theme.floorAPalette, PIXEL_SIZE);
+      const floorB = getSpriteCanvas(`floorB:${level.id}`, FLOOR_B, theme.floorBPalette, PIXEL_SIZE);
+      const wall = getSpriteCanvas(`wall:${level.id}`, WALL, theme.wallPalette, PIXEL_SIZE);
 
       for (let y = 0; y < ROWS; y++) {
         for (let x = 0; x < COLS; x++) {
@@ -825,6 +889,7 @@ export default function TimeCrystalRPG() {
   } else if (save) {
     const level = getEffectiveLevel(save.currentLevel);
     if (level) {
+      const theme = LEVEL_THEMES[Math.min(level.id - 1, LEVEL_THEMES.length - 1)];
       body = (
         <div>
           <div className="journey-bar">
@@ -841,6 +906,7 @@ export default function TimeCrystalRPG() {
             save={save}
             sound={sound}
             characterId={save.characterId ?? 'wanderer'}
+            theme={theme}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
@@ -850,13 +916,15 @@ export default function TimeCrystalRPG() {
     }
   }
 
+  const pageTheme = LEVEL_THEMES[Math.min((save?.currentLevel ?? 1) - 1, LEVEL_THEMES.length - 1)];
+
   function handleRestart() {
     clearSave();
     setSave(defaultSave());
   }
 
   return (
-    <div>
+    <div style={{ background: pageTheme.pageGradient, minHeight: '100vh', transition: 'background 0.6s ease' }}>
       <AuthWidget />
       {save && (
         <button className="mute-btn" onClick={toggleMuted} aria-label={muted ? 'Unmute' : 'Mute'}>
