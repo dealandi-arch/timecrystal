@@ -861,7 +861,7 @@ export default function TimeCrystalRPG() {
           {muted ? '🔇' : '🔊'}
         </button>
       )}
-      {save && save.characterId !== null && (
+      {save && (
         <button className="restart-btn" onClick={handleRestart} aria-label="Restart">
           ↺
         </button>
