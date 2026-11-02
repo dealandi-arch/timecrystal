@@ -7,22 +7,19 @@ import { COLS, FLOOR, ROWS, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVEL
 import { getEffectiveLevel } from './levelOverrides';
 import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
 import {
-  BOSS_PALETTE,
-  BOSS_SPRITE,
   CHARACTERS,
   type CharacterDef,
-  ENEMY_FROZEN_PALETTE,
-  ENEMY_PALETTE,
-  ENEMY_SPRITE,
   FLOOR_A,
   FLOOR_B,
   WALL,
   type Appearance,
   type Palette,
   getCharacterLook,
+  getEnemyLook,
   getSpriteCanvas
 } from './pixelArt';
-import { SPEAKER_NAMES, STORY_CHAPTERS, STORY_EPILOGUE, type StoryChapter } from './story';
+import { STORY_CHAPTER_COUNT, VILLAINS, getChapterTitle, getNemesis } from './story';
+import StoryStage from './StoryStage';
 import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
 import { useProfile } from '../profile/ProfileContext';
@@ -597,10 +594,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       for (const enemy of s.enemies) {
         if (!enemy.alive) continue;
         const pos = entityPixelPos(enemy);
-        const key = enemy.isBoss ? 'boss' : enemy.frozen ? 'enemyFrozen' : 'enemy';
-        const grid = enemy.isBoss ? BOSS_SPRITE : ENEMY_SPRITE;
-        const palette = enemy.isBoss ? BOSS_PALETTE : enemy.frozen ? ENEMY_FROZEN_PALETTE : ENEMY_PALETTE;
-        const sprite = getSpriteCanvas(key, grid, palette, PIXEL_SIZE);
+        const kind = enemy.isBoss ? 'boss' : enemy.frozen ? 'frozen' : 'enemy';
+        const enemyLook = getEnemyLook(kind, appearanceRef.current);
+        const sprite = getSpriteCanvas(`enemy:${kind}:${appearanceRef.current}`, enemyLook.sprite, enemyLook.palette, TILE / enemyLook.sprite.length);
         const bobY = Math.sin(time * 4 + pos.x) * 2;
         ctx.drawImage(sprite, pos.x, pos.y + bobY);
         if (enemy.maxHp > 1) {
@@ -800,56 +796,6 @@ function AppearanceToggle({ appearance, onChange }: { appearance: Appearance; on
   );
 }
 
-function StoryScene({
-  chapter,
-  char,
-  appearance,
-  onAppearanceChange,
-  onDone,
-  doneLabel
-}: {
-  chapter: StoryChapter;
-  char: CharacterDef;
-  appearance: Appearance;
-  onAppearanceChange: (a: Appearance) => void;
-  onDone: () => void;
-  doneLabel: string;
-}) {
-  const [index, setIndex] = useState(0);
-  const line = chapter.lines[index];
-  const isLast = index === chapter.lines.length - 1;
-  const speakerName = line.speaker === 'hero' ? char.name : SPEAKER_NAMES[line.speaker];
-  const text = line.text.split('{name}').join(char.name);
-
-  function advance() {
-    if (isLast) onDone();
-    else setIndex(index + 1);
-  }
-
-  return (
-    <div className="ability-select story-scene">
-      <h1>{chapter.title}</h1>
-      <AppearanceToggle appearance={appearance} onChange={onAppearanceChange} />
-      <div className={`story-box story-${line.speaker}`}>
-        {line.speaker === 'hero' && (
-          <div className="story-portrait">
-            <SpritePreview char={char} appearance={appearance} />
-          </div>
-        )}
-        <div className="story-text">
-          {speakerName && <div className="story-speaker">{speakerName}</div>}
-          <p>{text}</p>
-        </div>
-      </div>
-      <div className="story-actions">
-        <span className="story-progress">{index + 1} / {chapter.lines.length}</span>
-        <button className="ability-btn story-skip" onClick={onDone}>Skip</button>
-        <button className="ability-btn" onClick={advance}>{isLast ? doneLabel : 'Next ▸'}</button>
-      </div>
-    </div>
-  );
-}
-
 function CharacterSelectScreen({
   onChoose,
   appearance,
@@ -878,6 +824,11 @@ function CharacterSelectScreen({
             </div>
             <p className="char-desc">{c.description}</p>
             <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
+            {appearance && (
+              <p className="char-nemesis">
+                <strong>Nemesis: {VILLAINS[getNemesis(c.id)].name}</strong> — {VILLAINS[getNemesis(c.id)].blurb}
+              </p>
+            )}
           </button>
         ))}
       </div>
@@ -988,10 +939,12 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
     );
   } else if (save && isStory && save.currentLevel > TOTAL_LEVELS && save.storySeen <= TOTAL_LEVELS) {
     body = (
-      <StoryScene
+      <StoryStage
         key="epilogue"
-        chapter={STORY_EPILOGUE}
-        char={storyChar}
+        chapterIndex="epilogue"
+        hero={storyChar}
+        theme={LEVEL_THEMES[9]}
+        sound={sound}
         appearance={save.appearance}
         onAppearanceChange={setAppearance}
         doneLabel="Finish"
@@ -1008,12 +961,14 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
         onRestart={() => updateSave({ ...defaultSave(), appearance: save.appearance })}
       />
     );
-  } else if (save && isStory && save.storySeen < save.currentLevel && STORY_CHAPTERS[save.currentLevel - 1]) {
+  } else if (save && isStory && save.storySeen < save.currentLevel && save.currentLevel <= STORY_CHAPTER_COUNT) {
     body = (
-      <StoryScene
+      <StoryStage
         key={save.currentLevel}
-        chapter={STORY_CHAPTERS[save.currentLevel - 1]}
-        char={storyChar}
+        chapterIndex={save.currentLevel - 1}
+        hero={storyChar}
+        theme={LEVEL_THEMES[Math.min(save.currentLevel - 1, LEVEL_THEMES.length - 1)]}
+        sound={sound}
         appearance={save.appearance}
         onAppearanceChange={setAppearance}
         doneLabel="Begin ▸"
@@ -1027,7 +982,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
     const level = getEffectiveLevel(save.currentLevel);
     if (level) {
       const theme = LEVEL_THEMES[Math.min(level.id - 1, LEVEL_THEMES.length - 1)];
-      const chapter = isStory ? STORY_CHAPTERS[level.id - 1] : undefined;
+      const chapterTitle = isStory ? getChapterTitle(level.id - 1) : undefined;
       body = (
         <div>
           <div className="journey-bar">
@@ -1046,7 +1001,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             characterId={save.characterId ?? 'wanderer'}
             theme={theme}
             appearance={isStory ? save.appearance : 'original'}
-            displayName={chapter?.title}
+            displayName={chapterTitle}
             onToggleAppearance={isStory ? () => updateSave({ ...save, appearance: save.appearance === 'human' ? 'original' : 'human' }) : undefined}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}

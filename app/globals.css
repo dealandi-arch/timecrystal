@@ -809,3 +809,52 @@ body {
   background: rgba(148, 163, 184, 0.3);
   color: inherit;
 }
+
+.char-nemesis {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #fca5a5;
+}
+
+.story-stage {
+  max-width: 720px;
+  margin: 1.25rem auto 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.story-stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.75rem 0.75rem 0 0;
+  outline: 2px solid rgba(103, 232, 249, 0.3);
+  image-rendering: pixelated;
+}
+
+.story-stage .story-box {
+  margin: 0;
+  max-width: none;
+  min-height: 6.5rem;
+  border-radius: 0 0 1rem 1rem;
+  border-top: none;
+}
+
+.story-box.story-nemesis {
+  border-color: rgba(168, 85, 247, 0.65);
+}
+
+.story-nemesis .story-speaker {
+  color: #d8b4fe;
+}
+
+.story-hidden {
+  visibility: hidden;
+}
+
+.story-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.5;
+}

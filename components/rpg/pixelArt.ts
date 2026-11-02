@@ -380,6 +380,42 @@ export const CHARACTERS: CharacterDef[] = [
     palette: { o: '#1e1b4b', y: '#818cf8', d: '#4f46e5', e: '#e0e7ff' },
     stats: { maxHp: 6, moveMs: 130, attackCooldownMs: 220, attackDurationMs: 165, invulnS: 0.85, bulletSpeed: 11, passiveName: 'Harmonic', passiveDesc: 'Every stat is improved above the baseline simultaneously.' },
   },
+  {
+    id: 'oracle',
+    name: 'Oracle',
+    description:
+      "She tied a blindfold over her eyes the day she realised she could see every future at once. Sight only got in the way. Now she moves through the fracture by memory of things that have not happened yet, stepping aside from blows a heartbeat before they are thrown. Her bolts fly true because she already watched them land.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#3b0764', y: '#e879f9', d: '#a21caf', e: '#fdf4ff' },
+    stats: { maxHp: 4, moveMs: 150, attackCooldownMs: 240, attackDurationMs: 170, invulnS: 1.1, bulletSpeed: 11, passiveName: 'Foresight', passiveDesc: 'Longer invulnerability after damage and faster bolts.' },
+  },
+  {
+    id: 'ranger',
+    name: 'Ranger',
+    description:
+      "He mapped the wild edges of the timeline where no Archive surveyor would go, living off the land in places where the land kept changing its mind. He is patient, quiet and deadly at range. His bolts carry farther and faster than anyone else's, and he never takes a shot he has not already lined up twice.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1a2e05', y: '#65a30d', d: '#3f6212', e: '#fef9c3' },
+    stats: { maxHp: 5, moveMs: 135, attackCooldownMs: 250, attackDurationMs: 175, invulnS: 0.7, bulletSpeed: 14, passiveName: 'Longshot', passiveDesc: 'Fast projectiles and slightly quicker movement.' },
+  },
+  {
+    id: 'tinker',
+    name: 'Tinker',
+    description:
+      "They have never met a broken thing they could not make run again — usually with a few spare parts left over. Their workshop sits in a pocket of stalled time where a single afternoon has lasted a decade. Their gear is held together with wire and stubbornness, and somehow every piece of it performs a little better than it was built to.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#292524', y: '#a8a29e', d: '#57534e', e: '#fbbf24' },
+    stats: { maxHp: 5, moveMs: 150, attackCooldownMs: 230, attackDurationMs: 170, invulnS: 0.8, bulletSpeed: 10, passiveName: 'Jury-Rigged', passiveDesc: 'Slightly faster attacks and a longer recovery window.' },
+  },
+  {
+    id: 'valkyrie',
+    name: 'Valkyrie',
+    description:
+      "She rode the storm between timelines carrying fallen soldiers to whatever rest they had earned. When the crystal broke, the storm broke with it, and she came down to earth with her shield and her winged helm and a very short temper. She takes a beating and keeps pushing forward, because she has seen what waits for those who stop.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#172554', y: '#e2e8f0', d: '#94a3b8', e: '#fde68a' },
+    stats: { maxHp: 7, moveMs: 145, attackCooldownMs: 250, attackDurationMs: 180, invulnS: 0.7, bulletSpeed: 9, passiveName: 'Shieldmaiden', passiveDesc: 'High health without sacrificing movement speed.' },
+  },
 ];
 
 // Human look (story mode). Each character gets a unique 16×16 sprite assembled from layers:
@@ -577,7 +613,17 @@ const OPEN_HELM: Layer = {
   5: '...om......mo...',
   6: '....o......o....',
 };
-const HORNED_HELM: Layer = { 0: '.ow..........wo.', 1: '.ow..oooooo..wo.', 2: '..owommmmmmowo..', 3: '...ommmmmmmmo...' };
+const HORNED_HELM: Layer = { 0: '.oa..........ao.', 1: '.oa..oooooo..ao.', 2: '..oaommmmmmoao..', 3: '...ommmmmmmmo...' };
+const WINGED_HELM: Layer = { 0: '.w............w.', 1: '.ww..oooooo..ww.', 2: '..wwommmmmmoww..', 3: '....ommmmmmo....' };
+const FEATHER_CAP: Layer = { 0: '..........a.....', 1: '.....oyyyyoa....', 2: '....oyyyyyyo....', 3: '...odddddddddo..' };
+const TOP_HAT: Layer = { 0: '.....oooooo.....', 1: '.....oddddo.....', 2: '.....oaaaao.....', 3: '...oddddddddo...' };
+const CROWN: Layer = { 0: '....a.a..a.a....', 1: '....aaaaaaaa....' };
+const SMALL_HORNS: Layer = { 0: '...a........a...', 1: '....a......a....' };
+const BLINDFOLD: Layer = { 4: '....aaaaaaaa....', 5: '...a............', 6: '..a.............' };
+const EYE_GOGGLES: Layer = { 4: '....oaaooaao....' };
+const MONOCLE: Layer = { 4: '........oao.....' };
+const MUSTACHE: Layer = { 5: '......kkkk......' };
+const APRON: Layer = { 9: '......dddd......', 10: '.....dddddd.....', 11: '.....dadadd.....', 12: '.....dddddd.....' };
 const HOOD: Layer = {
   0: '......oooo......',
   1: '.....oddddo.....',
@@ -635,6 +681,11 @@ const HUMAN_LOOKS: Record<string, HumanLook> = {
   templar: { layers: [BROAD, CROSS, HEAD, BEARD, SHORT], s: '#c68642', h: '#fbbf24', a: '#fafaf9' },
   ironclad: { layers: [BULKY, HEAD, GREAT_HELM], s: '#8d5524', h: '#374151', a: '#6b7280' },
   null: { layers: [BROAD, HEAD, SHORT, VISOR], s: '#d6d3d1', h: '#0f172a', a: '#ef4444' },
+  // new characters
+  oracle: { layers: [ROBE, HEAD, LIPS, LONG, BLINDFOLD], s: '#8d5524', h: '#1e1b4b', a: '#f0abfc' },
+  ranger: { layers: [BROAD, HEAD, BEARD, FEATHER_CAP], s: '#e0ac69', h: '#713f12', a: '#ef4444' },
+  tinker: { layers: [NEUTRAL, APRON, HEAD, MESSY, EYE_GOGGLES], s: '#c68642', h: '#57534e', a: '#fbbf24' },
+  valkyrie: { layers: [SLIM, HEAD, LIPS, LONG, WINGED_HELM], s: '#ffdbac', h: '#fcd34d', a: '#fde68a' },
 };
 
 const DEFAULT_HUMAN: HumanLook = HUMAN_LOOKS.wanderer;
@@ -648,22 +699,30 @@ function darken(hex: string, amount: number): string {
 const humanSpriteCache = new Map<string, PixelGrid>();
 
 export type Appearance = 'original' | 'human';
+export interface Look {
+  sprite: PixelGrid;
+  palette: Palette;
+}
 
-export function getCharacterLook(char: CharacterDef, appearance: Appearance): { sprite: PixelGrid; palette: Palette } {
-  if (appearance === 'original') return { sprite: char.sprite, palette: char.palette };
-  const look = HUMAN_LOOKS[char.id] ?? DEFAULT_HUMAN;
-  let sprite = humanSpriteCache.get(char.id);
+interface Clothes {
+  o: string;
+  y: string;
+  d: string;
+}
+
+function humanLook(cacheKey: string, look: HumanLook, clothes: Clothes, eyes = '#0b1330'): Look {
+  let sprite = humanSpriteCache.get(cacheKey);
   if (!sprite) {
     sprite = compose(look.layers);
-    humanSpriteCache.set(char.id, sprite);
+    humanSpriteCache.set(cacheKey, sprite);
   }
   return {
     sprite,
     palette: {
-      o: char.palette.o,
-      y: char.palette.y,
-      d: char.palette.d,
-      e: '#0b1330',
+      o: clothes.o,
+      y: clothes.y,
+      d: clothes.d,
+      e: eyes,
       s: look.s,
       h: look.h,
       k: darken(look.h, 0.35),
@@ -675,4 +734,96 @@ export function getCharacterLook(char: CharacterDef, appearance: Appearance): { 
       r: '#dc2626',
     },
   };
+}
+
+export function getCharacterLook(char: CharacterDef, appearance: Appearance): Look {
+  if (appearance === 'original') return { sprite: char.sprite, palette: char.palette };
+  const { o, y, d } = char.palette;
+  return humanLook(char.id, HUMAN_LOOKS[char.id] ?? DEFAULT_HUMAN, { o, y, d });
+}
+
+// Enemies: in human form the pink minions are women and the boss is a man.
+const ENEMY_HUMAN: HumanLook = { layers: [DRESS, HEAD, LIPS, BOB, SMALL_HORNS], s: '#fde2e4', h: '#fbcfe8', a: '#831843' };
+const ENEMY_FROZEN_HUMAN: HumanLook = { ...ENEMY_HUMAN, s: '#e0f2fe', h: '#eff6ff', a: '#1e3a5f' };
+const BOSS_HUMAN: HumanLook = { layers: [BULKY, HEAD, BEARD, SHORT, CROWN], s: '#d6d3d1', h: '#1f2937', a: '#fde047' };
+
+export type EnemyKind = 'enemy' | 'frozen' | 'boss';
+
+export function getEnemyLook(kind: EnemyKind, appearance: Appearance): Look {
+  if (appearance === 'original') {
+    if (kind === 'boss') return { sprite: BOSS_SPRITE, palette: BOSS_PALETTE };
+    return { sprite: ENEMY_SPRITE, palette: kind === 'frozen' ? ENEMY_FROZEN_PALETTE : ENEMY_PALETTE };
+  }
+  if (kind === 'boss') return humanLook('boss', BOSS_HUMAN, { o: '#450a0a', y: '#dc2626', d: '#7f1d1d' }, '#fde047');
+  if (kind === 'frozen') return humanLook('enemyFrozen', ENEMY_FROZEN_HUMAN, { o: '#1e3a5f', y: '#93c5fd', d: '#3b82f6' });
+  return humanLook('enemy', ENEMY_HUMAN, { o: '#831843', y: '#f472b6', d: '#be185d' });
+}
+
+// Story actors: the guide, the Guardian (boss) and each hero's nemesis.
+export type VillainId = 'vex' | 'kestrel' | 'hollow' | 'sorrow' | 'tick' | 'mirror' | 'grimsby' | 'ashen';
+export type ActorId = 'oren' | 'guardian' | VillainId;
+
+interface ActorDef {
+  clothes: Clothes;
+  human: HumanLook;
+  original: Look;
+}
+
+const enemyPalette = (o: string, p: string, l: string, e = '#0b1330'): Palette => ({ o, p, l, e });
+
+const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
+  oren: {
+    clothes: { o: '#0c1a3a', y: '#2563eb', d: '#1e3a8a' },
+    human: { layers: [ROBE, HEAD, BEARD, SHORT], s: '#e0ac69', h: '#e5e7eb', a: '#67e8f9' },
+    original: { sprite: PLAYER_SPRITE, palette: { o: '#0c1a3a', y: '#60a5fa', d: '#2563eb', e: '#f8fafc' } },
+  },
+  vex: {
+    clothes: { o: '#052e16', y: '#15803d', d: '#14532d' },
+    human: { layers: [DRESS, HEAD, LIPS, LONG, WIZARD_HAT], s: '#d6d3d1', h: '#0f172a', a: '#a3e635' },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#052e16', '#22c55e', '#bbf7d0') },
+  },
+  kestrel: {
+    clothes: { o: '#1c0a0a', y: '#7f1d1d', d: '#450a0a' },
+    human: { layers: [BROAD, HEAD, BEARD, OPEN_HELM], s: '#e0ac69', h: '#57534e', a: '#fca5a5' },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#450a0a', '#b91c1c', '#fecaca') },
+  },
+  hollow: {
+    clothes: { o: '#020617', y: '#1f2937', d: '#111827' },
+    human: { layers: [FLOAT, HEAD, HOOD, SHADOW_FACE], s: '#64748b', h: '#020617', a: '#ef4444' },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#020617', '#334155', '#94a3b8', '#ef4444') },
+  },
+  sorrow: {
+    clothes: { o: '#1e0b2e', y: '#4c1d95', d: '#2e1065' },
+    human: { layers: [ROBE, HEAD, LIPS, BUN], s: '#e2e8f0', h: '#a1a1aa', a: '#c4b5fd' },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#2e1065', '#7c3aed', '#ddd6fe') },
+  },
+  tick: {
+    clothes: { o: '#1c1917', y: '#b45309', d: '#78350f' },
+    human: { layers: [BROAD, HEAD, MUSTACHE, MONOCLE, TOP_HAT], s: '#ffdbac', h: '#44403c', a: '#fbbf24' },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#451a03', '#d97706', '#fde68a') },
+  },
+  grimsby: {
+    clothes: { o: '#1c1917', y: '#ca8a04', d: '#854d0e' },
+    human: { layers: [BULKY, HEAD, BEARD, MESSY], s: '#c68642', h: '#3f3f46', a: '#fde047' },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#422006', '#eab308', '#fef08a') },
+  },
+  ashen: {
+    clothes: { o: '#0c0a09', y: '#57534e', d: '#292524' },
+    human: { layers: [DRESS, HEAD, LIPS, LONG, CROWN], s: '#d6d3d1', h: '#e7e5e4', a: '#f97316' },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#1c1917', '#78716c', '#f97316') },
+  },
+};
+
+// `hero` is needed for the Mirror, which is a dark copy of whoever it is haunting.
+export function getActorLook(id: ActorId, appearance: Appearance, hero: CharacterDef): Look {
+  if (id === 'guardian') return getEnemyLook('boss', appearance);
+  if (id === 'mirror') {
+    const base = getCharacterLook(hero, appearance);
+    const palette: Palette = {};
+    for (const [key, color] of Object.entries(base.palette)) palette[key] = darken(color, 0.6);
+    palette.e = '#ef4444';
+    return { sprite: base.sprite, palette };
+  }
+  const actor = ACTORS[id];
+  return appearance === 'original' ? actor.original : humanLook(`actor:${id}`, actor.human, actor.clothes);
 }
