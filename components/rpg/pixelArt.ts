@@ -382,50 +382,297 @@ export const CHARACTERS: CharacterDef[] = [
   },
 ];
 
-// Human look (story mode). Uses the character's palette for clothing plus skin + hair.
-export const HUMAN_SPRITE: PixelGrid = buildGrid([
-  '..oooo',
-  '.ohhhh',
-  '.ohsss',
-  '.osess',
-  '.ossss',
-  '..osss',
-  '.oyyyd',
-  'oyoyyy',
-  'osoyyy',
-  '..oddo',
-  '..oddo',
-  '..ooo.'
-]);
+// Human look (story mode). Each character gets a unique 16×16 sprite assembled from layers:
+// a body build, a face, hair and gear. Presentation follows the pronouns in their description.
+// Palette keys: o outline, y/d clothing (from the character), s skin, h/k hair, e eyes,
+// a accent, m metal, v shadow, w white, l lips, r red.
+const HUMAN_SIZE = 16;
+type Layer = Record<number, string>;
 
-const HUMAN_LOOKS: Record<string, { s: string; h: string }> = {
-  wanderer: { s: '#e0ac69', h: '#4a2c17' },
-  mage: { s: '#f1c27d', h: '#e5e7eb' },
-  knight: { s: '#c68642', h: '#1f2937' },
-  scout: { s: '#ffdbac', h: '#b45309' },
-  phantom: { s: '#e2e8f0', h: '#0e7490' },
-  berserker: { s: '#d4a373', h: '#991b1b' },
-  sage: { s: '#8d5524', h: '#f8fafc' },
-  trickster: { s: '#f1c27d', h: '#7e22ce' },
-  warden: { s: '#5c3a21', h: '#111827' },
-  chronomancer: { s: '#e0ac69', h: '#134e4a' },
-  shade: { s: '#a8a29e', h: '#030712' },
-  templar: { s: '#c68642', h: '#fbbf24' },
-  drifter: { s: '#d4a373', h: '#78350f' },
-  specter: { s: '#f5f3ff', h: '#a78bfa' },
-  ironclad: { s: '#8d5524', h: '#374151' },
-  viper: { s: '#ffdbac', h: '#166534' },
-  ghost: { s: '#f8fafc', h: '#bae6fd' },
-  ember: { s: '#e0ac69', h: '#ea580c' },
-  null: { s: '#d6d3d1', h: '#0f172a' },
-  titan: { s: '#5c3a21', h: '#7c2d12' },
-  rift: { s: '#f1c27d', h: '#312e81' },
+function compose(layers: Layer[]): PixelGrid {
+  const rows: string[][] = Array.from({ length: HUMAN_SIZE }, () => Array(HUMAN_SIZE).fill('.'));
+  for (const layer of layers) {
+    for (const [y, row] of Object.entries(layer)) {
+      for (let x = 0; x < HUMAN_SIZE; x++) {
+        const ch = row[x];
+        if (ch && ch !== '.') rows[Number(y)][x] = ch;
+      }
+    }
+  }
+  return rows.map((r) => r.join(''));
+}
+
+const HEAD: Layer = {
+  2: '.....oooooo.....',
+  3: '....osssssso....',
+  4: '....osesseso....',
+  5: '....osssssso....',
+  6: '.....osssso.....',
+  7: '......osso......',
 };
+
+// Builds
+const BROAD: Layer = {
+  8: '..oyyyyyyyyyyo..',
+  9: '.oyyoyyyyyyoyyo.',
+  10: '.oyyoyyyyyyoyyo.',
+  11: '.oyyoddddddoyyo.',
+  12: '.ossoyyyyyyosso.',
+  13: '....oddooddo....',
+  14: '....oddooddo....',
+  15: '...oooo..oooo...',
+};
+const BULKY: Layer = {
+  8: '.ommmyyyyyymmmo.',
+  9: '.ommoyyyyyyommo.',
+  10: 'oyyyoyyyyyyoyyyo',
+  11: 'oyyyoddddddoyyyo',
+  12: 'osssoyyyyyyossso',
+  13: '...odddoodddo...',
+  14: '...odddoodddo...',
+  15: '..ooooo..ooooo..',
+};
+const SLIM: Layer = {
+  8: '...oyyyyyyyyo...',
+  9: '..oyoyyyyyyoyo..',
+  10: '..oyoyyyyyyoyo..',
+  11: '..oyooyyyyooyo..',
+  12: '..osoddddddoso..',
+  13: '....oddooddo....',
+  14: '....oddooddo....',
+  15: '...oooo..oooo...',
+};
+const DRESS: Layer = {
+  8: '...oyyyyyyyyo...',
+  9: '..oyoyyyyyyoyo..',
+  10: '..oyoyyyyyyoyo..',
+  11: '..oyooyyyyooyo..',
+  12: '..osoyyyyyyoso..',
+  13: '...oyyyyyyyyo...',
+  14: '..oddddddddddo..',
+  15: '.....oo..oo.....',
+};
+const NEUTRAL: Layer = {
+  8: '...oyyyyyyyyo...',
+  9: '..oyoyyyyyyoyo..',
+  10: '..oyoyyyyyyoyo..',
+  11: '..oyoddddddoyo..',
+  12: '..osoyyyyyyoso..',
+  13: '....oddooddo....',
+  14: '....oddooddo....',
+  15: '...oooo..oooo...',
+};
+const ROBE: Layer = {
+  8: '...oyyyyyyyyo...',
+  9: '..oyyoyddyoyyo..',
+  10: '..oyyoyddyoyyo..',
+  11: '..ossoyddyosso..',
+  12: '...oyyyddyyyo...',
+  13: '...oyyyddyyyo...',
+  14: '..oyyyyddyyyyo..',
+  15: '..oooooooooooo..',
+};
+const FLOAT: Layer = {
+  8: '...oyyyyyyyyo...',
+  9: '..oyoyyyyyyoyo..',
+  10: '..oyoyyyyyyoyo..',
+  11: '..osoyyyyyyoso..',
+  12: '...oyyyyyyyyo...',
+  13: '....oyyyyyyo....',
+  14: '.....oyo.oyo....',
+  15: '......o...o.....',
+};
+
+// Face details
+const LIPS: Layer = { 5: '.......ll.......' };
+const BEARD: Layer = { 5: '.....k....k.....', 6: '.....khhhhk.....', 7: '......khhk......' };
+const BARE_ARMS: Layer = { 9: '..ss........ss..', 10: '..ss........ss..', 11: '..ss........ss..' };
+const MARKS: Layer = { 5: '......a..a......' };
+
+// Hair
+const SHORT: Layer = { 1: '.....kkkkkk.....', 2: '....khhhhhhk....', 3: '....khhhhssk....' };
+const SPIKY: Layer = { 0: '....k..kk..k....', 1: '...khkkhhkkhk...', 2: '...khhhhhhhhk...', 3: '....khhhhhhk....' };
+const LONG: Layer = {
+  1: '.....kkkkkk.....',
+  2: '....khhhhhhk....',
+  3: '...khhhsshhhk...',
+  4: '...kh......hk...',
+  5: '...kh......hk...',
+  6: '...kh......hk...',
+  7: '...khh....hhk...',
+  8: '...khh....hhk...',
+  9: '....kh....hk....',
+};
+const PONYTAIL: Layer = {
+  1: '.....kkkkkk.....',
+  2: '....khhhhhhkk...',
+  3: '....khhhhhhkhk..',
+  4: '...........khk..',
+  5: '............hk..',
+  6: '............hk..',
+  7: '............k...',
+};
+const BUN: Layer = { 0: '......kkkk......', 1: '.....khhhhk.....', 2: '....khhhhhhk....', 3: '....khhsshhk....', 4: '....k......k....' };
+const BOB: Layer = {
+  1: '.....kkkkkk.....',
+  2: '....khhhhhhk....',
+  3: '...khhhhhhhhk...',
+  4: '...kh......hk...',
+  5: '...kh......hk...',
+  6: '...khh....hhk...',
+  7: '....kk....kk....',
+};
+const PIGTAILS: Layer = {
+  1: '.....kkkkkk.....',
+  2: '....khhhhhhk....',
+  3: '....khhhhhhk....',
+  4: '..kh........hk..',
+  5: '.khh........hhk.',
+  6: '.khh........hhk.',
+  7: '..k..........k..',
+};
+const MEDIUM: Layer = {
+  1: '.....kkkkkk.....',
+  2: '....khhhhhhk....',
+  3: '...khhhhhssk....',
+  4: '...kh......k....',
+  5: '...kh...........',
+  6: '....k...........',
+};
+const MESSY: Layer = {
+  0: '......k..k......',
+  1: '....kkhkkhkk....',
+  2: '...khhhhhhhhk...',
+  3: '...khhhshhhhk...',
+  4: '...kh......hk...',
+  5: '....k......k....',
+};
+
+// Gear
+const WIZARD_HAT: Layer = { 0: '.......oyo......', 1: '......oyyyo.....', 2: '.....oaaaaao....', 3: '..oyyyyyyyyyyo..' };
+const PLUMED_HELM: Layer = {
+  0: '......aaaa......',
+  1: '.....oooooo.....',
+  2: '....ommmmmmo....',
+  3: '...ommmmmmmmo...',
+  4: '...omoooooomo...',
+  5: '...ommmmmmmmo...',
+  6: '....ommmmmmo....',
+  7: '.....oooooo.....',
+};
+const GREAT_HELM: Layer = {
+  1: '.....oooooo.....',
+  2: '....ommmmmmo....',
+  3: '...ommmmmmmmo...',
+  4: '...omoooooomo...',
+  5: '...ommmoommmo...',
+  6: '...ommmmmmmmo...',
+  7: '....oooooooo....',
+};
+const OPEN_HELM: Layer = {
+  1: '.....oooooo.....',
+  2: '....ommmmmmo....',
+  3: '...ommmmmmmmo...',
+  4: '...om..mm..mo...',
+  5: '...om......mo...',
+  6: '....o......o....',
+};
+const HORNED_HELM: Layer = { 0: '.ow..........wo.', 1: '.ow..oooooo..wo.', 2: '..owommmmmmowo..', 3: '...ommmmmmmmo...' };
+const HOOD: Layer = {
+  0: '......oooo......',
+  1: '.....oddddo.....',
+  2: '....oddddddo....',
+  3: '...oddddddddo...',
+  4: '...od......do...',
+  5: '...od......do...',
+  6: '...odd....ddo...',
+  7: '...oddd..dddo...',
+  8: '..oddddddddddo..',
+};
+const SHADOW_FACE: Layer = { 4: '.....vavvav.....', 5: '.....vvvvvv.....', 6: '......vvvv......' };
+const FACE_WRAP: Layer = { 5: '.....aaaaaa.....', 6: '......aaaa......' };
+const HALF_MASK: Layer = { 3: '.....www........', 4: '.....wew........', 5: '.....www........', 6: '......w.........' };
+const SCARF: Layer = { 7: '....oaaaaaao....', 8: '...oaaaaaaaao...', 9: '.........oao....', 10: '.........oao....' };
+const JESTER_HAT: Layer = { 0: '.a............a.', 1: '.oyo........odo.', 2: '..oyyo....oddo..', 3: '...oyyyyddddo...' };
+const DOMINO: Layer = { 4: '.....vwvvwv.....' };
+const GOGGLES: Layer = { 3: '...oaaommoaao...' };
+const BANDANA: Layer = { 3: '...oaaaaaaaao...', 4: '..aa............', 5: '..a.............' };
+const CIRCLET: Layer = { 3: '....mmmaammm....' };
+const BRIM_HAT: Layer = { 0: '.....oooooo.....', 1: '....oddddddo....', 2: '....oaaaaaao....', 3: 'oddddddddddddddo' };
+const FLAME_TIPS: Layer = { 0: '....a.a..a.a....' };
+const VISOR: Layer = { 4: '....aaaaaaaa....' };
+const CROSS: Layer = { 9: '.......rr.......', 10: '......rrrr......', 11: '.......rr.......' };
+
+interface HumanLook {
+  layers: Layer[];
+  s: string; // skin
+  h: string; // hair
+  a: string; // accent
+}
+
+const HUMAN_LOOKS: Record<string, HumanLook> = {
+  // they
+  wanderer: { layers: [NEUTRAL, HEAD, MESSY, SCARF], s: '#e0ac69', h: '#4a2c17', a: '#dc2626' },
+  phantom: { layers: [NEUTRAL, HEAD, MEDIUM, HALF_MASK], s: '#e2e8f0', h: '#0e7490', a: '#f0f9ff' },
+  trickster: { layers: [NEUTRAL, HEAD, JESTER_HAT, DOMINO], s: '#f1c27d', h: '#7e22ce', a: '#facc15' },
+  shade: { layers: [ROBE, HEAD, HOOD, SHADOW_FACE], s: '#a8a29e', h: '#030712', a: '#a5f3fc' },
+  specter: { layers: [FLOAT, HEAD, MEDIUM], s: '#f5f3ff', h: '#a78bfa', a: '#ede9fe' },
+  ghost: { layers: [NEUTRAL, HEAD, HOOD, FACE_WRAP], s: '#f8fafc', h: '#bae6fd', a: '#0369a1' },
+  titan: { layers: [BULKY, HEAD, HORNED_HELM], s: '#5c3a21', h: '#7c2d12', a: '#fed7aa' },
+  // she
+  mage: { layers: [DRESS, HEAD, LIPS, LONG, WIZARD_HAT], s: '#f1c27d', h: '#e5e7eb', a: '#fde047' },
+  scout: { layers: [SLIM, HEAD, LIPS, PIGTAILS, BANDANA], s: '#ffdbac', h: '#b45309', a: '#facc15' },
+  sage: { layers: [ROBE, HEAD, LIPS, BUN], s: '#8d5524', h: '#f8fafc', a: '#fef3c7' },
+  chronomancer: { layers: [SLIM, HEAD, LIPS, BOB, GOGGLES], s: '#e0ac69', h: '#134e4a', a: '#5eead4' },
+  drifter: { layers: [SLIM, HEAD, LIPS, BOB, BRIM_HAT], s: '#d4a373', h: '#78350f', a: '#fbbf24' },
+  viper: { layers: [SLIM, HEAD, LIPS, MARKS, PONYTAIL], s: '#ffdbac', h: '#166534', a: '#a3e635' },
+  ember: { layers: [SLIM, HEAD, LIPS, LONG, FLAME_TIPS], s: '#e0ac69', h: '#ea580c', a: '#fde047' },
+  rift: { layers: [DRESS, HEAD, LIPS, LONG, CIRCLET], s: '#f1c27d', h: '#312e81', a: '#22d3ee' },
+  // he
+  knight: { layers: [BROAD, HEAD, PLUMED_HELM], s: '#c68642', h: '#1f2937', a: '#38bdf8' },
+  berserker: { layers: [BROAD, BARE_ARMS, HEAD, BEARD, SPIKY], s: '#d4a373', h: '#991b1b', a: '#fde047' },
+  warden: { layers: [BULKY, HEAD, BEARD, OPEN_HELM], s: '#5c3a21', h: '#111827', a: '#bfdbfe' },
+  templar: { layers: [BROAD, CROSS, HEAD, BEARD, SHORT], s: '#c68642', h: '#fbbf24', a: '#fafaf9' },
+  ironclad: { layers: [BULKY, HEAD, GREAT_HELM], s: '#8d5524', h: '#374151', a: '#6b7280' },
+  null: { layers: [BROAD, HEAD, SHORT, VISOR], s: '#d6d3d1', h: '#0f172a', a: '#ef4444' },
+};
+
+const DEFAULT_HUMAN: HumanLook = HUMAN_LOOKS.wanderer;
+
+function darken(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (shift: number) => Math.round(((n >> shift) & 255) * (1 - amount));
+  return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`;
+}
+
+const humanSpriteCache = new Map<string, PixelGrid>();
 
 export type Appearance = 'original' | 'human';
 
 export function getCharacterLook(char: CharacterDef, appearance: Appearance): { sprite: PixelGrid; palette: Palette } {
   if (appearance === 'original') return { sprite: char.sprite, palette: char.palette };
-  const look = HUMAN_LOOKS[char.id] ?? { s: '#e0ac69', h: '#4a2c17' };
-  return { sprite: HUMAN_SPRITE, palette: { ...char.palette, e: '#0b1330', s: look.s, h: look.h } };
+  const look = HUMAN_LOOKS[char.id] ?? DEFAULT_HUMAN;
+  let sprite = humanSpriteCache.get(char.id);
+  if (!sprite) {
+    sprite = compose(look.layers);
+    humanSpriteCache.set(char.id, sprite);
+  }
+  return {
+    sprite,
+    palette: {
+      o: char.palette.o,
+      y: char.palette.y,
+      d: char.palette.d,
+      e: '#0b1330',
+      s: look.s,
+      h: look.h,
+      k: darken(look.h, 0.35),
+      a: look.a,
+      m: '#cbd5e1',
+      v: '#0b1330',
+      w: '#f8fafc',
+      l: '#be185d',
+      r: '#dc2626',
+    },
+  };
 }

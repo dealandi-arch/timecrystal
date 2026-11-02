@@ -619,7 +619,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const px = ppos.x;
       const py = ppos.y;
       const look = getCharacterLook(charDef, appearanceRef.current);
-      const playerSprite = getSpriteCanvas(`player:${characterId}:${appearanceRef.current}`, look.sprite, look.palette, PIXEL_SIZE);
+      const playerSprite = getSpriteCanvas(`player:${characterId}:${appearanceRef.current}`, look.sprite, look.palette, TILE / look.sprite.length);
       const walkBob = p.moving ? Math.sin(time * 16) * 1.5 : 0;
       ctx.drawImage(playerSprite, px, py + walkBob);
       const flashing = p.invuln > 0 && Math.floor(time * 10) % 2 === 0;
@@ -767,11 +767,14 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   );
 }
 
-const PREVIEW_PS = 6;
+// Largest whole-pixel scale that fits ~80px (12-grid sprites → 6px, 16-grid → 5px)
+const PREVIEW_MAX = 80;
 
 function SpritePreview({ char, appearance = 'original' }: { char: CharacterDef; appearance?: Appearance }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
-  const size = 12 * PREVIEW_PS;
+  const look = getCharacterLook(char, appearance);
+  const ps = Math.floor(PREVIEW_MAX / look.sprite.length);
+  const size = look.sprite.length * ps;
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
@@ -779,9 +782,8 @@ function SpritePreview({ char, appearance = 'original' }: { char: CharacterDef; 
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, size, size);
-    const look = getCharacterLook(char, appearance);
-    ctx.drawImage(getSpriteCanvas(`preview:${char.id}:${appearance}`, look.sprite, look.palette, PREVIEW_PS), 0, 0);
-  }, [char, appearance, size]);
+    ctx.drawImage(getSpriteCanvas(`preview:${char.id}:${appearance}`, look.sprite, look.palette, ps), 0, 0);
+  }, [char, appearance, look, ps, size]);
   return <canvas ref={ref} width={size} height={size} style={{ imageRendering: 'pixelated', display: 'block', margin: '0 auto' }} />;
 }
 
