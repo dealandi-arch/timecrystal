@@ -1,0 +1,32 @@
+Session,No,Prompt,Category
+Session 1 (2026-06-28),1,"first, research time crystal",Research
+Session 1 (2026-06-28),2,"let's make a game",Feature
+Session 1 (2026-06-28),3,"I'll state the game concept...",Feature
+Session 1 (2026-06-28),4,"make GUNS",Feature
+Session 1 (2026-06-28),5,"make a stage information and only ones that can be edited",Feature
+Session 1 (2026-06-28),6,"i edited",Follow-up
+Session 1 (2026-06-28),7,"make it so that i can put json in the code",Feature
+Session 1 (2026-06-28),8,"i updated folder for git https://github.com/dealandi-arch/timecrystal can you set up and commit to github",Git / Setup
+Session 1 (2026-06-28),9,"make every thing in the game beautiful change the costume of everything, make effects, sound effects, make pixel art",UI / Feature
+Session 1 (2026-06-28),10,"change the song into brazilian phonk",Feature
+Session 1 (2026-06-28),11,"with lyrics, instrumental like ZXKAI's",Feature
+Session 1 (2026-06-28),12,"what can we improve here",Question
+Session 1 (2026-06-28),13,"nah, i want 11 choice of what should be added and not fixed",Question
+Session 1 (2026-06-28),14,"Weapon variety — pickups that swap your gun for a spread shot, rapid-fire, or a piercing sniper shot found hidden...",Feature
+Session 1 (2026-06-28),15,"can't make profiles even when using supabase",Bug Fix
+Session 1 (2026-06-28),16,"make it that levels that used helps can't be recorded as a world record",Feature
+Session 1 (2026-06-28),17,"make it available for everybody to create a new level without using js paste in here, just when they click save.",Feature
+Session 1 (2026-06-28),18,"make the game frame bigger, make the graphic more beautiful",UI
+Session 2 (2026-07-19),1,"what to add about this project",Project Memory
+Session 2 (2026-07-19),2,"make the character choosable",Feature
+Session 2 (2026-07-19),3,"add more characters let there have 21 characters with unique designs. Unique powers, make the description longer use pronouns in character descriptions too",Feature
+Session 2 (2026-07-19),4,"make a button to activate the character's power, and when activated, it can be used for the rest of the journey, but you need to activate first.",Feature
+Session 2 (2026-07-19),5,"bring the restart button back don't save progress when you leave the website",Feature / Bug Fix
+Session 2 (2026-07-19),6,"list the character names with their abilities, with number in the exact order of the game's choiceboard",Question
+Session 2 (2026-07-19),7,"what's invulnerability window",Question
+Session 2 (2026-07-19),8,"make the name of the characters in the characters choiceboard on just below the picture of the character., any other things keep same",UI
+Session 2 (2026-07-19),9,"no I mean like right below the character, same layer, that when I capture the screen then I can see the whole name and the character's whole body.",UI
+Session 2 (2026-07-19),10,"make different backgrounds for different levels",Feature
+Session 2 (2026-07-19),11,"change font change the pagebackground delete the block undo everything back except the in-game backgrounds that are different, keep the in game pixel backgrounds",UI
+Session 2 (2026-07-19),12,"so what's are all programming languages used in this project so far",Question
+Session 2 (2026-07-19),13,"can you list all previous prompts we had used for this project then save in csv files?",Question
