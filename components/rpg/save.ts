@@ -1,3 +1,5 @@
+import type { Appearance } from './pixelArt';
+
 export type AbilityId = 'navigate' | 'killAll' | 'invisibility' | 'iceAge';
 
 export interface Save {
@@ -7,10 +9,13 @@ export interface Save {
   crystalsCollected: number;
   characterId: string | null;
   powerActivated: boolean;
+  // Story mode only
+  appearance: Appearance;
+  storySeen: number;
 }
 
 export function defaultSave(): Save {
-  return { ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0, characterId: null, powerActivated: false };
+  return { ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0, characterId: null, powerActivated: false, appearance: 'original', storySeen: 0 };
 }
 
 // No persistence — progress exists only while the page is open.

@@ -9,6 +9,9 @@ export default function PlayPage() {
       </Link>
       <h1>Time Crystal</h1>
       <p>Clear every enemy, uncover the secret passages, and predict where the time crystal will move next.</p>
+      <p>
+        Want the full tale? <Link href="/story">Play story mode</Link>
+      </p>
       <TimeCrystalRPG />
     </main>
   );

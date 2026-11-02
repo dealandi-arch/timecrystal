@@ -8,6 +8,7 @@ export default function Home() {
         <p>Welcome to your new Next.js website. Start building your game hub here.</p>
         <div className="actions">
           <Link href="/play">Play the game</Link>
+          <Link href="/story">Story mode</Link>
           <Link href="/editor">Stage editor</Link>
           <Link href="#features">Explore features</Link>
         </div>

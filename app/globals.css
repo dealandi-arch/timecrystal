@@ -712,3 +712,100 @@ body {
   border-top: 1px solid rgba(148, 163, 184, 0.2);
   padding-top: 0.5rem;
 }
+
+/* Story mode */
+.look-btn:not(:disabled) {
+  background: #f59e0b;
+  color: #1c1917;
+}
+
+.look-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin: 0.5rem auto 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.look-toggle button {
+  padding: 0.4rem 1.1rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.look-toggle button.active {
+  background: #38bdf8;
+  color: #0f172a;
+}
+
+.story-box {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  max-width: 640px;
+  min-height: 8rem;
+  margin: 1.5rem auto 0;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.7);
+  border: 2px solid rgba(56, 189, 248, 0.35);
+}
+
+.story-box.story-guardian {
+  border-color: rgba(220, 38, 38, 0.6);
+}
+
+.story-box.story-narrator {
+  justify-content: center;
+  text-align: center;
+  font-style: italic;
+}
+
+.story-portrait {
+  flex: 0 0 auto;
+}
+
+.story-speaker {
+  font-weight: 800;
+  margin-bottom: 0.35rem;
+  color: #67e8f9;
+}
+
+.story-guardian .story-speaker {
+  color: #f87171;
+}
+
+.story-text p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.story-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 640px;
+  margin: 1rem auto 0;
+}
+
+.story-actions .ability-btn {
+  margin-left: 0;
+}
+
+.story-progress {
+  margin-right: auto;
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+.story-skip:not(:disabled) {
+  background: rgba(148, 163, 184, 0.3);
+  color: inherit;
+}

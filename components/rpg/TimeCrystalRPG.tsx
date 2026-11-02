@@ -17,9 +17,12 @@ import {
   FLOOR_A,
   FLOOR_B,
   WALL,
+  type Appearance,
   type Palette,
+  getCharacterLook,
   getSpriteCanvas
 } from './pixelArt';
+import { SPEAKER_NAMES, STORY_CHAPTERS, STORY_EPILOGUE, type StoryChapter } from './story';
 import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
 import { useProfile } from '../profile/ProfileContext';
@@ -249,14 +252,21 @@ interface LevelRunnerProps {
   sound: SoundEngine;
   characterId: string;
   theme: LevelTheme;
+  appearance: Appearance;
+  displayName?: string;
+  onToggleAppearance?: () => void;
   onLevelComplete: (stats: LevelRunStats) => void;
   onAbilityUsed: () => void;
   onPowerActivated: () => void;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, onLevelComplete, onAbilityUsed, onPowerActivated }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
+
+  // Ref so the game loop picks up appearance changes without restarting the level
+  const appearanceRef = useRef(appearance);
+  appearanceRef.current = appearance;
 
   // Ref updated every render so the game loop always reads the latest value
   const powerActiveRef = useRef(save.powerActivated);
@@ -608,8 +618,8 @@ function LevelRunner({ level, save, sound, characterId, theme, onLevelComplete, 
       const ppos = entityPixelPos(p);
       const px = ppos.x;
       const py = ppos.y;
-      const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
-      const playerSprite = getSpriteCanvas(`player:${characterId}`, charDef.sprite, charDef.palette, PIXEL_SIZE);
+      const look = getCharacterLook(charDef, appearanceRef.current);
+      const playerSprite = getSpriteCanvas(`player:${characterId}:${appearanceRef.current}`, look.sprite, look.palette, PIXEL_SIZE);
       const walkBob = p.moving ? Math.sin(time * 16) * 1.5 : 0;
       ctx.drawImage(playerSprite, px, py + walkBob);
       const flashing = p.invuln > 0 && Math.floor(time * 10) % 2 === 0;
@@ -701,9 +711,14 @@ function LevelRunner({ level, save, sound, characterId, theme, onLevelComplete, 
   return (
     <div className="rpg-shell">
       <div className="rpg-hud">
-        <span>{level.name}</span>
+        <span>{displayName ?? level.name}</span>
         <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, effectiveMaxHp - hp))}</span>
         <span>Enemies left: {enemiesLeft}</span>
+        {onToggleAppearance && (
+          <button className="ability-btn look-btn" onClick={() => { sound.playMenuClick(); onToggleAppearance(); }}>
+            Look: {appearance === 'human' ? 'Human' : 'Original'}
+          </button>
+        )}
         <button
           className="ability-btn power-btn"
           disabled={save.powerActivated}
@@ -754,7 +769,7 @@ function LevelRunner({ level, save, sound, characterId, theme, onLevelComplete, 
 
 const PREVIEW_PS = 6;
 
-function SpritePreview({ char }: { char: CharacterDef }) {
+function SpritePreview({ char, appearance = 'original' }: { char: CharacterDef; appearance?: Appearance }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const size = 12 * PREVIEW_PS;
   useEffect(() => {
@@ -764,21 +779,99 @@ function SpritePreview({ char }: { char: CharacterDef }) {
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(getSpriteCanvas(`preview:${char.id}`, char.sprite, char.palette, PREVIEW_PS), 0, 0);
-  }, [char, size]);
+    const look = getCharacterLook(char, appearance);
+    ctx.drawImage(getSpriteCanvas(`preview:${char.id}:${appearance}`, look.sprite, look.palette, PREVIEW_PS), 0, 0);
+  }, [char, appearance, size]);
   return <canvas ref={ref} width={size} height={size} style={{ imageRendering: 'pixelated', display: 'block', margin: '0 auto' }} />;
 }
 
-function CharacterSelectScreen({ onChoose }: { onChoose: (id: string) => void }) {
+function AppearanceToggle({ appearance, onChange }: { appearance: Appearance; onChange: (a: Appearance) => void }) {
+  return (
+    <div className="look-toggle" role="group" aria-label="Character look">
+      <button className={appearance === 'original' ? 'active' : ''} onClick={() => onChange('original')}>
+        Original
+      </button>
+      <button className={appearance === 'human' ? 'active' : ''} onClick={() => onChange('human')}>
+        Human
+      </button>
+    </div>
+  );
+}
+
+function StoryScene({
+  chapter,
+  char,
+  appearance,
+  onAppearanceChange,
+  onDone,
+  doneLabel
+}: {
+  chapter: StoryChapter;
+  char: CharacterDef;
+  appearance: Appearance;
+  onAppearanceChange: (a: Appearance) => void;
+  onDone: () => void;
+  doneLabel: string;
+}) {
+  const [index, setIndex] = useState(0);
+  const line = chapter.lines[index];
+  const isLast = index === chapter.lines.length - 1;
+  const speakerName = line.speaker === 'hero' ? char.name : SPEAKER_NAMES[line.speaker];
+  const text = line.text.split('{name}').join(char.name);
+
+  function advance() {
+    if (isLast) onDone();
+    else setIndex(index + 1);
+  }
+
+  return (
+    <div className="ability-select story-scene">
+      <h1>{chapter.title}</h1>
+      <AppearanceToggle appearance={appearance} onChange={onAppearanceChange} />
+      <div className={`story-box story-${line.speaker}`}>
+        {line.speaker === 'hero' && (
+          <div className="story-portrait">
+            <SpritePreview char={char} appearance={appearance} />
+          </div>
+        )}
+        <div className="story-text">
+          {speakerName && <div className="story-speaker">{speakerName}</div>}
+          <p>{text}</p>
+        </div>
+      </div>
+      <div className="story-actions">
+        <span className="story-progress">{index + 1} / {chapter.lines.length}</span>
+        <button className="ability-btn story-skip" onClick={onDone}>Skip</button>
+        <button className="ability-btn" onClick={advance}>{isLast ? doneLabel : 'Next ▸'}</button>
+      </div>
+    </div>
+  );
+}
+
+function CharacterSelectScreen({
+  onChoose,
+  appearance,
+  onAppearanceChange
+}: {
+  onChoose: (id: string) => void;
+  appearance?: Appearance;
+  onAppearanceChange?: (a: Appearance) => void;
+}) {
   return (
     <div className="ability-select">
       <h1>Choose Your Character</h1>
       <p>Pick who travels through time. This choice is yours to keep.</p>
+      {appearance && onAppearanceChange && (
+        <>
+          <p>Story mode lets you switch between the original look and a human look at any time.</p>
+          <AppearanceToggle appearance={appearance} onChange={onAppearanceChange} />
+        </>
+      )}
       <div className="ability-grid">
         {CHARACTERS.map((c) => (
           <button key={c.id} className="ability-card" onClick={() => onChoose(c.id)}>
             <div className="char-portrait">
-              <SpritePreview char={c} />
+              <SpritePreview char={c} appearance={appearance} />
               <div className="char-portrait-name">{c.name}</div>
             </div>
             <p className="char-desc">{c.description}</p>
@@ -808,10 +901,10 @@ function AbilitySelectScreen({ onChoose }: { onChoose: (id: AbilityId) => void }
   );
 }
 
-function FinaleScreen({ onRestart }: { onRestart: () => void }) {
+function FinaleScreen({ onRestart, story }: { onRestart: () => void; story?: boolean }) {
   return (
     <div className="ability-select">
-      <h1>Time Crystal Restored</h1>
+      <h1>{story ? 'The End' : 'Time Crystal Restored'}</h1>
       <p>All eleven shards are yours. The timeline holds.</p>
       <button className="ability-card" onClick={onRestart}>
         Play again
@@ -822,7 +915,7 @@ function FinaleScreen({ onRestart }: { onRestart: () => void }) {
 
 const MUTE_STORAGE_KEY = 'timeCrystalMuted';
 
-export default function TimeCrystalRPG() {
+export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' | 'story' }) {
   const [save, setSave] = useState<Save | null>(null);
   const [muted, setMutedFlag] = useState(false);
   const soundRef = useRef<SoundEngine | null>(null);
@@ -859,10 +952,21 @@ export default function TimeCrystalRPG() {
     window.localStorage.setItem(MUTE_STORAGE_KEY, String(next));
   }
 
+  const isStory = mode === 'story';
+  const storyChar = CHARACTERS.find((c) => c.id === save?.characterId) ?? CHARACTERS[0];
+
+  function setAppearance(appearance: Appearance) {
+    if (!save) return;
+    sound.playMenuClick();
+    updateSave({ ...save, appearance });
+  }
+
   let body: ReactNode = null;
   if (save && save.characterId === null) {
     body = (
       <CharacterSelectScreen
+        appearance={isStory ? save.appearance : undefined}
+        onAppearanceChange={isStory ? setAppearance : undefined}
         onChoose={(id) => {
           sound.resume();
           sound.playMenuClick();
@@ -880,16 +984,48 @@ export default function TimeCrystalRPG() {
         }}
       />
     );
+  } else if (save && isStory && save.currentLevel > TOTAL_LEVELS && save.storySeen <= TOTAL_LEVELS) {
+    body = (
+      <StoryScene
+        key="epilogue"
+        chapter={STORY_EPILOGUE}
+        char={storyChar}
+        appearance={save.appearance}
+        onAppearanceChange={setAppearance}
+        doneLabel="Finish"
+        onDone={() => {
+          sound.playMenuClick();
+          updateSave({ ...save, storySeen: TOTAL_LEVELS + 1 });
+        }}
+      />
+    );
   } else if (save && save.currentLevel > TOTAL_LEVELS) {
     body = (
       <FinaleScreen
-        onRestart={() => updateSave({ ability: null, abilityUsed: false, currentLevel: 1, crystalsCollected: 0, characterId: null, powerActivated: false })}
+        story={isStory}
+        onRestart={() => updateSave({ ...defaultSave(), appearance: save.appearance })}
+      />
+    );
+  } else if (save && isStory && save.storySeen < save.currentLevel && STORY_CHAPTERS[save.currentLevel - 1]) {
+    body = (
+      <StoryScene
+        key={save.currentLevel}
+        chapter={STORY_CHAPTERS[save.currentLevel - 1]}
+        char={storyChar}
+        appearance={save.appearance}
+        onAppearanceChange={setAppearance}
+        doneLabel="Begin ▸"
+        onDone={() => {
+          sound.playMenuClick();
+          updateSave({ ...save, storySeen: save.currentLevel });
+        }}
       />
     );
   } else if (save) {
     const level = getEffectiveLevel(save.currentLevel);
     if (level) {
       const theme = LEVEL_THEMES[Math.min(level.id - 1, LEVEL_THEMES.length - 1)];
+      const chapter = isStory ? STORY_CHAPTERS[level.id - 1] : undefined;
       body = (
         <div>
           <div className="journey-bar">
@@ -907,6 +1043,9 @@ export default function TimeCrystalRPG() {
             sound={sound}
             characterId={save.characterId ?? 'wanderer'}
             theme={theme}
+            appearance={isStory ? save.appearance : 'original'}
+            displayName={chapter?.title}
+            onToggleAppearance={isStory ? () => updateSave({ ...save, appearance: save.appearance === 'human' ? 'original' : 'human' }) : undefined}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}

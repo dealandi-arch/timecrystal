@@ -381,3 +381,51 @@ export const CHARACTERS: CharacterDef[] = [
     stats: { maxHp: 6, moveMs: 130, attackCooldownMs: 220, attackDurationMs: 165, invulnS: 0.85, bulletSpeed: 11, passiveName: 'Harmonic', passiveDesc: 'Every stat is improved above the baseline simultaneously.' },
   },
 ];
+
+// Human look (story mode). Uses the character's palette for clothing plus skin + hair.
+export const HUMAN_SPRITE: PixelGrid = buildGrid([
+  '..oooo',
+  '.ohhhh',
+  '.ohsss',
+  '.osess',
+  '.ossss',
+  '..osss',
+  '.oyyyd',
+  'oyoyyy',
+  'osoyyy',
+  '..oddo',
+  '..oddo',
+  '..ooo.'
+]);
+
+const HUMAN_LOOKS: Record<string, { s: string; h: string }> = {
+  wanderer: { s: '#e0ac69', h: '#4a2c17' },
+  mage: { s: '#f1c27d', h: '#e5e7eb' },
+  knight: { s: '#c68642', h: '#1f2937' },
+  scout: { s: '#ffdbac', h: '#b45309' },
+  phantom: { s: '#e2e8f0', h: '#0e7490' },
+  berserker: { s: '#d4a373', h: '#991b1b' },
+  sage: { s: '#8d5524', h: '#f8fafc' },
+  trickster: { s: '#f1c27d', h: '#7e22ce' },
+  warden: { s: '#5c3a21', h: '#111827' },
+  chronomancer: { s: '#e0ac69', h: '#134e4a' },
+  shade: { s: '#a8a29e', h: '#030712' },
+  templar: { s: '#c68642', h: '#fbbf24' },
+  drifter: { s: '#d4a373', h: '#78350f' },
+  specter: { s: '#f5f3ff', h: '#a78bfa' },
+  ironclad: { s: '#8d5524', h: '#374151' },
+  viper: { s: '#ffdbac', h: '#166534' },
+  ghost: { s: '#f8fafc', h: '#bae6fd' },
+  ember: { s: '#e0ac69', h: '#ea580c' },
+  null: { s: '#d6d3d1', h: '#0f172a' },
+  titan: { s: '#5c3a21', h: '#7c2d12' },
+  rift: { s: '#f1c27d', h: '#312e81' },
+};
+
+export type Appearance = 'original' | 'human';
+
+export function getCharacterLook(char: CharacterDef, appearance: Appearance): { sprite: PixelGrid; palette: Palette } {
+  if (appearance === 'original') return { sprite: char.sprite, palette: char.palette };
+  const look = HUMAN_LOOKS[char.id] ?? { s: '#e0ac69', h: '#4a2c17' };
+  return { sprite: HUMAN_SPRITE, palette: { ...char.palette, e: '#0b1330', s: look.s, h: look.h } };
+}
