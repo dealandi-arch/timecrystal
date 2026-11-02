@@ -27,6 +27,8 @@ const HERO_X = 150;
 const OTHER_X = 570;
 const ENTER_S = 0.55;
 const CHARS_PER_S = 48;
+const AUTO_HOLD_MS = 1400;
+const AUTO_HOLD_PER_CHAR_MS = 18;
 
 export interface StageTheme {
   floorAPalette: Palette;
@@ -43,6 +45,8 @@ interface StoryStageProps {
   onAppearanceChange: (a: Appearance) => void;
   onDone: () => void;
   doneLabel: string;
+  // Animation mode: lines advance by themselves after a short pause.
+  autoPlay?: boolean;
 }
 
 function actorFor(speaker: Speaker, nemesis: ActorId): ActorId | null {
@@ -79,7 +83,7 @@ function drawDiamond(c: CanvasRenderingContext2D, x: number, y: number, size: nu
   c.shadowBlur = 0;
 }
 
-export default function StoryStage({ chapterIndex, hero, appearance, theme, sound, onAppearanceChange, onDone, doneLabel }: StoryStageProps) {
+export default function StoryStage({ chapterIndex, hero, appearance, theme, sound, onAppearanceChange, onDone, doneLabel, autoPlay = false }: StoryStageProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState(0);
@@ -109,8 +113,11 @@ export default function StoryStage({ chapterIndex, hero, appearance, theme, soun
     flash: 0,
     particles: [] as Particle[],
     shownChars: 0,
+    typedAt: 0,
+    autoPlay,
   });
   live.current.appearance = appearance;
+  live.current.autoPlay = autoPlay;
 
   // New line: reset typewriter and trigger entrances.
   useEffect(() => {
@@ -119,6 +126,7 @@ export default function StoryStage({ chapterIndex, hero, appearance, theme, soun
     s.textLen = text.length;
     s.lineStart = performance.now();
     s.shownChars = 0;
+    s.typedAt = 0;
     setShown(0);
     const nextRight = rightActorAt(chapter, index, nemesis);
     if (nextRight !== s.right) {
@@ -190,6 +198,11 @@ export default function StoryStage({ chapterIndex, hero, appearance, theme, soun
         setShown(chars);
       }
       const typingNow = chars < s.textLen;
+      if (!typingNow && s.typedAt === 0) s.typedAt = now;
+      if (s.autoPlay && s.typedAt > 0 && now - s.typedAt > AUTO_HOLD_MS + s.textLen * AUTO_HOLD_PER_CHAR_MS) {
+        s.typedAt = Infinity; // fire once per line
+        advanceRef.current();
+      }
       const speaker = chapter.lines[s.index].speaker;
 
       ctx.save();

@@ -51,14 +51,14 @@ const BASELINE_STATS = {
   bulletSpeed: BULLET_SPEED,
 };
 
-interface LevelTheme {
+export interface LevelTheme {
   pageGradient: string;
   floorAPalette: Palette;
   floorBPalette: Palette;
   wallPalette: Palette;
 }
 
-const LEVEL_THEMES: LevelTheme[] = [
+export const LEVEL_THEMES: LevelTheme[] = [
   // 1 — Blue Dungeon (default)
   { pageGradient: 'radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #07070f 100%)',
     floorAPalette: { b: '#11173a', a: '#1a2356', h: '#232f6b', c: '#0d1230' },
@@ -796,22 +796,26 @@ function AppearanceToggle({ appearance, onChange }: { appearance: Appearance; on
   );
 }
 
-function CharacterSelectScreen({
+export function CharacterSelectScreen({
   onChoose,
   appearance,
-  onAppearanceChange
+  onAppearanceChange,
+  title = 'Choose Your Character',
+  subtitle = 'Pick who travels through time. This choice is yours to keep.'
 }: {
   onChoose: (id: string) => void;
   appearance?: Appearance;
   onAppearanceChange?: (a: Appearance) => void;
+  title?: string;
+  subtitle?: string;
 }) {
   return (
     <div className="ability-select">
-      <h1>Choose Your Character</h1>
-      <p>Pick who travels through time. This choice is yours to keep.</p>
+      <h1>{title}</h1>
+      <p>{subtitle}</p>
       {appearance && onAppearanceChange && (
         <>
-          <p>Story mode lets you switch between the original look and a human look at any time.</p>
+          <p>Switch between the original look and a human look at any time.</p>
           <AppearanceToggle appearance={appearance} onChange={onAppearanceChange} />
         </>
       )}
@@ -866,7 +870,7 @@ function FinaleScreen({ onRestart, story }: { onRestart: () => void; story?: boo
   );
 }
 
-const MUTE_STORAGE_KEY = 'timeCrystalMuted';
+export const MUTE_STORAGE_KEY = 'timeCrystalMuted';
 
 export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' | 'story' }) {
   const [save, setSave] = useState<Save | null>(null);

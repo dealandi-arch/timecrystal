@@ -858,3 +858,43 @@ body {
   font-size: 0.8rem;
   opacity: 0.5;
 }
+
+/* Story animation mode */
+.movie-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.movie-controls .ability-btn {
+  margin-left: 0;
+}
+
+.movie-select {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(148, 163, 184, 0.2);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+
+.movie-select option {
+  background: #0f172a;
+}
+
+.movie-progress {
+  max-width: 720px;
+  margin: 0.75rem auto 0;
+}
+
+.movie-end-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
