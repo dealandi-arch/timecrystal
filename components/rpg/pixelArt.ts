@@ -416,6 +416,15 @@ export const CHARACTERS: CharacterDef[] = [
     palette: { o: '#172554', y: '#e2e8f0', d: '#94a3b8', e: '#fde68a' },
     stats: { maxHp: 7, moveMs: 145, attackCooldownMs: 250, attackDurationMs: 180, invulnS: 0.7, bulletSpeed: 9, passiveName: 'Shieldmaiden', passiveDesc: 'High health without sacrificing movement speed.' },
   },
+  {
+    id: 'grimsby',
+    name: 'Grimsby the Collector',
+    description:
+      "He spent a lifetime hoarding rare moments — first snowfalls, last words, perfect sunsets — sealed in jars across a hundred hidden vaults. When the crystal shattered, his whole collection began to fade. He set out to save his treasures, net in hand and pockets jingling. He is heavy, stubborn and hard to knock down, and somewhere along the road he is starting to wonder who those moments really belong to.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#422006', y: '#ca8a04', d: '#854d0e', e: '#fef08a' },
+    stats: { maxHp: 7, moveMs: 175, attackCooldownMs: 270, attackDurationMs: 190, invulnS: 0.9, bulletSpeed: 9, passiveName: 'Hoarder', passiveDesc: 'Extra health and a longer recovery window. Slower on his feet.' },
+  },
 ];
 
 // Human look (story mode). Each character gets a unique 16×16 sprite assembled from layers:
@@ -623,6 +632,13 @@ const BLINDFOLD: Layer = { 4: '....aaaaaaaa....', 5: '...a............', 6: '..a
 const EYE_GOGGLES: Layer = { 4: '....oaaooaao....' };
 const MONOCLE: Layer = { 4: '........oao.....' };
 const MUSTACHE: Layer = { 5: '......kkkk......' };
+const STORM_CROWN: Layer = { 0: '..a..a....a..a..', 1: '...aa.aaaa.aa...' };
+const SPECTACLES: Layer = { 4: '....owewwewo....' };
+const QUILL_FEATHER: Layer = { 0: '...........aa...', 1: '..........aa....', 2: '.........a......' };
+const EYEPATCH: Layer = { 4: '.....vvv........' };
+const THIRD_EYE: Layer = { 3: '.......aa.......' };
+const ANTENNAE: Layer = { 0: '....a......a....', 1: '.....a....a.....' };
+const GLOW_FACE: Layer = { 4: '.....wawwaw.....', 5: '.....wwwwww.....', 6: '......wwww......' };
 const APRON: Layer = { 9: '......dddd......', 10: '.....dddddd.....', 11: '.....dadadd.....', 12: '.....dddddd.....' };
 const HOOD: Layer = {
   0: '......oooo......',
@@ -686,6 +702,7 @@ const HUMAN_LOOKS: Record<string, HumanLook> = {
   ranger: { layers: [BROAD, HEAD, BEARD, FEATHER_CAP], s: '#e0ac69', h: '#713f12', a: '#ef4444' },
   tinker: { layers: [NEUTRAL, APRON, HEAD, MESSY, EYE_GOGGLES], s: '#c68642', h: '#57534e', a: '#fbbf24' },
   valkyrie: { layers: [SLIM, HEAD, LIPS, LONG, WINGED_HELM], s: '#ffdbac', h: '#fcd34d', a: '#fde68a' },
+  grimsby: { layers: [BULKY, HEAD, BEARD, MESSY], s: '#c68642', h: '#3f3f46', a: '#fde047' },
 };
 
 const DEFAULT_HUMAN: HumanLook = HUMAN_LOOKS.wanderer;
@@ -760,7 +777,14 @@ export function getEnemyLook(kind: EnemyKind, appearance: Appearance): Look {
 }
 
 // Story actors: the guide, the Guardian (boss) and each hero's nemesis.
-export type VillainId = 'vex' | 'kestrel' | 'hollow' | 'sorrow' | 'tick' | 'mirror' | 'grimsby' | 'ashen';
+// One nemesis per hero. Bad characters (nemeses + the Guardian) are 12 women, 12 men and 3 they.
+export type VillainId =
+  // women
+  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth'
+  // men
+  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco'
+  // they
+  | 'hollow' | 'mirror' | 'lantern';
 export type ActorId = 'oren' | 'guardian' | VillainId;
 
 interface ActorDef {
@@ -771,47 +795,49 @@ interface ActorDef {
 
 const enemyPalette = (o: string, p: string, l: string, e = '#0b1330'): Palette => ({ o, p, l, e });
 
+// clothes [outline, main, shade], human layers, skin, hair, accent, original-look [outline, body, light]
+function villain(clothes: [string, string, string], layers: Layer[], s: string, h: string, a: string, orig: [string, string, string], eyes?: string): ActorDef {
+  return {
+    clothes: { o: clothes[0], y: clothes[1], d: clothes[2] },
+    human: { layers, s, h, a },
+    original: { sprite: ENEMY_SPRITE, palette: enemyPalette(orig[0], orig[1], orig[2], eyes) },
+  };
+}
+
 const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   oren: {
     clothes: { o: '#0c1a3a', y: '#2563eb', d: '#1e3a8a' },
     human: { layers: [ROBE, HEAD, BEARD, SHORT], s: '#e0ac69', h: '#e5e7eb', a: '#67e8f9' },
     original: { sprite: PLAYER_SPRITE, palette: { o: '#0c1a3a', y: '#60a5fa', d: '#2563eb', e: '#f8fafc' } },
   },
-  vex: {
-    clothes: { o: '#052e16', y: '#15803d', d: '#14532d' },
-    human: { layers: [DRESS, HEAD, LIPS, LONG, WIZARD_HAT], s: '#d6d3d1', h: '#0f172a', a: '#a3e635' },
-    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#052e16', '#22c55e', '#bbf7d0') },
-  },
-  kestrel: {
-    clothes: { o: '#1c0a0a', y: '#7f1d1d', d: '#450a0a' },
-    human: { layers: [BROAD, HEAD, BEARD, OPEN_HELM], s: '#e0ac69', h: '#57534e', a: '#fca5a5' },
-    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#450a0a', '#b91c1c', '#fecaca') },
-  },
-  hollow: {
-    clothes: { o: '#020617', y: '#1f2937', d: '#111827' },
-    human: { layers: [FLOAT, HEAD, HOOD, SHADOW_FACE], s: '#64748b', h: '#020617', a: '#ef4444' },
-    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#020617', '#334155', '#94a3b8', '#ef4444') },
-  },
-  sorrow: {
-    clothes: { o: '#1e0b2e', y: '#4c1d95', d: '#2e1065' },
-    human: { layers: [ROBE, HEAD, LIPS, BUN], s: '#e2e8f0', h: '#a1a1aa', a: '#c4b5fd' },
-    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#2e1065', '#7c3aed', '#ddd6fe') },
-  },
-  tick: {
-    clothes: { o: '#1c1917', y: '#b45309', d: '#78350f' },
-    human: { layers: [BROAD, HEAD, MUSTACHE, MONOCLE, TOP_HAT], s: '#ffdbac', h: '#44403c', a: '#fbbf24' },
-    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#451a03', '#d97706', '#fde68a') },
-  },
-  grimsby: {
-    clothes: { o: '#1c1917', y: '#ca8a04', d: '#854d0e' },
-    human: { layers: [BULKY, HEAD, BEARD, MESSY], s: '#c68642', h: '#3f3f46', a: '#fde047' },
-    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#422006', '#eab308', '#fef08a') },
-  },
-  ashen: {
-    clothes: { o: '#0c0a09', y: '#57534e', d: '#292524' },
-    human: { layers: [DRESS, HEAD, LIPS, LONG, CROWN], s: '#d6d3d1', h: '#e7e5e4', a: '#f97316' },
-    original: { sprite: ENEMY_SPRITE, palette: enemyPalette('#1c1917', '#78716c', '#f97316') },
-  },
+  // women
+  vex: villain(['#052e16', '#15803d', '#14532d'], [DRESS, HEAD, LIPS, LONG, WIZARD_HAT], '#d6d3d1', '#0f172a', '#a3e635', ['#052e16', '#22c55e', '#bbf7d0']),
+  sorrow: villain(['#1e0b2e', '#4c1d95', '#2e1065'], [ROBE, HEAD, LIPS, BUN], '#e2e8f0', '#a1a1aa', '#c4b5fd', ['#2e1065', '#7c3aed', '#ddd6fe']),
+  ashen: villain(['#0c0a09', '#57534e', '#292524'], [DRESS, HEAD, LIPS, LONG, CROWN], '#d6d3d1', '#e7e5e4', '#f97316', ['#1c1917', '#78716c', '#f97316']),
+  morrigan: villain(['#020617', '#1e3a8a', '#172554'], [DRESS, HEAD, LIPS, LONG, STORM_CROWN], '#c68642', '#0f172a', '#facc15', ['#172554', '#3b82f6', '#fde047']),
+  quill: villain(['#0c0a09', '#f5f5f4', '#1c1917'], [ROBE, HEAD, LIPS, BUN, SPECTACLES, QUILL_FEATHER], '#ffdbac', '#78350f', '#1d4ed8', ['#1c1917', '#e7e5e4', '#1d4ed8']),
+  cassia: villain(['#3b0764', '#c026d3', '#701a75'], [ROBE, HEAD, LIPS, LONG, THIRD_EYE], '#e0ac69', '#fde047', '#22d3ee', ['#4a044e', '#d946ef', '#fde047']),
+  ledger: villain(['#052e16', '#166534', '#0f172a'], [SLIM, HEAD, LIPS, BOB, SPECTACLES], '#f1c27d', '#292524', '#fbbf24', ['#052e16', '#16a34a', '#fde68a']),
+  maren: villain(['#1c0505', '#991b1b', '#450a0a'], [ROBE, HEAD, LIPS, HOOD], '#ffdbac', '#1c1917', '#fecaca', ['#450a0a', '#b91c1c', '#fde68a']),
+  selene: villain(['#0f172a', '#cbd5e1', '#64748b'], [DRESS, HEAD, LIPS, PONYTAIL, CIRCLET], '#8d5524', '#f8fafc', '#a5f3fc', ['#1e293b', '#cbd5e1', '#a5f3fc']),
+  sable: villain(['#020617', '#0f766e', '#111827'], [SLIM, HEAD, LIPS, PONYTAIL, VISOR], '#c68642', '#111827', '#2dd4bf', ['#042f2e', '#0f766e', '#5eead4']),
+  breach: villain(['#0c0a09', '#3f3f46', '#18181b'], [SLIM, HEAD, LIPS, BOB, DOMINO], '#ffdbac', '#7c3aed', '#a78bfa', ['#18181b', '#52525b', '#c4b5fd']),
+  moth: villain(['#1c1917', '#78716c', '#44403c'], [DRESS, HEAD, LIPS, LONG, ANTENNAE], '#e2e8f0', '#d6d3d1', '#fde68a', ['#292524', '#a8a29e', '#fde68a']),
+  // men
+  kestrel: villain(['#1c0a0a', '#7f1d1d', '#450a0a'], [BROAD, HEAD, BEARD, OPEN_HELM], '#e0ac69', '#57534e', '#fca5a5', ['#450a0a', '#b91c1c', '#fecaca']),
+  tick: villain(['#1c1917', '#b45309', '#78350f'], [BROAD, HEAD, MUSTACHE, MONOCLE, TOP_HAT], '#ffdbac', '#44403c', '#fbbf24', ['#451a03', '#d97706', '#fde68a']),
+  brand: villain(['#1c0a00', '#78350f', '#451a03'], [BROAD, HEAD, MUSTACHE, EYEPATCH, BRIM_HAT], '#8d5524', '#292524', '#dc2626', ['#451a03', '#92400e', '#fca5a5']),
+  halden: villain(['#042f2e', '#115e59', '#134e4a'], [ROBE, HEAD, BEARD, MONOCLE], '#f1c27d', '#e5e7eb', '#5eead4', ['#042f2e', '#14b8a6', '#ccfbf1']),
+  voss: villain(['#1e293b', '#f1f5f9', '#94a3b8'], [BROAD, APRON, HEAD, MUSTACHE, SHORT, EYE_GOGGLES], '#ffdbac', '#78716c', '#4ade80', ['#334155', '#e2e8f0', '#4ade80']),
+  rustbelly: villain(['#1c0a00', '#c2410c', '#7c2d12'], [BULKY, HEAD, BEARD, BANDANA, EYEPATCH], '#d4a373', '#7c2d12', '#78716c', ['#431407', '#ea580c', '#fdba74']),
+  vance: villain(['#1c0505', '#dc2626', '#f8fafc'], [BROAD, HEAD, SPIKY, GOGGLES], '#e0ac69', '#facc15', '#38bdf8', ['#450a0a', '#ef4444', '#f8fafc']),
+  thorne: villain(['#052e16', '#3f6212', '#1a2e05'], [BROAD, HEAD, BEARD, HOOD], '#c68642', '#422006', '#a3e635', ['#1a2e05', '#4d7c0f', '#d9f99d']),
+  mallus: villain(['#1a2e05', '#4d7c0f', '#365314'], [BULKY, HEAD, MUSTACHE, SHORT], '#8d5524', '#d6d3d1', '#fde047', ['#1a2e05', '#65a30d', '#fde047']),
+  ringmaster: villain(['#450a0a', '#dc2626', '#fde047'], [BROAD, HEAD, MUSTACHE, TOP_HAT], '#f1c27d', '#1c1917', '#fde047', ['#7f1d1d', '#f87171', '#fde047']),
+  rocco: villain(['#0c0a09', '#7c3aed', '#3b0764'], [BULKY, HEAD, MUSTACHE, SHORT, SCARF], '#5c3a21', '#0c0a09', '#facc15', ['#2e1065', '#8b5cf6', '#facc15']),
+  // they
+  hollow: villain(['#020617', '#1f2937', '#111827'], [FLOAT, HEAD, HOOD, SHADOW_FACE], '#64748b', '#020617', '#ef4444', ['#020617', '#334155', '#94a3b8'], '#ef4444'),
+  lantern: villain(['#422006', '#fde68a', '#f59e0b'], [FLOAT, HEAD, HOOD, GLOW_FACE], '#fef3c7', '#fde68a', '#fb923c', ['#78350f', '#fde68a', '#fffbeb'], '#fb923c'),
 };
 
 // `hero` is needed for the Mirror, which is a dark copy of whoever it is haunting.
