@@ -22,6 +22,10 @@ import { STORY_CHAPTER_COUNT, VILLAINS, getChapterTitle, getNemesis } from './st
 import StoryStage from './StoryStage';
 import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
+import { BASIC_GUN, getSignatureWeapon } from './weapons';
+import { type CombatHooks, drawCombat, fireWeapon, makeCombat, updateCombat } from './combat';
+import { RARITY_INFO, SHARDS_PER_LEVEL, rarityOf } from './gacha';
+import { useCollection } from '../profile/CollectionContext';
 import { useProfile } from '../profile/ProfileContext';
 import AuthWidget from '../profile/AuthWidget';
 import SignInBanner from '../profile/SignInBanner';
@@ -39,7 +43,6 @@ const CRYSTAL_DWELL_MS = 2200;
 const CRYSTAL_MOVE_MS = 550;
 const ENEMY_WANDER_MS = 900;
 const BULLET_SPEED = 9;
-const BULLET_RADIUS = 5;
 const PIXEL_SIZE = TILE / 12;
 
 const BASELINE_STATS = {
@@ -150,16 +153,9 @@ interface RuntimeEnemy {
   hp: number;
   maxHp: number;
   frozen: boolean;
+  stunMs: number;
   wanderTimer: number;
   isBoss: boolean;
-}
-
-interface RuntimeBullet {
-  x: number;
-  y: number;
-  dx: number;
-  dy: number;
-  alive: boolean;
 }
 
 interface RuntimeCrystal {
@@ -223,9 +219,25 @@ function makeEnemies(level: LevelDef): RuntimeEnemy[] {
     hp: e.hp,
     maxHp: e.hp,
     frozen: false,
+    stunMs: 0,
     wanderTimer: Math.random() * ENEMY_WANDER_MS,
     isBoss: level.isBoss
   }));
+}
+
+// Hidden Emerald Shards: random walkable tiles (secret passages included), never the start tile.
+function pickEmeralds(level: LevelDef): Set<string> {
+  const cells: string[] = [];
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (isWalkable(level, x, y, false) && !(x === level.start.x && y === level.start.y)) cells.push(`${x},${y}`);
+    }
+  }
+  for (let i = cells.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  return new Set(cells.slice(0, SHARDS_PER_LEVEL));
 }
 
 function makeCrystal(level: LevelDef): RuntimeCrystal {
@@ -255,11 +267,15 @@ interface LevelRunnerProps {
   onLevelComplete: (stats: LevelRunStats) => void;
   onAbilityUsed: () => void;
   onPowerActivated: () => void;
+  onEmeraldFound: () => void;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
+  const signature = getSignatureWeapon(charDef.id);
+  const emeraldRef = useRef(onEmeraldFound);
+  emeraldRef.current = onEmeraldFound;
 
   // Ref so the game loop picks up appearance changes without restarting the level
   const appearanceRef = useRef(appearance);
@@ -277,12 +293,16 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   const [toast, setToast] = useState<string | null>(null);
   const [won, setWon] = useState(false);
   const [runStats, setRunStats] = useState<LevelRunStats | null>(null);
+  const [weaponSlot, setWeaponSlot] = useState<0 | 1>(0);
+  const [emeraldsFound, setEmeraldsFound] = useState(0);
 
   const stateRef = useRef({
     player: makePlayer(level, effectiveMaxHp),
     enemies: makeEnemies(level),
     crystal: makeCrystal(level),
-    bullets: [] as RuntimeBullet[],
+    combat: makeCombat(),
+    emeralds: pickEmeralds(level),
+    weaponSlot: 0 as 0 | 1,
     particles: [] as Particle[],
     discoveredSecrets: new Set<string>(),
     shake: 0,
@@ -300,12 +320,19 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     s.player = makePlayer(level, maxHp);
     s.enemies = makeEnemies(level);
     s.crystal = makeCrystal(level);
-    s.bullets = [];
+    s.combat = makeCombat(); // shards already found stay found
     s.shake = 0.3;
     s.won = false;
     s.startTime = performance.now();
     setHp(maxHp);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
+  }
+
+  function toggleWeapon() {
+    const s = stateRef.current;
+    s.weaponSlot = s.weaponSlot === 0 ? 1 : 0;
+    setWeaponSlot(s.weaponSlot);
+    sound.playMenuClick();
   }
 
   function activateAbility() {
@@ -346,6 +373,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       sound.resume();
       s.keys.add(e.key.toLowerCase());
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
+      if (e.key.toLowerCase() === 'q' && !e.repeat) toggleWeaponRef.current();
     }
     function onKeyUp(e: KeyboardEvent) {
       s.keys.delete(e.key.toLowerCase());
@@ -356,6 +384,36 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     let lastTime = performance.now();
     let rafId = 0;
     let attackWasPressed = false;
+
+    const hooks: CombatHooks = {
+      get enemies() {
+        return s.enemies;
+      },
+      particles: s.particles,
+      tile: TILE,
+      walkable: (x, y) => isWalkable(level, x, y, false),
+      shake: (amount) => {
+        s.shake = Math.max(s.shake, amount);
+      },
+      onHit: (enemy, weapon, killed) => {
+        const hitX = (enemy.gx + 0.5) * TILE;
+        const hitY = (enemy.gy + 0.5) * TILE;
+        if (killed) {
+          spawnBurst(s.particles, hitX, hitY, ['#f472b6', '#fbcfe8', '#831843'], 14, 140, 220);
+          sound.playEnemyDeath();
+          setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
+          if (weapon.lifesteal) {
+            const maxHp = powerActiveRef.current ? charStats.maxHp : BASELINE_STATS.maxHp;
+            s.player.hp = Math.min(maxHp, s.player.hp + 1);
+            setHp(s.player.hp);
+            spawnBurst(s.particles, (s.player.gx + 0.5) * TILE, (s.player.gy + 0.5) * TILE, ['#34d399', '#a7f3d0'], 10, 80, -60);
+          }
+        } else {
+          spawnBurst(s.particles, hitX, hitY, [weapon.color, '#fff'], 6, 90, 160);
+          sound.playHit();
+        }
+      },
+    };
 
     function heldDirection(): Dir | null {
       if (s.keys.has('arrowup') || s.keys.has('w')) return 'up';
@@ -406,53 +464,28 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const attackKey = s.keys.has(' ') || s.keys.has('j');
       if (p.attackCooldown > 0) p.attackCooldown -= dt * 1000;
       if (attackKey && !attackWasPressed && p.attackCooldown <= 0) {
+        const weapon = s.weaponSlot === 0 ? BASIC_GUN : signature;
         p.attackTimer = effectiveStats.attackDurationMs;
-        p.attackCooldown = effectiveStats.attackCooldownMs;
-        const { dx, dy } = DIR_VECTORS[p.facing];
-        s.bullets.push({ x: p.gx + 0.5 + dx * 0.5, y: p.gy + 0.5 + dy * 0.5, dx, dy, alive: true });
-        sound.playShoot();
+        p.attackCooldown = weapon === BASIC_GUN ? effectiveStats.attackCooldownMs : weapon.cooldownMs;
+        fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
+        if (weapon.kind === 'melee') sound.playHit();
+        else sound.playShoot();
       }
       attackWasPressed = attackKey;
       if (p.attackTimer > 0) p.attackTimer -= dt * 1000;
       if (p.invuln > 0) p.invuln -= dt;
       if (s.shake > 0) s.shake -= dt;
 
-      let enemyDiedFromBullet = false;
-      for (const bullet of s.bullets) {
-        if (!bullet.alive) continue;
-        bullet.x += bullet.dx * effectiveStats.bulletSpeed * dt;
-        bullet.y += bullet.dy * effectiveStats.bulletSpeed * dt;
-        const cellX = Math.floor(bullet.x);
-        const cellY = Math.floor(bullet.y);
-        if (!isWalkable(level, cellX, cellY, false)) {
-          bullet.alive = false;
-          continue;
-        }
-        for (const enemy of s.enemies) {
-          if (enemy.alive && enemy.gx === cellX && enemy.gy === cellY) {
-            enemy.hp -= 1;
-            bullet.alive = false;
-            const hitX = (cellX + 0.5) * TILE;
-            const hitY = (cellY + 0.5) * TILE;
-            if (enemy.hp <= 0) {
-              enemy.alive = false;
-              enemyDiedFromBullet = true;
-              spawnBurst(s.particles, hitX, hitY, ['#f472b6', '#fbcfe8', '#831843'], 14, 140, 220);
-              sound.playEnemyDeath();
-            } else {
-              spawnBurst(s.particles, hitX, hitY, ['#fde047', '#fff'], 6, 90, 160);
-              sound.playHit();
-            }
-            break;
-          }
-        }
+      updateCombat(s.combat, hooks, dt, { x: p.gx, y: p.gy });
+
+      for (const enemy of s.enemies) {
+        if (enemy.stunMs > 0) enemy.stunMs -= dt * 1000;
       }
-      if (s.bullets.length > 0) s.bullets = s.bullets.filter((b) => b.alive);
-      if (enemyDiedFromBullet) setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
+
 
       for (const enemy of s.enemies) {
         if (!enemy.alive) continue;
-        if (enemy.frozen) continue;
+        if (enemy.frozen || enemy.stunMs > 0) continue;
         if (!enemy.moving) {
           enemy.wanderTimer -= dt * 1000;
           if (enemy.wanderTimer <= 0) {
@@ -502,6 +535,15 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#67e8f9', '#a5f3fc', '#fff'], 16, 110, -40);
           sound.playSecretFound();
         }
+      }
+
+      const emeraldKey = `${p.gx},${p.gy}`;
+      if (s.emeralds.has(emeraldKey)) {
+        s.emeralds.delete(emeraldKey);
+        spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#10b981', '#6ee7b7', '#d1fae5', '#fff'], 24, 150, -50);
+        sound.playCrystalPickup();
+        setEmeraldsFound((n) => n + 1);
+        emeraldRef.current();
       }
 
       updateParticles(s.particles, dt);
@@ -594,7 +636,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       for (const enemy of s.enemies) {
         if (!enemy.alive) continue;
         const pos = entityPixelPos(enemy);
-        const kind = enemy.isBoss ? 'boss' : enemy.frozen ? 'frozen' : 'enemy';
+        const kind = enemy.isBoss ? 'boss' : enemy.frozen || enemy.stunMs > 0 ? 'frozen' : 'enemy';
         const enemyLook = getEnemyLook(kind, appearanceRef.current);
         const sprite = getSpriteCanvas(`enemy:${kind}:${appearanceRef.current}`, enemyLook.sprite, enemyLook.palette, TILE / enemyLook.sprite.length);
         const bobY = Math.sin(time * 4 + pos.x) * 2;
@@ -638,17 +680,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         ctx.fill();
       }
 
-      for (const bullet of s.bullets) {
-        const bx = bullet.x * TILE;
-        const by = bullet.y * TILE;
-        ctx.fillStyle = '#fde047';
-        ctx.shadowColor = '#fde047';
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(bx, by, BULLET_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
+      drawCombat(ctx, s.combat, TILE, time);
 
       if (s.abilityActive.navigate) {
         const pcx = px + TILE / 2;
@@ -700,6 +732,10 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level]);
 
+  const toggleWeaponRef = useRef(toggleWeapon);
+  toggleWeaponRef.current = toggleWeapon;
+  const currentWeapon = weaponSlot === 0 ? BASIC_GUN : signature;
+
   const abilityDef = ABILITIES.find((a) => a.id === save.ability);
   const abilityBlockedHere = save.ability === 'killAll' && level.isBoss;
   const canUseAbility = !!save.ability && !save.abilityUsed && !abilityBlockedHere;
@@ -710,6 +746,12 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         <span>{displayName ?? level.name}</span>
         <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, effectiveMaxHp - hp))}</span>
         <span>Enemies left: {enemiesLeft}</span>
+        <span className="emerald-count" title="Hidden Emerald Shards found in this level">
+          💎 {emeraldsFound}/{SHARDS_PER_LEVEL}
+        </span>
+        <button className="ability-btn weapon-btn" onClick={toggleWeapon} title={currentWeapon.desc} style={{ borderColor: currentWeapon.color }}>
+          ⚔ {currentWeapon.name} <kbd>Q</kbd>
+        </button>
         {onToggleAppearance && (
           <button className="ability-btn look-btn" onClick={() => { sound.playMenuClick(); onToggleAppearance(); }}>
             Look: {appearance === 'human' ? 'Human' : 'Original'}
@@ -736,6 +778,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             <h2>{level.isBoss ? 'The Time Crystal Is Whole Again' : 'Crystal Secured'}</h2>
             <p>{level.isBoss ? 'You defeated the guardian and restored the final shard.' : 'On to the next level.'}</p>
             <p>
+              Emerald Shards found: {emeraldsFound}/{SHARDS_PER_LEVEL}
+            </p>
+            <p>
               Time: {formatTime(runStats.timeMs)} &nbsp;·&nbsp; Secrets found: {runStats.secrets}
               {(() => {
                 const best = getLocalBest(level.id);
@@ -756,8 +801,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         )}
       </div>
       <p className="game-controls">
-        Move: Arrow keys / WASD &nbsp;·&nbsp; Shoot: Space / J &nbsp;·&nbsp; Find every secret passage, clear every
-        enemy, then catch the crystal.
+        Move: Arrow keys / WASD &nbsp;·&nbsp; Attack: Space / J &nbsp;·&nbsp; Switch weapon: Q &nbsp;·&nbsp; Clear every
+        enemy, then catch the crystal. Five Emerald Shards are hidden on random tiles — step on them to collect.
       </p>
     </div>
   );
@@ -809,10 +854,14 @@ export function CharacterSelectScreen({
   title?: string;
   subtitle?: string;
 }) {
+  const { isUnlocked, shards } = useCollection();
   return (
     <div className="ability-select">
       <h1>{title}</h1>
       <p>{subtitle}</p>
+      <p className="select-shards">
+        💎 {shards} Emerald Shards &nbsp;·&nbsp; <a href="/gacha">Summon more heroes</a>
+      </p>
       {appearance && onAppearanceChange && (
         <>
           <p>Switch between the original look and a human look at any time.</p>
@@ -820,21 +869,36 @@ export function CharacterSelectScreen({
         </>
       )}
       <div className="ability-grid">
-        {CHARACTERS.map((c) => (
-          <button key={c.id} className="ability-card" onClick={() => onChoose(c.id)}>
+        {CHARACTERS.map((c) => {
+          const rarity = rarityOf(c.id);
+          const unlocked = isUnlocked(c.id);
+          const weapon = getSignatureWeapon(c.id);
+          return (
+          <button
+            key={c.id}
+            className={`ability-card rarity-${rarity} ${unlocked ? '' : 'locked'}`}
+            onClick={() => unlocked && onChoose(c.id)}
+            aria-disabled={!unlocked}
+          >
+            <span className="rarity-badge" style={{ background: RARITY_INFO[rarity].color }}>{RARITY_INFO[rarity].name}</span>
             <div className="char-portrait">
               <SpritePreview char={c} appearance={appearance} />
               <div className="char-portrait-name">{c.name}</div>
             </div>
+            {!unlocked && <p className="locked-note">🔒 Locked — get this hero from the Gacha.</p>}
             <p className="char-desc">{c.description}</p>
             <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
+            <p className="char-weapon" style={{ color: weapon.color }}>
+              <strong>⚔ {weapon.name}</strong> — {weapon.desc}
+            </p>
             {appearance && (
               <p className="char-nemesis">
                 <strong>Nemesis: {VILLAINS[getNemesis(c.id)].name}</strong> — {VILLAINS[getNemesis(c.id)].blurb}
               </p>
             )}
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -879,6 +943,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
   if (!soundRef.current) soundRef.current = new SoundEngine();
   const sound = soundRef.current;
   const { profile, submitRun } = useProfile();
+  const { addShards } = useCollection();
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
@@ -1009,6 +1074,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             onToggleAppearance={isStory ? () => updateSave({ ...save, appearance: save.appearance === 'human' ? 'original' : 'human' }) : undefined}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
+            onEmeraldFound={() => addShards(1)}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
           />
         </div>

@@ -425,6 +425,51 @@ export const CHARACTERS: CharacterDef[] = [
     palette: { o: '#422006', y: '#ca8a04', d: '#854d0e', e: '#fef08a' },
     stats: { maxHp: 7, moveMs: 175, attackCooldownMs: 270, attackDurationMs: 190, invulnS: 0.9, bulletSpeed: 9, passiveName: 'Hoarder', passiveDesc: 'Extra health and a longer recovery window. Slower on his feet.' },
   },
+  {
+    id: 'corsair',
+    name: 'Corsair',
+    description:
+      "She captained the fastest airship ever to ride the winds between timelines, and she never once flew under anyone's flag but her own. When the crystal broke, the winds died and her ship ran aground. Now she is on foot, blunderbuss in hand, quick-witted and quicker on her feet, looking for whoever stole her sky.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#0c1a3a', y: '#0ea5e9', d: '#0369a1', e: '#fef3c7' },
+    stats: { maxHp: 4, moveMs: 130, attackCooldownMs: 240, attackDurationMs: 170, invulnS: 0.75, bulletSpeed: 11, passiveName: 'Sea Legs', passiveDesc: 'Quick on her feet with faster shots.' },
+  },
+  {
+    id: 'revenant',
+    name: 'Revenant',
+    description:
+      "They fell in a timeline that no longer exists, and when the crystal shattered, they simply got back up. The Revenant does not remember much of their old life, only that it ended too early. They are slow to tire and slower to fall, and they carry a scythe that drinks the strength of anything it cuts down.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#022c22', y: '#4b5563', d: '#1f2937', e: '#34d399' },
+    stats: { maxHp: 6, moveMs: 160, attackCooldownMs: 260, attackDurationMs: 180, invulnS: 1.1, bulletSpeed: 9, passiveName: 'Undying', passiveDesc: 'Sturdy, with a long recovery window after every hit.' },
+  },
+  {
+    id: 'solaris',
+    name: 'Solaris',
+    description:
+      "He is the sun-king of a timeline where the day never ended, a ruler who has spent a thousand years making sure the dawn arrives on time. He is warm, proud and almost unbearably bright. When he fights, he fights like noon: fast, hot and impossible to look away from. Every shadow in the fracture is his personal insult.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#7c2d12', y: '#fbbf24', d: '#f59e0b', e: '#fff7ed' },
+    stats: { maxHp: 7, moveMs: 140, attackCooldownMs: 210, attackDurationMs: 160, invulnS: 0.8, bulletSpeed: 12, passiveName: 'Radiance', passiveDesc: 'High health, fast attacks and bright, quick bolts.' },
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    description:
+      "She dances the northern lights across the sky of every timeline, and when she moves, colour follows her. She is graceful, fierce and much tougher than she looks — winter has tried to freeze her a hundred times and never managed it once. Her prism splits light into shards that bounce, dazzle and freeze anything they touch.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#083344', y: '#5eead4', d: '#a78bfa', e: '#f0fdfa' },
+    stats: { maxHp: 6, moveMs: 125, attackCooldownMs: 215, attackDurationMs: 160, invulnS: 1.0, bulletSpeed: 12, passiveName: 'Northern Lights', passiveDesc: 'Fast, tough and hard to pin down.' },
+  },
+  {
+    id: 'paradox',
+    name: 'Paradox',
+    description:
+      "They exist before and after every timeline at once, which should not be possible — and yet here they are. Paradox remembers the end of everything and the beginning too, and has quietly decided to protect the middle. Every one of their abilities loops back on itself, pushed far beyond anything a single timeline should allow.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#000000', y: '#f8fafc', d: '#3f3f46', e: '#f43f5e' },
+    stats: { maxHp: 6, moveMs: 105, attackCooldownMs: 170, attackDurationMs: 130, invulnS: 1.3, bulletSpeed: 15, passiveName: 'Causality Loop', passiveDesc: 'Every stat pushed far beyond the baseline.' },
+  },
 ];
 
 // Human look (story mode). Each character gets a unique 16×16 sprite assembled from layers:
@@ -639,6 +684,11 @@ const EYEPATCH: Layer = { 4: '.....vvv........' };
 const THIRD_EYE: Layer = { 3: '.......aa.......' };
 const ANTENNAE: Layer = { 0: '....a......a....', 1: '.....a....a.....' };
 const GLOW_FACE: Layer = { 4: '.....wawwaw.....', 5: '.....wwwwww.....', 6: '......wwww......' };
+const TRICORN: Layer = { 1: '....oddddddo....', 2: '.ooddddddddddoo.', 3: '...oaaaaaaaao...' };
+const SKULL_FACE: Layer = { 3: '.....wwwwww.....', 4: '.....wawwaw.....', 5: '.....wwvvww.....', 6: '......wwww......' };
+const SUN_CROWN: Layer = { 0: '.a..a.a..a.a..a.', 1: '..a.aaaaaaaa.a..' };
+const AURORA_TIARA: Layer = { 0: '....a.w..w.a....', 1: '....awaaaawa....' };
+const HALO: Layer = { 0: '.....aaaaaa.....' };
 const APRON: Layer = { 9: '......dddd......', 10: '.....dddddd.....', 11: '.....dadadd.....', 12: '.....dddddd.....' };
 const HOOD: Layer = {
   0: '......oooo......',
@@ -703,6 +753,11 @@ const HUMAN_LOOKS: Record<string, HumanLook> = {
   tinker: { layers: [NEUTRAL, APRON, HEAD, MESSY, EYE_GOGGLES], s: '#c68642', h: '#57534e', a: '#fbbf24' },
   valkyrie: { layers: [SLIM, HEAD, LIPS, LONG, WINGED_HELM], s: '#ffdbac', h: '#fcd34d', a: '#fde68a' },
   grimsby: { layers: [BULKY, HEAD, BEARD, MESSY], s: '#c68642', h: '#3f3f46', a: '#fde047' },
+  corsair: { layers: [SLIM, HEAD, LIPS, LONG, TRICORN], s: '#c68642', h: '#7f1d1d', a: '#f8fafc' },
+  revenant: { layers: [NEUTRAL, HEAD, HOOD, SKULL_FACE], s: '#a8a29e', h: '#022c22', a: '#34d399' },
+  solaris: { layers: [BROAD, HEAD, BEARD, SHORT, SUN_CROWN], s: '#8d5524', h: '#fbbf24', a: '#fde047' },
+  aurora: { layers: [DRESS, HEAD, LIPS, LONG, AURORA_TIARA], s: '#ffdbac', h: '#f0fdfa', a: '#a78bfa' },
+  paradox: { layers: [NEUTRAL, HEAD, MEDIUM, HALF_MASK, HALO], s: '#d6d3d1', h: '#f8fafc', a: '#f43f5e' },
 };
 
 const DEFAULT_HUMAN: HumanLook = HUMAN_LOOKS.wanderer;
@@ -777,14 +832,14 @@ export function getEnemyLook(kind: EnemyKind, appearance: Appearance): Look {
 }
 
 // Story actors: the guide, the Guardian (boss) and each hero's nemesis.
-// One nemesis per hero. Bad characters (nemeses + the Guardian) are 12 women, 12 men and 3 they.
+// One nemesis per hero. Bad characters (nemeses + the Guardian) are 14 women, 14 men and 4 they.
 export type VillainId =
   // women
-  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth'
+  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse'
   // men
-  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco'
+  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw'
   // they
-  | 'hollow' | 'mirror' | 'lantern';
+  | 'hollow' | 'mirror' | 'lantern' | 'unmaker';
 export type ActorId = 'oren' | 'guardian' | VillainId;
 
 interface ActorDef {
@@ -823,7 +878,11 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   sable: villain(['#020617', '#0f766e', '#111827'], [SLIM, HEAD, LIPS, PONYTAIL, VISOR], '#c68642', '#111827', '#2dd4bf', ['#042f2e', '#0f766e', '#5eead4']),
   breach: villain(['#0c0a09', '#3f3f46', '#18181b'], [SLIM, HEAD, LIPS, BOB, DOMINO], '#ffdbac', '#7c3aed', '#a78bfa', ['#18181b', '#52525b', '#c4b5fd']),
   moth: villain(['#1c1917', '#78716c', '#44403c'], [DRESS, HEAD, LIPS, LONG, ANTENNAE], '#e2e8f0', '#d6d3d1', '#fde68a', ['#292524', '#a8a29e', '#fde68a']),
+  grave: villain(['#022c22', '#1f2937', '#064e3b'], [DRESS, HEAD, LIPS, PIGTAILS], '#d6d3d1', '#111827', '#6ee7b7', ['#022c22', '#374151', '#6ee7b7']),
+  eclipse: villain(['#020617', '#312e81', '#0f0a1e'], [DRESS, HEAD, LIPS, LONG, SUN_CROWN], '#5c3a21', '#0f0a1e', '#1e1b4b', ['#0f0a1e', '#4338ca', '#c7d2fe']),
   // men
+  gale: villain(['#0c1a3a', '#1e3a8a', '#fbbf24'], [BROAD, HEAD, BEARD, TRICORN], '#ffdbac', '#e5e7eb', '#fbbf24', ['#172554', '#1d4ed8', '#fde68a']),
+  frostjaw: villain(['#082f49', '#bae6fd', '#0369a1'], [BULKY, HEAD, BEARD, SPIKY], '#e0f2fe', '#f8fafc', '#7dd3fc', ['#0c4a6e', '#7dd3fc', '#f0f9ff']),
   kestrel: villain(['#1c0a0a', '#7f1d1d', '#450a0a'], [BROAD, HEAD, BEARD, OPEN_HELM], '#e0ac69', '#57534e', '#fca5a5', ['#450a0a', '#b91c1c', '#fecaca']),
   tick: villain(['#1c1917', '#b45309', '#78350f'], [BROAD, HEAD, MUSTACHE, MONOCLE, TOP_HAT], '#ffdbac', '#44403c', '#fbbf24', ['#451a03', '#d97706', '#fde68a']),
   brand: villain(['#1c0a00', '#78350f', '#451a03'], [BROAD, HEAD, MUSTACHE, EYEPATCH, BRIM_HAT], '#8d5524', '#292524', '#dc2626', ['#451a03', '#92400e', '#fca5a5']),
@@ -837,6 +896,7 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   rocco: villain(['#0c0a09', '#7c3aed', '#3b0764'], [BULKY, HEAD, MUSTACHE, SHORT, SCARF], '#5c3a21', '#0c0a09', '#facc15', ['#2e1065', '#8b5cf6', '#facc15']),
   // they
   hollow: villain(['#020617', '#1f2937', '#111827'], [FLOAT, HEAD, HOOD, SHADOW_FACE], '#64748b', '#020617', '#ef4444', ['#020617', '#334155', '#94a3b8'], '#ef4444'),
+  unmaker: villain(['#000000', '#18181b', '#450a0a'], [FLOAT, HEAD, MESSY, VISOR], '#71717a', '#09090b', '#ef4444', ['#000000', '#27272a', '#ef4444'], '#ef4444'),
   lantern: villain(['#422006', '#fde68a', '#f59e0b'], [FLOAT, HEAD, HOOD, GLOW_FACE], '#fef3c7', '#fde68a', '#fb923c', ['#78350f', '#fde68a', '#fffbeb'], '#fb923c'),
 };
 

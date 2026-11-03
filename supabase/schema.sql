@@ -20,3 +20,8 @@ create table if not exists best_runs (
 );
 
 create index if not exists best_runs_level_time_idx on best_runs (level_id, time_ms asc);
+
+-- Gacha collection (run this once on an existing project too — it is safe to re-run).
+-- emerald_shards: currency found hidden in levels. owned_characters: gacha heroes the player has unlocked.
+alter table profiles add column if not exists emerald_shards int not null default 0;
+alter table profiles add column if not exists owned_characters text[] not null default '{}';

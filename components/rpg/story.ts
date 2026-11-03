@@ -29,6 +29,8 @@ export const VILLAINS: Record<VillainId, { name: string; blurb: string }> = {
   sable: { name: 'Hunter Sable', blurb: 'An anomaly hunter with a custom visor and one name left on her list.' },
   breach: { name: 'Lady Breach', blurb: 'A master thief — the only one who ever cracked the deepest vault.' },
   moth: { name: 'Countess Moth', blurb: 'A rival collector who prefers stealing other people’s collections.' },
+  grave: { name: 'Mother Grave', blurb: 'The gravekeeper of a dead timeline, who wants every risen soul back in the ground.' },
+  eclipse: { name: 'Queen Eclipse', blurb: 'She has spent a thousand years trying to blot out the sun for good.' },
   // men
   kestrel: { name: 'Captain Kestrel', blurb: 'A fallen Vault Guard captain who decided he was owed the crystal.' },
   tick: { name: 'Baron Tick', blurb: 'A clockwork tyrant grinding time into parts and charging tolls on every second.' },
@@ -41,10 +43,13 @@ export const VILLAINS: Record<VillainId, { name: string; blurb: string }> = {
   mallus: { name: 'General Mallus', blurb: 'A warlord who wants the power of a temporal collapse for his army.' },
   ringmaster: { name: 'The Ringmaster', blurb: 'His circus is full of performers kidnapped from other timelines.' },
   rocco: { name: 'Big Rocco', blurb: 'A tournament promoter who bought every fighting circuit — and its fighters.' },
+  gale: { name: 'Admiral Gale', blurb: 'An admiral who bottled the winds between timelines so only his fleet could fly.' },
+  frostjaw: { name: 'Frostjaw', blurb: 'A winter warlord who froze time itself so his winter would never end.' },
   // they
   hollow: { name: 'The Hollow', blurb: 'An echo of every path not taken, hungry for what is real.' },
   mirror: { name: 'The Mirror', blurb: 'A dark copy built from every piece of yourself you left behind.' },
   lantern: { name: 'The Lantern', blurb: 'A blinding light that wants to burn away every shadow in time.' },
+  unmaker: { name: 'The Unmaker', blurb: 'Another impossibility, determined to unmake time so nothing can go wrong ever again.' },
 };
 
 export const SPEAKER_NAMES: Record<'oren' | 'guardian', string> = {
@@ -342,6 +347,41 @@ const ARCS: Record<string, PersonalArc> = {
     rival: [v('Grimsby, darling. While you were out, I emptied your vaults.'), h('Countess Moth. You always did prefer stealing to collecting.'), v('Collecting is just stealing slowly.')],
     clash: [v('Every moment ever kept belongs in MY cabinet!'), h('No. I have been wrong about that for years. They belong to the people who lived them.'), n('Grimsby throws open the Countess’s cabinets, and a thousand stolen moments flutter home like moths to a flame.')],
     ending: [h('My vaults are empty. I gave every moment back.'), o('How does it feel?'), h('Lighter. I think I will start collecting friends instead.')],
+  },
+  corsair: {
+    nemesis: 'gale',
+    intro: [h('Ahoy, Oren. My airship sailed the winds between timelines until the crystal broke and the winds died.'), o('And now?'), h('Now someone has bottled up what is left of them.')],
+    rival: [v('The Corsair! Still flying that leaky tub? The winds belong to the Admiralty now.'), h('Admiral Gale. You never could catch me in fair weather.'), v('Then I have made sure there is none.')],
+    clash: [v('Strike your colours, pirate!'), h('Never. Not to you, not to anyone.'), n('The Corsair’s blunderbuss shreds the Admiral’s sails, and the bottled winds burst free across the sky.')],
+    ending: [h('The winds are back. My ship is flying again.'), o('Where will you go?'), h('Wherever the wind takes me. That is the whole point.')],
+  },
+  revenant: {
+    nemesis: 'grave',
+    intro: [n('The Revenant fell in a timeline that no longer exists, and got back up when the crystal broke.'), h('I should not be here, Oren. I know that.'), o('And yet here you are, fighting for the rest of us.')],
+    rival: [v('There you are, my lost lamb. Your grave is getting cold. Come home and lie down.'), h('Mother Grave. I will rest when the work is done.'), v('The dead do not get to choose.')],
+    clash: [v('Every soul belongs in the ground eventually!'), h('Eventually. Not today.'), n('The Revenant’s siphon drains Mother Grave’s chains of bone, and the restless dead she gathered drift peacefully away.')],
+    ending: [h('The work is done. I can feel the rest calling.'), o('Will you go?'), h('Not yet. I would like to see one more sunrise.')],
+  },
+  solaris: {
+    nemesis: 'eclipse',
+    intro: [h('The sun has been setting earlier in every timeline. I am the sun-king; I would notice.'), o('Something is swallowing the light?'), h('Someone. She has wanted my throne for a thousand years.')],
+    rival: [v('Solaris, dear cousin. Your light is fading. Let me cover it for good.'), h('Queen Eclipse. Without the sun, nothing grows.'), v('Without the sun, I rule.')],
+    clash: [v('Let the long night begin!'), h('Every night ends. That is the promise of the dawn.'), n('Solaris’s Sunspears pierce the shadow, and the eclipse cracks open into morning.')],
+    ending: [h('The sun rose on time today. In every timeline.'), o('A good day, then.'), h('Every day the sun rises is a good day.')],
+  },
+  aurora: {
+    nemesis: 'frostjaw',
+    intro: [h('The northern lights have gone dark, Oren. Winter will not end.'), o('A natural freeze?'), h('No. Frostjaw has frozen time itself to keep his winter forever.')],
+    rival: [v('Little light-dancer. Your colours melt my snow. I cannot allow that.'), h('Frostjaw. Even winter has to end.'), v('Not mine.')],
+    clash: [v('Freeze! Everything freeze!'), h('Light does not freeze.'), n('Aurora’s prism splits the sky into colour, and Frostjaw’s endless ice begins to thaw.')],
+    ending: [h('Spring has come back. The lights are dancing again.'), o('They are beautiful.'), h('They always were. They just needed the dark to go away.')],
+  },
+  paradox: {
+    nemesis: 'unmaker',
+    intro: [n('Paradox exists before and after every timeline at once. They should not be possible.'), h('I remember the end of everything, Oren. Someone is trying to make it happen early.'), o('Who could unmake time itself?'), h('The only other thing that should not exist.')],
+    rival: [v('Paradox. We are the same — two impossibilities. Help me unmake it all, and we will finally make sense.'), h('Unmaker. I do not need to make sense. I need things to keep going.'), v('Then you are a contradiction.')],
+    clash: [v('Without time, there are no paradoxes. No mistakes. Nothing.'), h('Nothing is the biggest mistake of all.'), n('Paradox loops their own bolt through yesterday and tomorrow, and the Unmaker is caught in a moment that never ends — and never begins.')],
+    ending: [h('I still should not exist.'), o('And yet?'), h('And yet. Turns out that is a pretty good place to be.')],
   },
 };
 
