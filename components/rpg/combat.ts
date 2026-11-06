@@ -149,6 +149,21 @@ export function fireWeapon(c: Combat, h: CombatHooks, weapon: WeaponDef, origin:
     else if (pattern === 'sweep') offsets = [[fx, fy], [fx + px, fy + py], [fx - px, fy - py]];
     else if (pattern === 'lunge') offsets = [[fx, fy], [fx * 2, fy * 2]];
     else offsets = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+    const reach = weapon.reach ?? 0;
+    if (reach > 0 && pattern === 'spin') {
+      for (let dy = -1 - reach; dy <= 1 + reach; dy++) {
+        for (let dx = -1 - reach; dx <= 1 + reach; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > 1) offsets.push([dx, dy]);
+        }
+      }
+    } else if (reach > 0) {
+      // Extra tiles straight ahead, stopping at the first wall.
+      const baseLength = pattern === 'lunge' ? 2 : 1;
+      for (let i = baseLength + 1; i <= baseLength + reach; i++) {
+        if (!h.walkable(origin.x + fx * (i - 1), origin.y + fy * (i - 1))) break;
+        offsets.push([fx * i, fy * i]);
+      }
+    }
     const cells = offsets
       .map(([dx, dy]) => ({ x: origin.x + dx, y: origin.y + dy }))
       .filter((cell) => h.walkable(cell.x, cell.y));

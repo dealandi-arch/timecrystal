@@ -3,6 +3,7 @@ import { Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { ProfileProvider } from '../components/profile/ProfileContext';
 import { CollectionProvider } from '../components/profile/CollectionContext';
+import { ProgressionProvider } from '../components/profile/ProgressionContext';
 
 const font = Space_Grotesk({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'] });
 
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={font.className}>
       <body>
         <ProfileProvider>
-          <CollectionProvider>{children}</CollectionProvider>
+          <CollectionProvider>
+            <ProgressionProvider>{children}</ProgressionProvider>
+          </CollectionProvider>
         </ProfileProvider>
       </body>
     </html>

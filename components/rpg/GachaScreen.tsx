@@ -24,7 +24,7 @@ import AuthWidget from '../profile/AuthWidget';
 const MUTE_STORAGE_KEY = 'timeCrystalMuted';
 type Tab = 'summon' | 'shop' | 'collection';
 
-function HeroSprite({ char, size = 96, appearance = 'original', silhouette = false }: { char: CharacterDef; size?: number; appearance?: Appearance; silhouette?: boolean }) {
+export function HeroSprite({ char, size = 96, appearance = 'original', silhouette = false }: { char: CharacterDef; size?: number; appearance?: Appearance; silhouette?: boolean }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const canvas = ref.current;

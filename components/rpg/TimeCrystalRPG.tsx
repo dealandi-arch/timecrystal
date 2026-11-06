@@ -28,6 +28,8 @@ import { BASIC_GUN, getSignatureWeapon } from './weapons';
 import { type CombatHooks, drawCombat, fireWeapon, makeCombat, updateCombat } from './combat';
 import { RARITY_INFO, SHARDS_PER_LEVEL, rarityOf } from './gacha';
 import { useCollection } from '../profile/CollectionContext';
+import { type ClaimResult, useProgression } from '../profile/ProgressionContext';
+import { applyStatRanks, applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
 import { useProfile } from '../profile/ProfileContext';
 import AuthWidget from '../profile/AuthWidget';
 import SignInBanner from '../profile/SignInBanner';
@@ -272,12 +274,21 @@ interface LevelRunnerProps {
   onEmeraldFound: () => void;
   autoWeapon: boolean;
   paused: boolean;
+  heroLevel: number;
+  onRunFinished: (stats: LevelRunStats) => Promise<ClaimResult | null>;
+  signedIn: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, onRunFinished, signedIn }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
-  const signature = getSignatureWeapon(charDef.id);
+  const baseSignature = getSignatureWeapon(charDef.id);
+  const ranks = ranksAtLevel(heroLevel, baseSignature);
+  const signature = applyWeaponRanks(baseSignature, ranks, true);
+  const basicGun = applyWeaponRanks(BASIC_GUN, ranks, false);
+  // Levelled-up gear; a ref so the game loop always reads the latest values.
+  const gearRef = useRef({ hero: charStats, base: BASELINE_STATS, signature, basicGun });
+  gearRef.current = { hero: applyStatRanks(charStats, ranks), base: applyStatRanks(BASELINE_STATS, ranks), signature, basicGun };
   const emeraldRef = useRef(onEmeraldFound);
   emeraldRef.current = onEmeraldFound;
 
@@ -289,7 +300,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   const powerActiveRef = useRef(save.powerActivated);
   powerActiveRef.current = save.powerActivated;
 
-  const effectiveMaxHp = save.powerActivated ? charStats.maxHp : BASELINE_STATS.maxHp;
+  const effectiveMaxHp = save.powerActivated ? gearRef.current.hero.maxHp : gearRef.current.base.maxHp;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hp, setHp] = useState(effectiveMaxHp);
@@ -301,6 +312,15 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   pausedRef.current = paused;
   const [weaponSlot, setWeaponSlot] = useState<0 | 1>(autoWeapon ? 1 : 0);
   const [emeraldsFound, setEmeraldsFound] = useState(0);
+  const [reward, setReward] = useState<ClaimResult | null>(null);
+  const claimedRef = useRef(false);
+
+  useEffect(() => {
+    if (!runStats || claimedRef.current) return;
+    claimedRef.current = true;
+    onRunFinished(runStats).then(setReward);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runStats]);
 
   const stateRef = useRef({
     player: makePlayer(level, effectiveMaxHp),
@@ -322,7 +342,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
   function resetLevelRuntime() {
     const s = stateRef.current;
-    const maxHp = powerActiveRef.current ? charStats.maxHp : BASELINE_STATS.maxHp;
+    const maxHp = powerActiveRef.current ? gearRef.current.hero.maxHp : gearRef.current.base.maxHp;
     s.player = makePlayer(level, maxHp);
     s.enemies = makeEnemies(level);
     s.crystal = makeCrystal(level);
@@ -417,7 +437,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           sound.playEnemyDeath();
           setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
           if (weapon.lifesteal) {
-            const maxHp = powerActiveRef.current ? charStats.maxHp : BASELINE_STATS.maxHp;
+            const maxHp = powerActiveRef.current ? gearRef.current.hero.maxHp : gearRef.current.base.maxHp;
             s.player.hp = Math.min(maxHp, s.player.hp + 1);
             setHp(s.player.hp);
             spawnBurst(s.particles, (s.player.gx + 0.5) * TILE, (s.player.gy + 0.5) * TILE, ['#34d399', '#a7f3d0'], 10, 80, -60);
@@ -451,7 +471,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
     function update(dt: number) {
       if (s.won) return;
-      const effectiveStats = powerActiveRef.current ? charStats : BASELINE_STATS;
+      const effectiveStats = powerActiveRef.current ? gearRef.current.hero : gearRef.current.base;
       const p = s.player;
 
       const dir = heldDirection();
@@ -478,9 +498,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const attackKey = s.keys.has(' ') || s.keys.has('j');
       if (p.attackCooldown > 0) p.attackCooldown -= dt * 1000;
       if (attackKey && !attackWasPressed && p.attackCooldown <= 0) {
-        const weapon = s.weaponSlot === 0 ? BASIC_GUN : signature;
+        const weapon = s.weaponSlot === 0 ? gearRef.current.basicGun : gearRef.current.signature;
         p.attackTimer = effectiveStats.attackDurationMs;
-        p.attackCooldown = weapon === BASIC_GUN ? effectiveStats.attackCooldownMs : weapon.cooldownMs;
+        p.attackCooldown = s.weaponSlot === 0 ? effectiveStats.attackCooldownMs : weapon.cooldownMs;
         fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
         if (weapon.kind === 'melee') sound.playHit();
         else sound.playShoot();
@@ -616,7 +636,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     }
 
     function draw() {
-      const effectiveStats = powerActiveRef.current ? charStats : BASELINE_STATS;
+      const effectiveStats = powerActiveRef.current ? gearRef.current.hero : gearRef.current.base;
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
       ctx.save();
       if (s.shake > 0) {
@@ -795,6 +815,12 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             <p>
               Emerald Shards found: {emeraldsFound}/{SHARDS_PER_LEVEL}
             </p>
+            {signedIn && reward && (
+              <p className="run-reward">
+                {reward.earned > 0 ? <>Rank {reward.rank} &nbsp;·&nbsp; ⬡ +{reward.earned} Aizodon</> : reward.reason}
+              </p>
+            )}
+            {!signedIn && <p className="run-reward">Sign in to earn Aizodon and level up your heroes.</p>}
             <p>
               Time: {formatTime(runStats.timeMs)} &nbsp;·&nbsp; Secrets found: {runStats.secrets}
               {(() => {
@@ -870,12 +896,14 @@ export function CharacterSelectScreen({
   subtitle?: string;
 }) {
   const { isUnlocked, shards } = useCollection();
+  const { signedIn, levelOf } = useProgression();
   return (
     <div className="ability-select">
       <h1>{title}</h1>
       <p>{subtitle}</p>
       <p className="select-shards">
         💎 {shards} Emerald Shards &nbsp;·&nbsp; <a href="/gacha">Summon more heroes</a>
+        {signedIn && <> &nbsp;·&nbsp; <a href="/level-up">Level up heroes</a></>}
       </p>
       {appearance && onAppearanceChange && (
         <>
@@ -899,6 +927,9 @@ export function CharacterSelectScreen({
             <div className="char-portrait">
               <SpritePreview char={c} appearance={appearance} />
               <div className="char-portrait-name">{c.name}</div>
+              {signedIn && unlocked && (
+                <div className="char-level">Lv {levelOf(c.id)} &nbsp;·&nbsp; Power {heroSnapshot(c, levelOf(c.id)).power}</div>
+              )}
             </div>
             {!unlocked && <p className="locked-note">🔒 Locked — get this hero from the Gacha.</p>}
             <p className="char-desc">{c.description}</p>
@@ -959,6 +990,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
   const sound = soundRef.current;
   const { profile, submitRun } = useProfile();
   const { addShards } = useCollection();
+  const { signedIn, levelOf, claimRun } = useProgression();
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -1105,6 +1137,9 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
             onEmeraldFound={() => addShards(1)}
+            heroLevel={levelOf(save.characterId ?? 'wanderer')}
+            signedIn={signedIn}
+            onRunFinished={(stats) => claimRun(level.id, stats.timeMs, stats.usedAbility)}
             autoWeapon={settings.autoWeapon}
             paused={settingsOpen}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}

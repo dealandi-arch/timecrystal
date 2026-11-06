@@ -27,6 +27,7 @@ export interface WeaponDef {
   size?: number; // projectile radius in px
   // melee
   pattern?: MeleePattern;
+  reach?: number; // extra tiles beyond the pattern (from levelling up)
   // beam: number of beams fanned out (1 = straight ahead)
   beams?: number;
   // nova / mine

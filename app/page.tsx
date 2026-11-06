@@ -11,6 +11,7 @@ export default function Home() {
           <Link href="/story">Story mode</Link>
           <Link href="/watch">Story animation</Link>
           <Link href="/gacha">Gacha</Link>
+          <Link href="/level-up">Level up</Link>
           <Link href="/editor">Stage editor</Link>
           <Link href="#features">Explore features</Link>
         </div>

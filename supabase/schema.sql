@@ -25,3 +25,10 @@ create index if not exists best_runs_level_time_idx on best_runs (level_id, time
 -- emerald_shards: currency found hidden in levels. owned_characters: gacha heroes the player has unlocked.
 alter table profiles add column if not exists emerald_shards int not null default 0;
 alter table profiles add column if not exists owned_characters text[] not null default '{}';
+
+-- Hero levelling (signed-in players; safe to re-run).
+-- aizodon: currency earned by finishing levels quickly. character_levels: { heroId: level }.
+-- aizodon_claimed_at: when the last run reward was paid, used to reject forged rapid claims.
+alter table profiles add column if not exists aizodon int not null default 0;
+alter table profiles add column if not exists character_levels jsonb not null default '{}';
+alter table profiles add column if not exists aizodon_claimed_at timestamptz;
