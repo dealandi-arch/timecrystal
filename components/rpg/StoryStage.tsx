@@ -280,7 +280,7 @@ export default function StoryStage({ chapterIndex, hero, appearance, theme, soun
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       // Focused buttons handle their own Space/Enter
-      if (e.target instanceof HTMLButtonElement) return;
+      if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement) return;
       if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
         e.preventDefault();
         advanceRef.current();

@@ -20,6 +20,8 @@ import {
 } from './pixelArt';
 import { STORY_CHAPTER_COUNT, VILLAINS, getChapterTitle, getNemesis } from './story';
 import StoryStage from './StoryStage';
+import SettingsPanel from './SettingsPanel';
+import { DEFAULT_SETTINGS, type GameSettings, loadSettings, persistSettings } from './settings';
 import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
 import { BASIC_GUN, getSignatureWeapon } from './weapons';
@@ -268,9 +270,11 @@ interface LevelRunnerProps {
   onAbilityUsed: () => void;
   onPowerActivated: () => void;
   onEmeraldFound: () => void;
+  autoWeapon: boolean;
+  paused: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
   const signature = getSignatureWeapon(charDef.id);
@@ -293,7 +297,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   const [toast, setToast] = useState<string | null>(null);
   const [won, setWon] = useState(false);
   const [runStats, setRunStats] = useState<LevelRunStats | null>(null);
-  const [weaponSlot, setWeaponSlot] = useState<0 | 1>(0);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const [weaponSlot, setWeaponSlot] = useState<0 | 1>(autoWeapon ? 1 : 0);
   const [emeraldsFound, setEmeraldsFound] = useState(0);
 
   const stateRef = useRef({
@@ -302,7 +308,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     crystal: makeCrystal(level),
     combat: makeCombat(),
     emeralds: pickEmeralds(level),
-    weaponSlot: 0 as 0 | 1,
+    weaponSlot: (autoWeapon ? 1 : 0) as 0 | 1,
     particles: [] as Particle[],
     discoveredSecrets: new Set<string>(),
     shake: 0,
@@ -327,6 +333,13 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     setHp(maxHp);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
   }
+
+  // Turning the setting on mid-level equips the weapon straight away.
+  useEffect(() => {
+    if (!autoWeapon) return;
+    stateRef.current.weaponSlot = 1;
+    setWeaponSlot(1);
+  }, [autoWeapon]);
 
   function toggleWeapon() {
     const s = stateRef.current;
@@ -370,6 +383,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     const s = stateRef.current;
 
     function onKeyDown(e: KeyboardEvent) {
+      if (pausedRef.current) return;
       sound.resume();
       s.keys.add(e.key.toLowerCase());
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
@@ -717,8 +731,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
     function loop(now: number) {
       const dt = Math.min(0.033, (now - lastTime) / 1000);
+      if (pausedRef.current) s.startTime += now - lastTime; // paused time doesn't count toward the run
       lastTime = now;
-      update(dt);
+      if (!pausedRef.current) update(dt);
       draw();
       rafId = requestAnimationFrame(loop);
     }
@@ -944,6 +959,8 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
   const sound = soundRef.current;
   const { profile, submitRun } = useProfile();
   const { addShards } = useCollection();
+  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
@@ -957,10 +974,23 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
 
   useEffect(() => {
     setSave(loadSave());
+    setSettings(loadSettings());
     const storedMuted = window.localStorage.getItem(MUTE_STORAGE_KEY) === 'true';
     setMutedFlag(storedMuted);
     sound.setMuted(storedMuted);
   }, [sound]);
+
+  useEffect(() => {
+    if (save && settings.autoSpeciality && save.characterId && !save.powerActivated) {
+      updateSave({ ...save, powerActivated: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [save, settings.autoSpeciality]);
+
+  function changeSettings(next: GameSettings) {
+    setSettings(next);
+    persistSettings(next);
+  }
 
   function updateSave(next: Save) {
     setSave(next);
@@ -1075,6 +1105,8 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
             onEmeraldFound={() => addShards(1)}
+            autoWeapon={settings.autoWeapon}
+            paused={settingsOpen}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
           />
         </div>
@@ -1100,7 +1132,13 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
           ↺
         </button>
       )}
+      {save && (
+        <button className="settings-btn" onClick={() => setSettingsOpen(true)} aria-label="Settings">
+          ⚙
+        </button>
+      )}
       {body}
+      {settingsOpen && <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
