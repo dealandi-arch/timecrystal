@@ -14,12 +14,14 @@ import {
   QUALITY_NAMES,
   RUN_RANKS,
   STAT_LABELS,
+  UPGRADE_LEVELS,
   heroSnapshot,
   levelUpCost,
+  nextUpgradeLevel,
   upgradesAtLevel,
-  usesAmount,
-  usesRange,
+  usesStat,
 } from './progression';
+import { getPerks } from './perks';
 
 const num = (v: number, digits = 1) => (Number.isInteger(v) ? String(v) : v.toFixed(digits));
 
@@ -79,12 +81,15 @@ export default function LevelUpScreen() {
   }
 
   const fmt = {
-    speed: (s: Snapshot) => `${num(1000 / s.stats.moveMs)} tiles/s`,
-    invuln: (s: Snapshot) => `${s.stats.invulnS.toFixed(2)}s`,
-    damage: (s: Snapshot) => `${num(s.weapon.damage)} / gun ${num(s.basicDamage)}`,
-    attackSpeed: (s: Snapshot) => `${num(1000 / s.weapon.cooldownMs)}/s / gun ${num(1000 / s.stats.attackCooldownMs)}/s`,
-    quality: (s: Snapshot) => QUALITY_NAMES[Math.min(s.quality, QUALITY_NAMES.length - 1)],
+    quality: (s: Snapshot) => `${QUALITY_NAMES[Math.min(s.quality, QUALITY_NAMES.length - 1)]} (${num(s.weapon.damage)} dmg)`,
+    recharge: (s: Snapshot) => `${(s.weapon.cooldownMs / 1000).toFixed(2)}s`,
+    range: (s: Snapshot) => rangeText(s.weapon),
+    amount: (s: Snapshot) => `${s.weapon.count ?? 1} per attack`,
+    bounce: (s: Snapshot) => `${s.weapon.bounce ?? 0}`,
+    pierce: (s: Snapshot) => (s.weapon.chain ? `chains to ${s.weapon.chain}` : `${s.weapon.pierce ?? 0} enemies`),
   };
+  const nextUp = nextUpgradeLevel(level, baseWeapon);
+  const perks = getPerks(hero.id);
 
   return (
     <div className="levelup">
@@ -119,23 +124,41 @@ export default function LevelUpScreen() {
             <tbody>
               <StatRow label="Level" now={level} next={next?.level} highlight={!atMax} />
               <StatRow label="OVRL Power" now={now.power} next={next?.power} highlight={!atMax} />
-              <StatRow label={STAT_LABELS.invuln} now={fmt.invuln(now)} next={next && fmt.invuln(next)} highlight={rising.includes('invuln')} />
-              <StatRow label={STAT_LABELS.speed} now={fmt.speed(now)} next={next && fmt.speed(next)} highlight={rising.includes('speed')} />
-              <StatRow label={STAT_LABELS.health} now={now.stats.maxHp} next={next?.stats.maxHp} highlight={rising.includes('health')} />
-              <StatRow label={STAT_LABELS.damage} now={fmt.damage(now)} next={next && fmt.damage(next)} highlight={rising.includes('damage')} />
-              <StatRow label={STAT_LABELS.attackSpeed} now={fmt.attackSpeed(now)} next={next && fmt.attackSpeed(next)} highlight={rising.includes('attackSpeed')} />
-              {usesAmount(baseWeapon) && <StatRow label={STAT_LABELS.amount} now={now.weapon.count} next={next?.weapon.count} highlight={rising.includes('amount')} />}
-              <StatRow label={STAT_LABELS.quality} now={fmt.quality(now)} next={next && fmt.quality(next)} highlight={rising.includes('quality')} />
-              {usesRange(baseWeapon) && <StatRow label={STAT_LABELS.range} now={rangeText(now.weapon)} next={next && rangeText(next.weapon)} highlight={rising.includes('range')} />}
+              {(['quality', 'recharge', 'range', 'amount', 'bounce', 'pierce'] as const)
+                .filter((stat) => usesStat(stat, baseWeapon))
+                .map((stat) => (
+                  <StatRow
+                    key={stat}
+                    label={`${STAT_LABELS[stat]} (Lv ${UPGRADE_LEVELS[stat].join(', ')})`}
+                    now={fmt[stat](now)}
+                    next={next && fmt[stat](next)}
+                    highlight={rising.includes(stat)}
+                  />
+                ))}
             </tbody>
           </table>
-          <p className="gacha-fine">Stats shown with the speciality on. Upgrades apply whether or not it’s active.</p>
+          <p className="gacha-fine">
+            Levelling only improves the special weapon, and only in ways it can use. Health {now.stats.maxHp}, speed {num(1000 / now.stats.moveMs)} tiles/s and
+            protection {now.stats.invulnS.toFixed(2)}s come from {hero.name}’s tier and stay the same.
+          </p>
+          <div className="levelup-perks">
+            <strong>{hero.stats.passiveName}</strong>
+            <ul className="char-perks">
+              {perks.map((perk) => (
+                <li key={perk.kind}><strong>{perk.name}:</strong> {perk.desc}</li>
+              ))}
+            </ul>
+          </div>
 
           {atMax ? (
             <p className="gacha-notice">Maximum level reached.</p>
           ) : (
             <>
-              <p className="levelup-rises">Next level raises: {rising.map((s) => STAT_LABELS[s]).join(', ')}</p>
+              <p className="levelup-rises">
+                {rising.length
+                  ? <>Next level upgrades: {rising.map((s) => STAT_LABELS[s]).join(', ')}</>
+                  : <>Level {level + 1} raises Level and OVRL only.{nextUp ? ` Next weapon upgrade at level ${nextUp}.` : ' No weapon upgrades left.'}</>}
+              </p>
               <button className="ability-btn levelup-buy" disabled={busy || !ready || !!error || aizodon < cost} onClick={doLevelUp}>
                 Level up for ⬡ {cost}
               </button>

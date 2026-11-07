@@ -17,6 +17,7 @@ import {
   rarityOf,
 } from './gacha';
 import { getSignatureWeapon } from './weapons';
+import { getPerks } from './perks';
 import { useCollection } from '../profile/CollectionContext';
 import { useProfile } from '../profile/ProfileContext';
 import AuthWidget from '../profile/AuthWidget';
@@ -78,6 +79,11 @@ function Reveal({ result, onClose }: { result: PullResult; onClose: () => void }
           <h2>{char.name}</h2>
           <p className="gacha-weapon" style={{ color: weapon.color }}>⚔ {weapon.name} — {weapon.desc}</p>
           <p>{char.stats.passiveName} — {char.stats.passiveDesc}</p>
+          <ul className="char-perks">
+            {getPerks(char.id).map((perk) => (
+              <li key={perk.kind}><strong>{perk.name}:</strong> {perk.desc}</li>
+            ))}
+          </ul>
           {result.duplicate ? (
             <p className="gacha-dup">Already owned — refunded 💎 {result.refund}</p>
           ) : (
@@ -231,6 +237,11 @@ export default function GachaScreen() {
                   <h3>{c.name}</h3>
                   <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
                   <p className="char-weapon" style={{ color: weapon.color }}><strong>⚔ {weapon.name}</strong> — {weapon.desc}</p>
+                  <ul className="char-perks">
+                    {getPerks(c.id).map((perk) => (
+                      <li key={perk.kind}><strong>{perk.name}:</strong> {perk.desc}</li>
+                    ))}
+                  </ul>
                   <button className="ability-btn gacha-buy" disabled={have || busy || shards < price} onClick={() => doBuy(c.id)}>
                     {have ? 'Owned' : `Buy for 💎 ${price}`}
                   </button>

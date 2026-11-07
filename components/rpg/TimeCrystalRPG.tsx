@@ -26,11 +26,12 @@ import { DEFAULT_SETTINGS, type GameSettings, loadSettings, persistSettings } fr
 import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
 import { BASIC_GUN, getSignatureWeapon } from './weapons';
-import { type CombatHooks, drawCombat, fireWeapon, makeCombat, updateCombat } from './combat';
+import { type CombatHooks, drawCombat, explode, fireWeapon, makeCombat, updateCombat } from './combat';
 import { RARITY_INFO, SHARDS_PER_LEVEL, rarityOf } from './gacha';
 import { useCollection } from '../profile/CollectionContext';
 import { type ClaimResult, useProgression } from '../profile/ProgressionContext';
-import { applyStatRanks, applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
+import { applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
+import { getPerkValues, getPerks } from './perks';
 import { useProfile } from '../profile/ProfileContext';
 import AuthWidget from '../profile/AuthWidget';
 import SignInBanner from '../profile/SignInBanner';
@@ -245,6 +246,11 @@ function pickEmeralds(level: LevelDef): Set<string> {
   return new Set(cells.slice(0, SHARDS_PER_LEVEL));
 }
 
+// Speciality perk timers and counters; reset when the level restarts.
+function freshPerkState() {
+  return { regenT: 0, shieldUp: true, shieldT: 0, hasteT: 0, attacks: 0, kills: 0, revived: false, started: false, echoT: -1 };
+}
+
 function makeCrystal(level: LevelDef): RuntimeCrystal {
   const first = level.crystalPath[0];
   return {
@@ -287,9 +293,10 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   const ranks = ranksAtLevel(heroLevel, baseSignature);
   const signature = applyWeaponRanks(baseSignature, ranks, true);
   const basicGun = applyWeaponRanks(BASIC_GUN, ranks, false);
-  // Levelled-up gear; a ref so the game loop always reads the latest values.
-  const gearRef = useRef({ hero: charStats, base: BASELINE_STATS, signature, basicGun });
-  gearRef.current = { hero: applyStatRanks(charStats, ranks), base: applyStatRanks(BASELINE_STATS, ranks), signature, basicGun };
+  const perks = getPerkValues(charDef.id);
+  // Gear and perks in a ref so the game loop always reads the latest values.
+  const gearRef = useRef({ hero: charStats, base: BASELINE_STATS, signature, basicGun, perks });
+  gearRef.current = { hero: charStats, base: BASELINE_STATS, signature, basicGun, perks };
   const emeraldRef = useRef(onEmeraldFound);
   emeraldRef.current = onEmeraldFound;
 
@@ -338,7 +345,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     toastTimer: 0,
     won: false,
     startTime: performance.now(),
-    usedAbilityThisRun: false
+    usedAbilityThisRun: false,
+    perk: freshPerkState()
   });
 
   function resetLevelRuntime() {
@@ -348,6 +356,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     s.enemies = makeEnemies(level);
     s.crystal = makeCrystal(level);
     s.combat = makeCombat(); // shards already found stay found
+    s.perk = freshPerkState();
     s.shake = 0.3;
     s.won = false;
     s.startTime = performance.now();
@@ -450,9 +459,23 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       shake: (amount) => {
         s.shake = Math.max(s.shake, amount);
       },
+      modifyDamage: (enemy, amount) => {
+        const perk = activePerks();
+        let dmg = amount;
+        const maxHp = powerActiveRef.current ? gearRef.current.hero.maxHp : gearRef.current.base.maxHp;
+        if (perk.lastStand && s.player.hp <= Math.max(1, Math.floor(maxHp / 3))) dmg *= perk.lastStand;
+        if (perk.giantSlayer && (enemy as RuntimeEnemy).maxHp > 1) dmg *= perk.giantSlayer;
+        if (perk.crit && Math.random() < perk.crit) {
+          dmg *= 2;
+          spawnBurst(s.particles, (enemy.gx + 0.5) * TILE, (enemy.gy + 0.5) * TILE, ['#fde047', '#fff'], 10, 160, 0);
+        }
+        return dmg;
+      },
       onHit: (enemy, weapon, killed) => {
         const hitX = (enemy.gx + 0.5) * TILE;
         const hitY = (enemy.gy + 0.5) * TILE;
+        if (killed) onPerkKill(enemy as RuntimeEnemy);
+        else if (activePerks().knockback) knockBack(enemy as RuntimeEnemy, activePerks().knockback as number);
         if (killed) {
           spawnBurst(s.particles, hitX, hitY, ['#f472b6', '#fbcfe8', '#831843'], 14, 140, 220);
           sound.playEnemyDeath();
@@ -469,6 +492,58 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         }
       },
     };
+
+    // Perks only work while the speciality is active.
+    function activePerks() {
+      return powerActiveRef.current ? gearRef.current.perks : {};
+    }
+
+    function enemySpeed(enemy: RuntimeEnemy) {
+      const perk = activePerks();
+      let speed = perk.timeSlow ?? 1;
+      if (perk.slowAura && Math.max(Math.abs(enemy.gx - s.player.gx), Math.abs(enemy.gy - s.player.gy)) <= perk.slowAura) speed *= 0.5;
+      return speed;
+    }
+
+    function heal(amount: number, color = '#34d399') {
+      const maxHp = powerActiveRef.current ? gearRef.current.hero.maxHp : gearRef.current.base.maxHp;
+      if (s.player.hp >= maxHp) return;
+      s.player.hp = Math.min(maxHp, s.player.hp + amount);
+      setHp(s.player.hp);
+      spawnBurst(s.particles, (s.player.gx + 0.5) * TILE, (s.player.gy + 0.5) * TILE, [color, '#fff'], 10, 80, -60);
+    }
+
+    function onPerkKill(enemy: RuntimeEnemy) {
+      const perk = activePerks();
+      if (perk.killHaste) s.perk.hasteT = perk.killHaste;
+      if (perk.vampire) {
+        s.perk.kills++;
+        if (s.perk.kills % perk.vampire === 0) heal(1, '#f43f5e');
+      }
+      if (perk.killShield && !s.perk.shieldUp && Math.random() < perk.killShield) s.perk.shieldUp = true;
+      if (perk.momentum && Math.random() < perk.momentum) s.player.attackCooldown = 0;
+      if (perk.deathBurst) {
+        explode(s.combat, hooks, enemy.gx, enemy.gy, perk.deathBurst, { ...gearRef.current.basicGun, color: '#fb923c', damage: 1 });
+      }
+    }
+
+    function knockBack(enemy: RuntimeEnemy, tiles: number) {
+      const dx = Math.sign(enemy.gx - s.player.gx);
+      const dy = Math.sign(enemy.gy - s.player.gy);
+      if (!dx && !dy) return;
+      for (let i = 0; i < tiles; i++) {
+        const nx = enemy.gx + dx;
+        const ny = enemy.gy + dy;
+        const blocked = !isWalkable(level, nx, ny, true) || s.enemies.some((o) => o !== enemy && o.alive && o.gx === nx && o.gy === ny);
+        if (blocked) break;
+        enemy.fromX = enemy.gx;
+        enemy.fromY = enemy.gy;
+        enemy.gx = nx;
+        enemy.gy = ny;
+        enemy.moveT = 0;
+        enemy.moving = true;
+      }
+    }
 
     function heldDirection(): Dir | null {
       if (s.keys.has('arrowup') || s.keys.has('w')) return 'up';
@@ -513,7 +588,29 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           }
         }
       } else {
-        stepEntityMove(p, dt, effectiveStats.moveMs);
+        stepEntityMove(p, dt, s.perk.hasteT > 0 ? effectiveStats.moveMs / 1.5 : effectiveStats.moveMs);
+      }
+
+      const perk = activePerks();
+      if (s.perk.hasteT > 0) s.perk.hasteT -= dt;
+      if (!s.perk.started) {
+        s.perk.started = true;
+        if (perk.shield) s.perk.shieldUp = true; // the Barrier is ready when a level starts
+        if (perk.headstart) p.invuln = Math.max(p.invuln, perk.headstart);
+      }
+      if (perk.regen) {
+        s.perk.regenT += dt;
+        if (s.perk.regenT >= perk.regen) {
+          s.perk.regenT = 0;
+          heal(1);
+        }
+      }
+      if (perk.shield && !s.perk.shieldUp) {
+        s.perk.shieldT += dt;
+        if (s.perk.shieldT >= perk.shield) {
+          s.perk.shieldT = 0;
+          s.perk.shieldUp = true;
+        }
       }
 
       const attackKey = s.keys.has(' ') || s.keys.has('j');
@@ -525,6 +622,16 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
         if (weapon.kind === 'melee') sound.playHit();
         else sound.playShoot();
+        s.perk.attacks++;
+        if (perk.echoShot && s.perk.attacks % perk.echoShot === 0) s.perk.echoT = 0.12;
+      }
+      if (s.perk.echoT >= 0) {
+        s.perk.echoT -= dt;
+        if (s.perk.echoT < 0) {
+          const weapon = s.weaponSlot === 0 ? gearRef.current.basicGun : gearRef.current.signature;
+          fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
+          spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#c084fc', '#fff'], 6, 70, 0);
+        }
       }
       attackWasPressed = attackKey;
       if (p.attackTimer > 0) p.attackTimer -= dt * 1000;
@@ -542,7 +649,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         if (!enemy.alive) continue;
         if (enemy.frozen || enemy.stunMs > 0) continue;
         if (!enemy.moving) {
-          enemy.wanderTimer -= dt * 1000;
+          enemy.wanderTimer -= dt * 1000 * enemySpeed(enemy);
           if (enemy.wanderTimer <= 0) {
             enemy.wanderTimer = ENEMY_WANDER_MS * (0.6 + Math.random() * 0.8);
             const dirs: Dir[] = ['up', 'down', 'left', 'right'];
@@ -561,7 +668,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             }
           }
         } else {
-          stepEntityMove(enemy, dt, MOVE_MS);
+          stepEntityMove(enemy, dt, MOVE_MS / enemySpeed(enemy));
         }
 
         if (
@@ -570,11 +677,44 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           enemy.gx === p.gx &&
           enemy.gy === p.gy
         ) {
-          p.hp -= 1;
+          // Touch effects happen whether or not the hit lands.
+          if (perk.thorns) {
+            enemy.hp -= perk.thorns;
+            if (enemy.hp <= 0) {
+              enemy.alive = false;
+              hooks.onHit(enemy, gearRef.current.basicGun, true);
+            }
+          }
+          if (perk.stunTouch && enemy.alive) enemy.stunMs = Math.max(enemy.stunMs, perk.stunTouch * 1000);
           p.invuln = effectiveStats.invulnS;
+          if (perk.dodge && Math.random() < perk.dodge) {
+            spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#e0f2fe', '#fff'], 8, 120, 0);
+            continue;
+          }
+          if (s.perk.shieldUp && (perk.shield || perk.killShield)) {
+            s.perk.shieldUp = false;
+            s.perk.shieldT = 0;
+            spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#38bdf8', '#bae6fd', '#fff'], 14, 140, 0);
+            sound.playHit();
+            continue;
+          }
+          p.hp -= 1;
           s.shake = 0.2;
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#f87171', '#fecaca'], 10, 110, 180);
           sound.playPlayerHurt();
+          if (perk.frostOnHurt) {
+            for (const other of s.enemies) {
+              if (other.alive && Math.max(Math.abs(other.gx - p.gx), Math.abs(other.gy - p.gy)) <= 1) other.stunMs = Math.max(other.stunMs, perk.frostOnHurt * 1000);
+            }
+            spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#93c5fd', '#e0f2fe'], 18, 150, 0);
+          }
+          if (p.hp <= 0 && perk.revive && !s.perk.revived) {
+            const maxHp = powerActiveRef.current ? gearRef.current.hero.maxHp : gearRef.current.base.maxHp;
+            s.perk.revived = true;
+            p.hp = Math.max(1, Math.round(maxHp * perk.revive));
+            p.invuln = Math.max(p.invuln, 1.5);
+            spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#fde047', '#fff', '#fbbf24'], 30, 180, -40);
+          }
           setHp(p.hp);
           if (p.hp <= 0) {
             resetLevelRuntime();
@@ -675,7 +815,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             ctx.drawImage((x + y) % 2 === 0 ? floorA : floorB, x * TILE, y * TILE);
           } else {
             ctx.drawImage(wall, x * TILE, y * TILE);
-            if (tile === SECRET && s.abilityActive.iceAge) {
+            if (tile === SECRET && (s.abilityActive.iceAge || activePerks().secretSight)) {
               ctx.fillStyle = 'rgba(103, 232, 249, 0.3)';
               ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
             }
@@ -683,8 +823,28 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         }
       }
 
-      const crystalPos = entityPixelPos(s.crystal);
       const time = performance.now() / 1000;
+      const drawPerks = activePerks();
+      if (drawPerks.shardSense) {
+        for (const key of s.emeralds) {
+          const [ex, ey] = key.split(',').map(Number);
+          if (Math.max(Math.abs(ex - s.player.gx), Math.abs(ey - s.player.gy)) > drawPerks.shardSense) continue;
+          ctx.globalAlpha = 0.45 + Math.sin(time * 6 + ex) * 0.25;
+          drawDiamond(ctx, (ex + 0.5) * TILE, (ey + 0.5) * TILE, 6, '#10b981');
+          ctx.globalAlpha = 1;
+        }
+      }
+      if (drawPerks.crystalSense) {
+        for (let i = 1; i <= drawPerks.crystalSense; i++) {
+          const stop = s.crystal.path[(s.crystal.index + i) % s.crystal.path.length];
+          ctx.strokeStyle = `rgba(103, 232, 249, ${0.7 / i})`;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.strokeRect(stop.x * TILE + 6, stop.y * TILE + 6, TILE - 12, TILE - 12);
+          ctx.setLineDash([]);
+        }
+      }
+      const crystalPos = entityPixelPos(s.crystal);
       const bob = Math.sin(time * 3) * 4;
       drawDiamond(ctx, crystalPos.x + TILE / 2, crystalPos.y + TILE / 2 + bob, 14, '#67e8f9');
 
@@ -715,6 +875,14 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const playerSprite = getSpriteCanvas(`player:${characterId}:${appearanceRef.current}`, look.sprite, look.palette, TILE / look.sprite.length);
       const walkBob = p.moving ? Math.sin(time * 16) * 1.5 : 0;
       ctx.drawImage(playerSprite, px, py + walkBob);
+      if (s.perk.shieldUp && (drawPerks.shield || drawPerks.killShield)) {
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px + TILE / 2, py + TILE / 2 + walkBob, TILE * 0.55, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (s.perk.hasteT > 0 && p.moving) spawnBurst(s.particles, px + TILE / 2, py + TILE - 4, ['#facc15'], 1, 20, 0);
       const flashing = p.invuln > 0 && Math.floor(time * 10) % 2 === 0;
       if (flashing) {
         ctx.globalCompositeOperation = 'source-atop';
@@ -970,6 +1138,11 @@ export function CharacterSelectScreen({
             {!unlocked && <p className="locked-note">🔒 Locked — get this hero from the Gacha.</p>}
             <p className="char-desc">{c.description}</p>
             <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
+            <ul className="char-perks">
+              {getPerks(c.id).map((perk) => (
+                <li key={perk.kind}><strong>{perk.name}:</strong> {perk.desc}</li>
+              ))}
+            </ul>
             <p className="char-weapon" style={{ color: weapon.color }}>
               <strong>⚔ {weapon.name}</strong> — {weapon.desc}
             </p>

@@ -58,6 +58,8 @@ export interface CombatHooks {
   walkable: (x: number, y: number) => boolean;
   // Called after damage lands. `killed` is true when this hit finished the enemy off.
   onHit: (enemy: CombatEnemy, weapon: WeaponDef, killed: boolean) => void;
+  // Lets speciality perks (critical hits, last stand...) change a hit's damage.
+  modifyDamage?: (enemy: CombatEnemy, amount: number) => number;
   shake: (amount: number) => void;
 }
 
@@ -67,7 +69,7 @@ const CHAIN_RANGE = 3.5;
 
 function damage(h: CombatHooks, enemy: CombatEnemy, amount: number, weapon: WeaponDef) {
   if (!enemy.alive) return;
-  enemy.hp -= amount;
+  enemy.hp -= h.modifyDamage ? h.modifyDamage(enemy, amount) : amount;
   if (weapon.freezeMs) enemy.stunMs = Math.max(enemy.stunMs, weapon.freezeMs);
   const killed = enemy.hp <= 0;
   if (killed) enemy.alive = false;
@@ -78,7 +80,7 @@ function enemiesAt(h: CombatHooks, x: number, y: number) {
   return h.enemies.filter((e) => e.alive && e.gx === x && e.gy === y);
 }
 
-function explode(c: Combat, h: CombatHooks, cx: number, cy: number, radius: number, weapon: WeaponDef) {
+export function explode(c: Combat, h: CombatHooks, cx: number, cy: number, radius: number, weapon: WeaponDef) {
   for (const e of h.enemies) {
     if (e.alive && Math.abs(e.gx - cx) <= radius && Math.abs(e.gy - cy) <= radius) damage(h, e, weapon.damage, weapon);
   }

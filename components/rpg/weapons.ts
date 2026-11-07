@@ -1,3 +1,5 @@
+import { type Rarity, rarityOf } from './gacha';
+
 // Every hero carries the basic gun plus one signature weapon of their own (switch with Q).
 // Weapons are data: the game reads these fields to decide how each one behaves.
 
@@ -99,6 +101,17 @@ export const SIGNATURE_WEAPONS: Record<string, WeaponDef> = {
   oblivion: W({ name: 'Erasure', desc: 'Three beams of nothing. Each kill restores 1 HP.', kind: 'beam', color: '#f43f5e', cooldownMs: 1000, damage: 4, beams: 3, lifesteal: true }, 'erasure'),
 };
 
+// Higher tiers carry better weapons: harder hits and faster recharge on top of each weapon's own style.
+export const TIER_WEAPON: Record<Rarity, { damage: number; cooldown: number }> = {
+  common: { damage: 1, cooldown: 1 },
+  rare: { damage: 1.2, cooldown: 0.95 },
+  epic: { damage: 1.4, cooldown: 0.9 },
+  legendary: { damage: 1.7, cooldown: 0.85 },
+  mythic: { damage: 2, cooldown: 0.8 },
+};
+
 export function getSignatureWeapon(characterId: string): WeaponDef {
-  return SIGNATURE_WEAPONS[characterId] ?? SIGNATURE_WEAPONS.wanderer;
+  const weapon = SIGNATURE_WEAPONS[characterId] ?? SIGNATURE_WEAPONS.wanderer;
+  const tier = TIER_WEAPON[rarityOf(characterId)];
+  return { ...weapon, damage: weapon.damage * tier.damage, cooldownMs: weapon.cooldownMs * tier.cooldown };
 }

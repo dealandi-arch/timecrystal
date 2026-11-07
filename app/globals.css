@@ -1353,3 +1353,8 @@ body {
   .rpg-hud { padding-right: 0; max-width: calc(100vw - 11rem); scrollbar-width: none; }
   .rpg-hud::-webkit-scrollbar { display: none; }
 }
+
+/* Speciality perks */
+.char-perks { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.8rem; line-height: 1.4; color: #c4b5fd; text-align: left; }
+.char-perks li + li { margin-top: 0.15rem; }
+.levelup-perks { margin-top: 0.75rem; font-size: 0.9rem; }
