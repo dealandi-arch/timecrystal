@@ -964,7 +964,7 @@ export function CharacterSelectScreen({
               <SpritePreview char={c} appearance={appearance} />
               <div className="char-portrait-name">{c.name}</div>
               {signedIn && unlocked && (
-                <div className="char-level">Lv {levelOf(c.id)} &nbsp;·&nbsp; Power {heroSnapshot(c, levelOf(c.id)).power}</div>
+                <div className="char-level">Lv {levelOf(c.id)} &nbsp;·&nbsp; OVRL {heroSnapshot(c, levelOf(c.id)).power}</div>
               )}
             </div>
             {!unlocked && <p className="locked-note">🔒 Locked — get this hero from the Gacha.</p>}

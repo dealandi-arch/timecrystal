@@ -1,3 +1,6 @@
+import { rarityOf } from './gacha';
+import { balanceStats } from './progression';
+
 export type PixelGrid = string[];
 export type Palette = Record<string, string>;
 
@@ -190,7 +193,7 @@ export interface CharacterDef {
   stats: CharacterStats;
 }
 
-export const CHARACTERS: CharacterDef[] = [
+const RAW_CHARACTERS: CharacterDef[] = [
   {
     id: 'wanderer',
     name: 'Wanderer',
@@ -333,7 +336,7 @@ export const CHARACTERS: CharacterDef[] = [
       "She strikes before most people finish deciding to react. Her attack speed is a reflex, not a decision — conditioned through years in underground tournament circuits that did not care about legal timeline access. She hits three times in the window others manage once. She does not plan on getting touched, and usually does not need to.",
     sprite: PLAYER_SPRITE,
     palette: { o: '#1a2e05', y: '#a3e635', d: '#65a30d', e: '#1a2e05' },
-    stats: { maxHp: 3, moveMs: 150, attackCooldownMs: 110, attackDurationMs: 100, invulnS: 0.6, bulletSpeed: 10, passiveName: 'Rapid Strike', passiveDesc: 'Fastest attack speed of any character. Reduced health.' },
+    stats: { maxHp: 3, moveMs: 150, attackCooldownMs: 110, attackDurationMs: 100, invulnS: 0.6, bulletSpeed: 10, passiveName: 'Rapid Strike', passiveDesc: 'Among the fastest attacks of any hero. Reduced health.' },
   },
   {
     id: 'ghost',
@@ -342,7 +345,7 @@ export const CHARACTERS: CharacterDef[] = [
       "No one has clocked them accurately. Timeline tracking stations record only blur and absence — a footprint where something passed but nothing can identify. The Ghost does not fight the same way twice, because they are never in the same place long enough for a pattern to form. They are, by every measurable metric, the fastest presence in the fracture.",
     sprite: PLAYER_SPRITE,
     palette: { o: '#0c4a6e', y: '#e0f2fe', d: '#7dd3fc', e: '#0c4a6e' },
-    stats: { maxHp: 4, moveMs: 75, attackCooldownMs: 265, attackDurationMs: 180, invulnS: 1.0, bulletSpeed: 9, passiveName: 'Blur', passiveDesc: 'Absolute maximum movement speed. Reduced health.' },
+    stats: { maxHp: 4, moveMs: 75, attackCooldownMs: 265, attackDurationMs: 180, invulnS: 1.0, bulletSpeed: 9, passiveName: 'Blur', passiveDesc: 'Extreme movement speed. Reduced health.' },
   },
   {
     id: 'ember',
@@ -597,6 +600,9 @@ export const CHARACTERS: CharacterDef[] = [
     stats: { maxHp: 6, moveMs: 100, attackCooldownMs: 160, attackDurationMs: 125, invulnS: 1.5, bulletSpeed: 16, passiveName: 'Unmaking', passiveDesc: 'Every stat is pushed to the edge of what is possible.' },
   },
 ];
+
+// Same stat budget for everyone in a tier; see balanceStats.
+export const CHARACTERS: CharacterDef[] = RAW_CHARACTERS.map((c) => ({ ...c, stats: balanceStats(c.stats, rarityOf(c.id)) }));
 
 // Human look (story mode). Each character gets a unique 16×16 sprite assembled from layers:
 // a body build, a face, hair and gear. Presentation follows the pronouns in their description.

@@ -118,7 +118,7 @@ export default function LevelUpScreen() {
           <table className="levelup-stats">
             <tbody>
               <StatRow label="Level" now={level} next={next?.level} highlight={!atMax} />
-              <StatRow label="Total Power" now={now.power} next={next?.power} highlight={!atMax} />
+              <StatRow label="OVRL Power" now={now.power} next={next?.power} highlight={!atMax} />
               <StatRow label={STAT_LABELS.invuln} now={fmt.invuln(now)} next={next && fmt.invuln(next)} highlight={rising.includes('invuln')} />
               <StatRow label={STAT_LABELS.speed} now={fmt.speed(now)} next={next && fmt.speed(next)} highlight={rising.includes('speed')} />
               <StatRow label={STAT_LABELS.health} now={now.stats.maxHp} next={next?.stats.maxHp} highlight={rising.includes('health')} />

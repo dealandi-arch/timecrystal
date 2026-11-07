@@ -1,6 +1,7 @@
 // Hero levelling rules shared by the client UI and the server API routes (no React, no browser APIs).
 // Signed-in players earn Aizodon by finishing levels quickly and spend it levelling up heroes.
 
+import { type Rarity, rarityOf } from './gacha';
 import { BASIC_GUN, type WeaponDef, getSignatureWeapon } from './weapons';
 
 export const MAX_HERO_LEVEL = 20;
@@ -48,10 +49,13 @@ export function usesRange(weapon: WeaponDef): boolean {
 }
 
 // The stats a hero gains on reaching `level`.
-export function upgradesAtLevel(level: number, weapon: WeaponDef): UpgradeStat[] {
+function plannedUpgrades(level: number): UpgradeStat[] {
   if (level < 2 || level > MAX_HERO_LEVEL) return [];
-  const planned = level === MAX_HERO_LEVEL ? ALL_STATS : SCHEDULE[(level - 2) % SCHEDULE.length];
-  return planned.filter((s) => (s !== 'amount' || usesAmount(weapon)) && (s !== 'range' || usesRange(weapon)));
+  return level === MAX_HERO_LEVEL ? ALL_STATS : SCHEDULE[(level - 2) % SCHEDULE.length];
+}
+
+export function upgradesAtLevel(level: number, weapon: WeaponDef): UpgradeStat[] {
+  return plannedUpgrades(level).filter((s) => (s !== 'amount' || usesAmount(weapon)) && (s !== 'range' || usesRange(weapon)));
 }
 
 export function ranksAtLevel(level: number, weapon: WeaponDef): Ranks {
@@ -111,19 +115,39 @@ export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boo
   };
 }
 
-// A single score for comparing heroes; every level-up raises it.
-export function totalPower(stats: CoreStats, weapon: WeaponDef, ranks: Ranks): number {
-  const shots = weapon.kind === 'beam' ? weapon.beams ?? 1 : weapon.count ?? 1;
-  const dps = (weapon.damage * shots * 1000) / Math.max(60, weapon.cooldownMs);
-  return Math.round(
-    stats.maxHp * 10 +
-      15000 / stats.moveMs +
-      stats.invulnS * 100 +
-      26000 / stats.attackCooldownMs +
-      dps * 20 +
-      ranks.quality * 25 +
-      ranks.range * 15
-  );
+// ----- OVRL power -----
+// Every hero in a tier has the same OVRL at the same level, and each tier sits above the one below.
+// It's kept honest by balanceStats: a hero's level 1 stats are scaled to spend exactly their tier's budget.
+export const TIER_BASE_OVRL: Record<Rarity, number> = { common: 350, rare: 400, epic: 450, legendary: 520, mythic: 600 };
+
+const STAT_POINTS: Record<UpgradeStat, number> = { health: 10, speed: 8, invuln: 6, damage: 8, attackSpeed: 8, amount: 5, quality: 8, range: 5 };
+
+export function overallPower(rarity: Rarity, level: number): number {
+  let ovrl = TIER_BASE_OVRL[rarity];
+  for (let l = 2; l <= Math.min(level, MAX_HERO_LEVEL); l++) {
+    for (const stat of plannedUpgrades(l)) ovrl += STAT_POINTS[stat];
+  }
+  return ovrl;
+}
+
+// What a hero's stats are worth: health, how fast they move and attack, and how long they're protected after a hit.
+// Weapons aren't counted, because each one works differently and has no fair single number.
+export function statPoints(stats: CoreStats): number {
+  return stats.maxHp * 10 + 15000 / stats.moveMs + 26000 / stats.attackCooldownMs + stats.invulnS * 100;
+}
+
+// Scales speed, attack rate and protection together so the hero spends exactly their tier's budget.
+// Health is left alone and the ratios between the other stats are kept, so each hero keeps their personality.
+export function balanceStats<T extends CoreStats>(stats: T, rarity: Rarity): T {
+  const health = stats.maxHp * 10;
+  const factor = (TIER_BASE_OVRL[rarity] - health) / (statPoints(stats) - health);
+  return {
+    ...stats,
+    moveMs: stats.moveMs / factor,
+    attackCooldownMs: stats.attackCooldownMs / factor,
+    attackDurationMs: stats.attackDurationMs / factor,
+    invulnS: stats.invulnS * factor,
+  };
 }
 
 export interface HeroSnapshot {
@@ -143,7 +167,7 @@ export function heroSnapshot(hero: { id: string; stats: CoreStats }, level: numb
   const weapon = applyWeaponRanks(base, ranks, true);
   return {
     level,
-    power: totalPower(stats, weapon, ranks),
+    power: overallPower(rarityOf(hero.id), level),
     stats,
     weapon,
     basicDamage: applyWeaponRanks(BASIC_GUN, ranks, false).damage,
