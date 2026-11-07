@@ -890,12 +890,14 @@ export function CharacterSelectScreen({
   onChoose,
   appearance,
   onAppearanceChange,
+  showNemesis = false,
   title = 'Choose Your Character',
   subtitle = 'Pick who travels through time. This choice is yours to keep.'
 }: {
   onChoose: (id: string) => void;
   appearance?: Appearance;
   onAppearanceChange?: (a: Appearance) => void;
+  showNemesis?: boolean;
   title?: string;
   subtitle?: string;
 }) {
@@ -941,7 +943,7 @@ export function CharacterSelectScreen({
             <p className="char-weapon" style={{ color: weapon.color }}>
               <strong>⚔ {weapon.name}</strong> — {weapon.desc}
             </p>
-            {appearance && (
+            {showNemesis && (
               <p className="char-nemesis">
                 <strong>Nemesis: {VILLAINS[getNemesis(c.id)].name}</strong> — {VILLAINS[getNemesis(c.id)].blurb}
               </p>
@@ -1053,8 +1055,9 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
   if (save && save.characterId === null) {
     body = (
       <CharacterSelectScreen
-        appearance={isStory ? save.appearance : undefined}
-        onAppearanceChange={isStory ? setAppearance : undefined}
+        appearance={save.appearance}
+        onAppearanceChange={setAppearance}
+        showNemesis={isStory}
         onChoose={(id) => {
           sound.resume();
           sound.playMenuClick();
@@ -1135,9 +1138,9 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             sound={sound}
             characterId={save.characterId ?? 'wanderer'}
             theme={theme}
-            appearance={isStory ? save.appearance : 'original'}
+            appearance={save.appearance}
             displayName={chapterTitle}
-            onToggleAppearance={isStory ? () => updateSave({ ...save, appearance: save.appearance === 'human' ? 'original' : 'human' }) : undefined}
+            onToggleAppearance={() => updateSave({ ...save, appearance: save.appearance === 'human' ? 'original' : 'human' })}
             onAbilityUsed={() => updateSave({ ...save, abilityUsed: true })}
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
             onEmeraldFound={() => addShards(1)}

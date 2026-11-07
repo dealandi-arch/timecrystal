@@ -45,6 +45,7 @@ export default function StoryMovie() {
         subtitle="Pick a hero and watch their whole journey play out as an animated story — no fighting required."
         appearance={appearance}
         onAppearanceChange={setAppearance}
+        showNemesis
         onChoose={(id) => {
           sound.resume();
           sound.playMenuClick();

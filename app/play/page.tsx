@@ -8,7 +8,7 @@ export default function PlayPage() {
         ← Back home
       </Link>
       <h1>Time Crystal</h1>
-      <p>Clear every enemy, uncover the secret passages, and predict where the time crystal will move next.</p>
+      <p>Clear every enemy, uncover the secret passages, and predict where the time crystal will move next. Switch between the original and human look whenever you like.</p>
       <p>
         Want the full tale? <Link href="/story">Play story mode</Link>
       </p>
