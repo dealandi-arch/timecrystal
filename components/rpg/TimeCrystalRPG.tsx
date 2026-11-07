@@ -459,6 +459,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       shake: (amount) => {
         s.shake = Math.max(s.shake, amount);
       },
+      push: (enemy, tiles) => knockBack(enemy as RuntimeEnemy, tiles),
       modifyDamage: (enemy, amount) => {
         const perk = activePerks();
         let dmg = amount;
@@ -619,7 +620,16 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         const weapon = s.weaponSlot === 0 ? gearRef.current.basicGun : gearRef.current.signature;
         p.attackTimer = effectiveStats.attackDurationMs;
         p.attackCooldown = s.weaponSlot === 0 ? effectiveStats.attackCooldownMs : weapon.cooldownMs;
-        fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
+        const fired = fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
+        if (fired.dashTo) {
+          // Blink: slide the hero to where the attack ended.
+          p.fromX = p.gx;
+          p.fromY = p.gy;
+          p.gx = fired.dashTo.x;
+          p.gy = fired.dashTo.y;
+          p.moving = true;
+          p.moveT = 0;
+        }
         if (weapon.kind === 'melee') sound.playHit();
         else sound.playShoot();
         s.perk.attacks++;
@@ -1267,6 +1277,9 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
           sound.resume();
           sound.playMenuClick();
           updateSave({ ...save, characterId: id });
+          if (profile) {
+            fetch('/api/profile/recent', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ characterId: id }) }).catch(() => {});
+          }
         }}
       />
     );

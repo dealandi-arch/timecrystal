@@ -6,6 +6,7 @@ export interface Profile {
   id: string;
   nickname: string;
   avatarColor: string;
+  avatarPixels?: string | null;
 }
 
 interface AuthResult {
@@ -19,10 +20,12 @@ interface ProfileContextValue {
   signUp: (nickname: string, password: string, avatarColor: string) => Promise<AuthResult>;
   logIn: (nickname: string, password: string) => Promise<AuthResult>;
   logOut: () => Promise<void>;
+  setAvatar: (pixels: string | null, color: string) => void;
   submitRun: (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean) => Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean } | null>;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
+const HEARTBEAT_MS = 2 * 60 * 1000;
 
 async function parseJson(res: Response) {
   return res.json().catch(() => ({}));
@@ -31,6 +34,20 @@ async function parseJson(res: Response) {
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const signedIn = !!profile;
+
+  // While signed in, check in every few minutes so "last online" stays current.
+  useEffect(() => {
+    if (!signedIn) return;
+    const timer = window.setInterval(() => {
+      fetch('/api/auth/me').catch(() => {});
+    }, HEARTBEAT_MS);
+    return () => window.clearInterval(timer);
+  }, [signedIn]);
+
+  const setAvatar = useCallback((pixels: string | null, color: string) => {
+    setProfile((p) => (p ? { ...p, avatarPixels: pixels, avatarColor: color } : p));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,8 +108,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ profile, loading, signUp, logIn, logOut, submitRun }),
-    [profile, loading, signUp, logIn, logOut, submitRun]
+    () => ({ profile, loading, signUp, logIn, logOut, submitRun, setAvatar }),
+    [profile, loading, signUp, logIn, logOut, submitRun, setAvatar]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

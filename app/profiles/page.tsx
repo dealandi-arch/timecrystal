@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Avatar from '../../components/profile/Avatar';
 
 interface SearchResult {
   id: string;
   nickname: string;
   avatarColor: string;
+  avatarPixels?: string | null;
 }
 
 export default function ProfilesBrowsePage() {
@@ -33,7 +35,7 @@ export default function ProfilesBrowsePage() {
         &larr; Back to the game
       </Link>
       <h1>Browse Profiles</h1>
-      <p>Search for other players and see their best runs across every level.</p>
+      <p>Search for other players to see their avatar, heroes, levels and best runs.</p>
       <div className="profile-search">
         <input
           type="text"
@@ -47,7 +49,7 @@ export default function ProfilesBrowsePage() {
       {results &&
         results.map((p) => (
           <Link key={p.id} href={`/profiles/${p.id}`} className="profile-result-row">
-            <span className="avatar-bar" style={{ background: p.avatarColor, width: '1.6rem', height: '0.6rem' }} />
+            <Avatar nickname={p.nickname} color={p.avatarColor} pixels={p.avatarPixels} size={32} />
             <span>{p.nickname}</span>
             <span style={{ opacity: 0.6, marginLeft: 'auto' }}>#{p.id}</span>
           </Link>

@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from '../../../../lib/supabase';
+import { PROFILE_PAGE_EXTRAS, selectWithFallback } from '../../../../lib/profileFields';
+
+const BASE = 'id, nickname, avatar_color, created_at';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   if (!isBackendConfigured()) return NextResponse.json({ profile: null });
 
   const supabase = getSupabase();
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, nickname, avatar_color, created_at')
-    .eq('id', params.id)
-    .maybeSingle();
-
-  if (!profile) return NextResponse.json({ profile: null });
+  const { data } = await selectWithFallback(
+    (columns) => supabase.from('profiles').select(columns).eq('id', params.id).maybeSingle(),
+    `${BASE}, ${PROFILE_PAGE_EXTRAS}`,
+    BASE
+  );
+  if (!data) return NextResponse.json({ profile: null });
+  const profile = data as unknown as {
+    id: string;
+    nickname: string;
+    avatar_color: string;
+    created_at: string;
+    avatar_pixels?: string | null;
+    last_seen_at?: string | null;
+    recent_characters?: string[] | null;
+    owned_characters?: string[] | null;
+    character_levels?: Record<string, number> | null;
+  };
 
   const { data: runs } = await supabase
     .from('best_runs')
@@ -24,7 +37,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       id: profile.id,
       nickname: profile.nickname,
       avatarColor: profile.avatar_color,
-      createdAt: profile.created_at
+      createdAt: profile.created_at,
+      avatarPixels: profile.avatar_pixels ?? null,
+      lastSeenAt: profile.last_seen_at ?? null,
+      recentCharacters: profile.recent_characters ?? [],
+      ownedCharacters: profile.owned_characters ?? [],
+      characterLevels: profile.character_levels ?? {}
     },
     runs: (runs ?? []).map((r) => ({
       levelId: r.level_id,

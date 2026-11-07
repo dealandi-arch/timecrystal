@@ -3,11 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useProfile } from './ProfileContext';
-
-const AVATAR_COLORS = [
-  '#ef4444', '#f97316', '#facc15', '#22c55e', '#10b981',
-  '#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#ec4899'
-];
+import Avatar from './Avatar';
+import { AVATAR_COLORS } from './avatarData';
 
 export default function AuthWidget() {
   const { profile, loading, signUp, logIn, logOut } = useProfile();
@@ -24,7 +21,7 @@ export default function AuthWidget() {
   if (profile) {
     return (
       <div className="auth-widget">
-        <span className="avatar-bar" style={{ background: profile.avatarColor }} />
+        <Avatar nickname={profile.nickname} color={profile.avatarColor} pixels={profile.avatarPixels} size={28} />
         <span className="auth-nickname">{profile.nickname}</span>
         <span className="auth-id">#{profile.id}</span>
         <Link href={`/profiles/${profile.id}`} className="auth-link">

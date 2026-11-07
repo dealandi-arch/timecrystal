@@ -43,7 +43,7 @@ export function usesAmount(weapon: WeaponDef): boolean {
 export function usesRange(weapon: WeaponDef): boolean {
   if (weapon.kind === 'beam') return false; // beams already reach the next wall
   if (weapon.kind === 'shot') return !!weapon.range && weapon.range <= 14;
-  return true;
+  return true; // melee reach, blast/bubble/ripple radius, wave distance
 }
 
 export function usesBounce(weapon: WeaponDef): boolean {
@@ -114,7 +114,7 @@ export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boo
     homing: weapon.homing ? weapon.homing * (1 + q * 0.2) : weapon.homing,
     explode: weapon.explode && q >= 4 ? weapon.explode + 1 : weapon.explode,
     cooldownMs: Math.max(60, weapon.cooldownMs * Math.pow(0.9, ranks.recharge)),
-    range: weapon.kind === 'shot' && weapon.range && usesRange(weapon) ? weapon.range + range * 1.5 : weapon.range,
+    range: (weapon.kind === 'shot' || weapon.kind === 'wave') && weapon.range && usesRange(weapon) ? weapon.range + range * 1.5 : weapon.range,
     radius: weapon.radius !== undefined && usesRange(weapon) ? weapon.radius + (range >= 2 ? 1 : 0) : weapon.radius,
     reach: weapon.kind === 'melee' ? Math.ceil(range / 2) : undefined,
     count: weapon.count !== undefined && usesAmount(weapon) ? weapon.count + ranks.amount : weapon.count,

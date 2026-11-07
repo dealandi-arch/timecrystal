@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { formatTime } from './formatTime';
+import Avatar from './Avatar';
 
 interface Entry {
   profileId: string | null;
   nickname: string;
   avatarColor: string;
+  avatarPixels?: string | null;
   timeMs: number;
 }
 
@@ -38,7 +40,7 @@ export default function LeaderboardPanel({ levelId }: { levelId: number }) {
       {entries.map((entry, i) => (
         <div className="leaderboard-row" key={`${entry.profileId ?? entry.nickname}-${i}`}>
           <span className="leaderboard-rank">{i + 1}.</span>
-          <span className="avatar-bar" style={{ background: entry.avatarColor }} />
+          <Avatar nickname={entry.nickname} color={entry.avatarColor} pixels={entry.avatarPixels} size={20} />
           <span>{entry.nickname}</span>
           <span className="leaderboard-time">{formatTime(entry.timeMs)}</span>
         </div>

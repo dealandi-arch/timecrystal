@@ -32,3 +32,10 @@ alter table profiles add column if not exists owned_characters text[] not null d
 alter table profiles add column if not exists aizodon int not null default 0;
 alter table profiles add column if not exists character_levels jsonb not null default '{}';
 alter table profiles add column if not exists aizodon_claimed_at timestamptz;
+
+-- Avatars and richer profiles (safe to re-run).
+-- avatar_pixels: 1024 characters for a 32x32 pixel avatar (null = show the player's initial).
+-- last_seen_at: when they were last online. recent_characters: heroes they picked most recently.
+alter table profiles add column if not exists avatar_pixels text;
+alter table profiles add column if not exists last_seen_at timestamptz;
+alter table profiles add column if not exists recent_characters text[] not null default '{}';

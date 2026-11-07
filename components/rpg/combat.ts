@@ -1,8 +1,9 @@
-// Weapon behaviour for the level runner: projectiles, melee, beams, mines, novas and their effects.
+// Weapon behaviour for the level runner: projectiles, melee, beams, mines, blasts, time bubbles,
+// ripples, rolling waves and their effects.
 // Positions are in tile units (cell centres are x + 0.5); drawing converts to pixels.
 
 import { type Particle, spawnBurst } from './particles';
-import type { WeaponDef } from './weapons';
+import type { BlastShape, WeaponDef } from './weapons';
 
 export interface CombatEnemy {
   gx: number;
@@ -38,6 +39,10 @@ interface Slash extends Fx { cells: { x: number; y: number }[] }
 interface Line extends Fx { x1: number; y1: number; x2: number; y2: number; width: number }
 interface Ring extends Fx { x: number; y: number; radius: number }
 interface Mine { gx: number; gy: number; life: number; weapon: WeaponDef }
+interface Zone { gx: number; gy: number; life: number; maxLife: number; tick: number; weapon: WeaponDef }
+interface Pulse { x: number; y: number; r: number; maxR: number; hit: Set<CombatEnemy>; weapon: WeaponDef }
+interface Wave { x: number; y: number; dx: number; dy: number; travelled: number; hit: Set<CombatEnemy>; weapon: WeaponDef }
+interface Dot { enemy: CombatEnemy; t: number; amount: number; weapon: WeaponDef }
 
 export interface Combat {
   projectiles: Projectile[];
@@ -45,10 +50,14 @@ export interface Combat {
   lines: Line[];
   rings: Ring[];
   mines: Mine[];
+  zones: Zone[];
+  pulses: Pulse[];
+  waves: Wave[];
+  dots: Dot[];
 }
 
 export function makeCombat(): Combat {
-  return { projectiles: [], slashes: [], lines: [], rings: [], mines: [] };
+  return { projectiles: [], slashes: [], lines: [], rings: [], mines: [], zones: [], pulses: [], waves: [], dots: [] };
 }
 
 export interface CombatHooks {
@@ -61,11 +70,17 @@ export interface CombatHooks {
   // Lets speciality perks (critical hits, last stand...) change a hit's damage.
   modifyDamage?: (enemy: CombatEnemy, amount: number) => number;
   shake: (amount: number) => void;
+  // Pushes an enemy away from the player (knockback weapons).
+  push?: (enemy: CombatEnemy, tiles: number) => void;
 }
 
 const MAX_MINES = 3;
 const MINE_LIFE_S = 8;
 const CHAIN_RANGE = 3.5;
+const ZONE_TICK_S = 0.6;
+const PULSE_SPEED = 8; // tiles per second
+const WAVE_SPEED = 7;
+const POISON_DELAY_S = 1;
 
 function damage(h: CombatHooks, enemy: CombatEnemy, amount: number, weapon: WeaponDef) {
   if (!enemy.alive) return;
@@ -74,6 +89,44 @@ function damage(h: CombatHooks, enemy: CombatEnemy, amount: number, weapon: Weap
   const killed = enemy.hp <= 0;
   if (killed) enemy.alive = false;
   h.onHit(enemy, weapon, killed);
+  if (killed) return;
+  if (weapon.knockback && h.push) h.push(enemy, weapon.knockback);
+  if (weapon.poison && c_dots) c_dots.push({ enemy, t: POISON_DELAY_S, amount: weapon.poison, weapon: { ...weapon, poison: 0, knockback: 0 } });
+}
+
+// Set while a combat update or attack runs, so damage() can queue poison without threading Combat everywhere.
+let c_dots: Dot[] | null = null;
+
+// Cells a blast covers around a centre, by shape. Cross arms stop at walls.
+function blastCells(h: CombatHooks, cx: number, cy: number, r: number, shape: BlastShape): { x: number; y: number }[] {
+  const cells: { x: number; y: number }[] = [];
+  if (shape === 'cross') {
+    cells.push({ x: cx, y: cy });
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (let i = 1; i <= r; i++) {
+        if (!h.walkable(cx + dx * i, cy + dy * i)) break;
+        cells.push({ x: cx + dx * i, y: cy + dy * i });
+      }
+    }
+    return cells;
+  }
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (shape === 'diamond' && Math.abs(dx) + Math.abs(dy) > r) continue;
+      if (h.walkable(cx + dx, cy + dy)) cells.push({ x: cx + dx, y: cy + dy });
+    }
+  }
+  return cells;
+}
+
+// Tiles in a straight line, stopping before the first wall.
+function ray(h: CombatHooks, ox: number, oy: number, dx: number, dy: number, length: number) {
+  const cells: { x: number; y: number }[] = [];
+  for (let i = 1; i <= length; i++) {
+    if (!h.walkable(ox + dx * i, oy + dy * i)) break;
+    cells.push({ x: ox + dx * i, y: oy + dy * i });
+  }
+  return cells;
 }
 
 function enemiesAt(h: CombatHooks, x: number, y: number) {
@@ -118,7 +171,15 @@ function chain(c: Combat, h: CombatHooks, from: CombatEnemy, jumps: number, weap
 }
 
 // origin: player cell; dir: facing unit vector; basicSpeed: hero bullet speed for the basic gun.
-export function fireWeapon(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: number; y: number }, dir: { dx: number; dy: number }, basicSpeed: number) {
+// Returns where the player ends up for blink attacks.
+export function fireWeapon(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: number; y: number }, dir: { dx: number; dy: number }, basicSpeed: number): { dashTo?: { x: number; y: number } } {
+  c_dots = c.dots;
+  const result = fireInner(c, h, weapon, origin, dir, basicSpeed);
+  c_dots = null;
+  return result ?? {};
+}
+
+function fireInner(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: number; y: number }, dir: { dx: number; dy: number }, basicSpeed: number): { dashTo?: { x: number; y: number } } | void {
   const fx = dir.dx;
   const fy = dir.dy;
   const px = -fy;
@@ -146,37 +207,55 @@ export function fireWeapon(c: Combat, h: CombatHooks, weapon: WeaponDef, origin:
 
   if (weapon.kind === 'melee') {
     const pattern = weapon.pattern ?? 'front';
-    let offsets: [number, number][];
-    if (pattern === 'front') offsets = [[fx, fy]];
-    else if (pattern === 'sweep') offsets = [[fx, fy], [fx + px, fy + py], [fx - px, fy - py]];
-    else if (pattern === 'lunge') offsets = [[fx, fy], [fx * 2, fy * 2]];
-    else offsets = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
     const reach = weapon.reach ?? 0;
-    if (reach > 0 && pattern === 'spin') {
-      for (let dy = -1 - reach; dy <= 1 + reach; dy++) {
-        for (let dx = -1 - reach; dx <= 1 + reach; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) > 1) offsets.push([dx, dy]);
-        }
-      }
-    } else if (reach > 0) {
-      // Extra tiles straight ahead, stopping at the first wall.
-      const baseLength = pattern === 'lunge' ? 2 : 1;
-      for (let i = baseLength + 1; i <= baseLength + reach; i++) {
-        if (!h.walkable(origin.x + fx * (i - 1), origin.y + fy * (i - 1))) break;
-        offsets.push([fx * i, fy * i]);
-      }
+    const forward = (length: number) => ray(h, origin.x, origin.y, fx, fy, length);
+    let cells: { x: number; y: number }[];
+    let dashTo: { x: number; y: number } | undefined;
+    if (pattern === 'front') cells = forward(1 + reach);
+    else if (pattern === 'lunge') cells = forward(2 + reach);
+    else if (pattern === 'spear') cells = forward(3 + reach);
+    else if (pattern === 'dash') {
+      // Blink forward, cutting every tile passed through.
+      cells = forward(2 + reach);
+      if (cells.length) dashTo = cells[cells.length - 1];
+    } else if (pattern === 'x') {
+      cells = [[1, 1], [1, -1], [-1, 1], [-1, -1]].flatMap(([dx, dy]) => ray(h, origin.x, origin.y, dx, dy, 3 + reach));
+    } else if (pattern === 'spin') {
+      cells = blastCells(h, origin.x, origin.y, 1 + reach, 'square').filter((cell) => cell.x !== origin.x || cell.y !== origin.y);
+    } else {
+      // sweep: the row ahead; arc: the row ahead plus the tiles beside you
+      const offsets: [number, number][] = [[fx, fy], [fx + px, fy + py], [fx - px, fy - py]];
+      if (pattern === 'arc') offsets.push([px, py], [-px, -py]);
+      cells = offsets.map(([dx, dy]) => ({ x: origin.x + dx, y: origin.y + dy })).filter((cell) => h.walkable(cell.x, cell.y));
+      if (reach > 0) cells.push(...forward(1 + reach).slice(1));
     }
-    const cells = offsets
-      .map(([dx, dy]) => ({ x: origin.x + dx, y: origin.y + dy }))
-      .filter((cell) => h.walkable(cell.x, cell.y));
     for (const cell of cells) for (const e of enemiesAt(h, cell.x, cell.y)) damage(h, e, weapon.damage, weapon);
     c.slashes.push({ cells, life: 0.2, maxLife: 0.2, color: weapon.color });
+    return { dashTo };
+  }
+
+  if (weapon.kind === 'zone') {
+    const life = (weapon.durationMs ?? 3000) / 1000;
+    c.zones.push({ gx: origin.x, gy: origin.y, life, maxLife: life, tick: 0, weapon });
+    return;
+  }
+
+  if (weapon.kind === 'pulse') {
+    c.pulses.push({ x: ocx, y: ocy, r: 0, maxR: (weapon.radius ?? 3) + 0.5, hit: new Set(), weapon });
+    return;
+  }
+
+  if (weapon.kind === 'wave') {
+    c.waves.push({ x: ocx, y: ocy, dx: fx, dy: fy, travelled: 0, hit: new Set(), weapon });
     return;
   }
 
   if (weapon.kind === 'beam') {
     const beams = weapon.beams ?? 1;
-    const dirs: [number, number][] = beams === 1 ? [[fx, fy]] : [[fx, fy], [fx + px, fy + py], [fx - px, fy - py]];
+    const dirs: [number, number][] =
+      beams === 1 ? [[fx, fy]]
+      : beams === 4 ? [[fx, fy], [-fx, -fy], [px, py], [-px, -py]]
+      : [[fx, fy], [fx + px, fy + py], [fx - px, fy - py]];
     for (const [dx, dy] of dirs) {
       let x = origin.x;
       let y = origin.y;
@@ -205,10 +284,14 @@ export function fireWeapon(c: Combat, h: CombatHooks, weapon: WeaponDef, origin:
 
   if (weapon.kind === 'nova') {
     const r = weapon.radius ?? 1;
+    const shape = weapon.shape ?? 'square';
+    const cells = blastCells(h, origin.x, origin.y, r, shape);
+    const inBlast = new Set(cells.map((cell) => `${cell.x},${cell.y}`));
     for (const e of h.enemies) {
-      if (e.alive && Math.abs(e.gx - origin.x) <= r && Math.abs(e.gy - origin.y) <= r) damage(h, e, weapon.damage, weapon);
+      if (e.alive && inBlast.has(`${e.gx},${e.gy}`)) damage(h, e, weapon.damage, weapon);
     }
-    c.rings.push({ x: ocx * h.tile, y: ocy * h.tile, radius: (r + 0.5) * h.tile, life: 0.4, maxLife: 0.4, color: weapon.color });
+    if (shape === 'square') c.rings.push({ x: ocx * h.tile, y: ocy * h.tile, radius: (r + 0.5) * h.tile, life: 0.4, maxLife: 0.4, color: weapon.color });
+    else c.slashes.push({ cells, life: 0.35, maxLife: 0.35, color: weapon.color });
     spawnBurst(h.particles, ocx * h.tile, ocy * h.tile, [weapon.color, '#fff'], 18, 160, 0);
     if (r >= 2) h.shake(0.2);
     return;
@@ -220,6 +303,12 @@ export function fireWeapon(c: Combat, h: CombatHooks, weapon: WeaponDef, origin:
 }
 
 export function updateCombat(c: Combat, h: CombatHooks, dt: number, player: { x: number; y: number }) {
+  c_dots = c.dots;
+  updateInner(c, h, dt, player);
+  c_dots = null;
+}
+
+function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number; y: number }) {
   for (const p of c.projectiles) {
     if (!p.alive) continue;
     const w = p.weapon;
@@ -291,6 +380,7 @@ export function updateCombat(c: Combat, h: CombatHooks, dt: number, player: { x:
         p.returning = true;
         p.hit.clear();
       } else {
+        if (w.explodeAtEnd && w.explode) explode(c, h, Math.floor(p.x), Math.floor(p.y), w.explode, w);
         p.alive = false;
       }
       continue;
@@ -327,6 +417,67 @@ export function updateCombat(c: Combat, h: CombatHooks, dt: number, player: { x:
   }
   if (c.mines.length) c.mines = c.mines.filter((m) => m.life > 0);
 
+  // Time bubbles: hurt and freeze whatever is inside, every tick, until they fade.
+  for (const z of c.zones) {
+    z.life -= dt;
+    z.tick -= dt;
+    if (z.tick <= 0) {
+      z.tick = ZONE_TICK_S;
+      const r = z.weapon.radius ?? 1;
+      for (const e of h.enemies) {
+        if (e.alive && Math.abs(e.gx - z.gx) <= r && Math.abs(e.gy - z.gy) <= r) damage(h, e, z.weapon.damage, z.weapon);
+      }
+    }
+  }
+  if (c.zones.length) c.zones = c.zones.filter((z) => z.life > 0);
+
+  // Ripples: grow outward and hit each enemy once as the edge passes it.
+  for (const pulse of c.pulses) {
+    pulse.r += PULSE_SPEED * dt;
+    for (const e of h.enemies) {
+      if (!e.alive || pulse.hit.has(e)) continue;
+      if (Math.hypot(e.gx + 0.5 - pulse.x, e.gy + 0.5 - pulse.y) <= pulse.r) {
+        pulse.hit.add(e);
+        damage(h, e, pulse.weapon.damage, pulse.weapon);
+      }
+    }
+  }
+  if (c.pulses.length) c.pulses = c.pulses.filter((pulse) => pulse.r < pulse.maxR);
+
+  // Waves: a three-tile wall rolling forward until it hits a wall or runs out of range.
+  for (const wave of c.waves) {
+    const step = (wave.weapon.speed ?? WAVE_SPEED) * dt;
+    wave.x += wave.dx * step;
+    wave.y += wave.dy * step;
+    wave.travelled += step;
+    const cx = Math.floor(wave.x);
+    const cy = Math.floor(wave.y);
+    if (!h.walkable(cx, cy) || wave.travelled >= (wave.weapon.range ?? 6)) {
+      wave.travelled = Infinity;
+      continue;
+    }
+    const px = -wave.dy;
+    const py = wave.dx;
+    for (const [ox, oy] of [[0, 0], [px, py], [-px, -py]]) {
+      for (const e of enemiesAt(h, cx + ox, cy + oy)) {
+        if (wave.hit.has(e)) continue;
+        wave.hit.add(e);
+        damage(h, e, wave.weapon.damage, wave.weapon);
+      }
+    }
+  }
+  if (c.waves.length) c.waves = c.waves.filter((wave) => Number.isFinite(wave.travelled));
+
+  // Poison: the delayed second bite.
+  for (const d of c.dots) {
+    d.t -= dt;
+    if (d.t <= 0) {
+      damage(h, d.enemy, d.amount, d.weapon);
+      spawnBurst(h.particles, (d.enemy.gx + 0.5) * h.tile, (d.enemy.gy + 0.5) * h.tile, ['#a3e635', '#365314'], 6, 60, -40);
+    }
+  }
+  if (c.dots.length) c.dots = c.dots.filter((d) => d.t > 0);
+
   for (const list of [c.slashes, c.lines, c.rings] as Fx[][]) for (const fx of list) fx.life -= dt;
   c.slashes = c.slashes.filter((s) => s.life > 0);
   c.lines = c.lines.filter((l) => l.life > 0);
@@ -334,6 +485,64 @@ export function updateCombat(c: Combat, h: CombatHooks, dt: number, player: { x:
 }
 
 export function drawCombat(ctx: CanvasRenderingContext2D, c: Combat, tile: number, time: number) {
+  for (const z of c.zones) {
+    const x = (z.gx + 0.5) * tile;
+    const y = (z.gy + 0.5) * tile;
+    const r = ((z.weapon.radius ?? 1) + 0.5) * tile;
+    const fade = Math.min(1, z.life / 0.4);
+    ctx.globalAlpha = 0.18 * fade + Math.sin(time * 8) * 0.04;
+    ctx.fillStyle = z.weapon.color;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    ctx.globalAlpha = 0.7 * fade;
+    ctx.strokeStyle = z.weapon.color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.lineDashOffset = -time * 20;
+    ctx.strokeRect(x - r, y - r, r * 2, r * 2);
+    ctx.setLineDash([]);
+    // clock hand sweeping round, so it reads as stopped time
+    const angle = time * 4;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(angle) * r * 0.8, y + Math.sin(angle) * r * 0.8);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  for (const pulse of c.pulses) {
+    ctx.globalAlpha = Math.max(0, 1 - pulse.r / pulse.maxR) * 0.9 + 0.1;
+    ctx.strokeStyle = pulse.weapon.color;
+    ctx.shadowColor = pulse.weapon.color;
+    ctx.shadowBlur = 12;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(pulse.x * tile, pulse.y * tile, pulse.r * tile, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+
+  for (const wave of c.waves) {
+    const x = wave.x * tile;
+    const y = wave.y * tile;
+    const half = tile * 1.5;
+    const px = -wave.dy;
+    const py = wave.dx;
+    ctx.strokeStyle = wave.weapon.color;
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(x + px * half - wave.dx * 6, y + py * half - wave.dy * 6);
+    ctx.quadraticCurveTo(x + wave.dx * 10, y + wave.dy * 10, x - px * half - wave.dx * 6, y - py * half - wave.dy * 6);
+    ctx.stroke();
+    ctx.strokeStyle = '#ecfeff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+  }
+  ctx.globalAlpha = 1;
+
   for (const m of c.mines) {
     const x = (m.gx + 0.5) * tile;
     const y = (m.gy + 0.5) * tile;

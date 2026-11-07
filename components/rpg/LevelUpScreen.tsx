@@ -26,7 +26,7 @@ import { getPerks } from './perks';
 const num = (v: number, digits = 1) => (Number.isInteger(v) ? String(v) : v.toFixed(digits));
 
 function rangeText(w: WeaponDef): string {
-  if (w.kind === 'shot') return `${num(w.range ?? 0)} tiles`;
+  if (w.kind === 'shot' || w.kind === 'wave') return `${num(w.range ?? 0)} tiles`;
   if (w.kind === 'melee') return `+${w.reach ?? 0} tile reach`;
   return `${w.radius ?? 0} tile radius`;
 }

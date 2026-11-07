@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   const token = createSessionToken({ id, nickname });
-  const res = NextResponse.json({ profile: { id, nickname, avatarColor } });
+  const res = NextResponse.json({ profile: { id, nickname, avatarColor, avatarPixels: null } });
   res.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: 'lax',

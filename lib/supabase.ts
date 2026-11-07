@@ -14,7 +14,9 @@ export function getSupabase(): SupabaseClient {
   }
   if (!client) {
     client = createClient(process.env.SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, {
-      auth: { persistSession: false }
+      auth: { persistSession: false },
+      // Next.js caches fetch() by default, which made profile pages show stale data. Always ask the database.
+      global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) }
     });
   }
   return client;
