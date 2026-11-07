@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { SoundEngine } from './audio';
+import { type SoundEngine, getSoundEngine } from './audio';
 import { CHARACTERS, type Appearance } from './pixelArt';
 import { STORY_CHAPTER_COUNT, VILLAINS, getChapterTitle, getNemesis } from './story';
 import StoryStage from './StoryStage';
@@ -19,7 +19,7 @@ export default function StoryMovie() {
   const [autoPlay, setAutoPlay] = useState(true);
   const [muted, setMuted] = useState(false);
   const soundRef = useRef<SoundEngine | null>(null);
-  if (!soundRef.current) soundRef.current = new SoundEngine();
+  if (!soundRef.current) soundRef.current = getSoundEngine();
   const sound = soundRef.current;
 
   useEffect(() => {

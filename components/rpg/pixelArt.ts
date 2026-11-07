@@ -470,6 +470,132 @@ export const CHARACTERS: CharacterDef[] = [
     palette: { o: '#000000', y: '#f8fafc', d: '#3f3f46', e: '#f43f5e' },
     stats: { maxHp: 6, moveMs: 105, attackCooldownMs: 170, attackDurationMs: 130, invulnS: 1.3, bulletSpeed: 15, passiveName: 'Causality Loop', passiveDesc: 'Every stat pushed far beyond the baseline.' },
   },
+  {
+    id: 'falconer',
+    name: 'Falconer',
+    description:
+      "She spent her life on the cliffs at the edge of the fracture, raising hawks that can fly between one second and the next. Her birds see what she cannot, and she has learned to trust them completely. She is quick, patient and sharp-eyed, and nothing that runs from her has ever run far enough.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1c1917', y: '#a16207', d: '#713f12', e: '#fef3c7' },
+    stats: { maxHp: 4, moveMs: 130, attackCooldownMs: 240, attackDurationMs: 170, invulnS: 0.75, bulletSpeed: 12, passiveName: 'Keen Eye', passiveDesc: 'Quick on her feet with faster shots.' },
+  },
+  {
+    id: 'prospector',
+    name: 'Prospector',
+    description:
+      "He has been digging for time crystals since before anyone knew they could break. Forty years underground gave him a bad back, a worse temper and an encyclopaedic knowledge of explosives. He does not move fast, but he has never met a problem that a well-placed charge could not improve.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#292524', y: '#b45309', d: '#78350f', e: '#fde68a' },
+    stats: { maxHp: 6, moveMs: 170, attackCooldownMs: 280, attackDurationMs: 190, invulnS: 0.8, bulletSpeed: 9, passiveName: 'Thick Skin', passiveDesc: 'Extra health and a longer recovery window. A little slow.' },
+  },
+  {
+    id: 'bard',
+    name: 'Bard',
+    description:
+      "They wandered from timeline to timeline collecting songs, and they have noticed the world goes quiet wherever the fracture spreads. The Bard fights the way they perform: in rhythm, a little showily, and always with one eye on the crowd. Their chords hit like a wall, and they are never short of a verse about it afterwards.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#3b0764', y: '#c084fc', d: '#7e22ce', e: '#fdf4ff' },
+    stats: { maxHp: 4, moveMs: 135, attackCooldownMs: 230, attackDurationMs: 170, invulnS: 0.85, bulletSpeed: 10, passiveName: 'Encore', passiveDesc: 'Quick steps and a slightly faster tempo.' },
+  },
+  {
+    id: 'alchemist',
+    name: 'Alchemist',
+    description:
+      "She can tell you what any substance will do just by the smell of it, and she has the scorch marks to prove how she learned. The Alchemist fills her belt with flasks that burn, freeze and do things chemistry has no polite word for. She is curious to a fault, and she takes notes even in the middle of a fight.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#052e16', y: '#10b981', d: '#047857', e: '#d1fae5' },
+    stats: { maxHp: 4, moveMs: 150, attackCooldownMs: 250, attackDurationMs: 175, invulnS: 1, bulletSpeed: 10, passiveName: 'Tonic', passiveDesc: 'A longer recovery window from her own potions.' },
+  },
+  {
+    id: 'ronin',
+    name: 'Ronin',
+    description:
+      "He served a house that no longer exists in a timeline nobody remembers, and he has been walking ever since. The Ronin says little and wastes nothing. His katana is out and back in its sheath before most opponents have finished reaching for their weapons, and he considers every extra movement a personal failure.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#0c0a09', y: '#475569', d: '#1e293b', e: '#e2e8f0' },
+    stats: { maxHp: 4, moveMs: 125, attackCooldownMs: 200, attackDurationMs: 150, invulnS: 0.7, bulletSpeed: 11, passiveName: 'Iaido', passiveDesc: 'Very fast attacks and quick footwork.' },
+  },
+  {
+    id: 'gladiator',
+    name: 'Gladiator',
+    description:
+      "She won her freedom in an arena that existed in every timeline at once, in front of a crowd that never went home. She walked out with a trident, a crest helm and no interest in ever being told when to fight again. She is tough, loud and very hard to knock down, and she still salutes before she hits you.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#450a0a', y: '#b91c1c', d: '#7f1d1d', e: '#fde68a' },
+    stats: { maxHp: 7, moveMs: 155, attackCooldownMs: 280, attackDurationMs: 190, invulnS: 0.75, bulletSpeed: 9, passiveName: 'Crowd Favourite', passiveDesc: 'High health and a steady pace.' },
+  },
+  {
+    id: 'puppeteer',
+    name: 'Puppeteer',
+    description:
+      "They used to run a little theatre in a pocket of stalled time, and their puppets were the most lifelike anyone had ever seen. Now they use the same razor-fine strings for other work. The Puppeteer is soft-spoken, unsettlingly polite and always seems to know exactly where you are about to step.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1e1b4b', y: '#7c3aed', d: '#4c1d95', e: '#f5f3ff' },
+    stats: { maxHp: 5, moveMs: 140, attackCooldownMs: 230, attackDurationMs: 165, invulnS: 0.9, bulletSpeed: 12, passiveName: 'Marionette', passiveDesc: 'Quick hands and fast, far-reaching strings.' },
+  },
+  {
+    id: 'dragoon',
+    name: 'Dragoon',
+    description:
+      "She rode with the last dragon wing in a timeline that burned, and she came out of the fire wearing its horns. The dragon is gone but its breath is not, and she has learned to carry it in a gauntlet on her arm. She is proud and fearless, and she has a habit of charging at things other people run from.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#431407', y: '#ea580c', d: '#9a3412', e: '#fed7aa' },
+    stats: { maxHp: 6, moveMs: 135, attackCooldownMs: 230, attackDurationMs: 165, invulnS: 0.85, bulletSpeed: 11, passiveName: 'Dragonheart', passiveDesc: 'Tough and fast, with a burning temper.' },
+  },
+  {
+    id: 'tidecaller',
+    name: 'Tidecaller',
+    description:
+      "He speaks for the oceans of a hundred timelines, and they have been very angry lately. The Tidecaller moves with a slow, rolling confidence, and when he finally strikes, everything around him gets swept up. He has a long beard, a longer memory and no patience at all for anyone who has ever polluted a reef.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#083344', y: '#0891b2', d: '#155e75', e: '#cffafe' },
+    stats: { maxHp: 7, moveMs: 145, attackCooldownMs: 250, attackDurationMs: 180, invulnS: 1, bulletSpeed: 10, passiveName: 'High Tide', passiveDesc: 'Great health and a long recovery window.' },
+  },
+  {
+    id: 'automaton',
+    name: 'Automaton',
+    description:
+      "They were built to run a clock tower and woke up one day with opinions. The Automaton has been upgrading themselves ever since, one stolen part at a time, and their right arm now fires faster than most people can blink. They do not get tired, they do not get bored, and they find the concept of sleep frankly hilarious.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1c1917', y: '#71717a', d: '#3f3f46', e: '#fbbf24' },
+    stats: { maxHp: 7, moveMs: 150, attackCooldownMs: 170, attackDurationMs: 130, invulnS: 0.8, bulletSpeed: 13, passiveName: 'Overclock', passiveDesc: 'Heavy plating and extremely fast attacks.' },
+  },
+  {
+    id: 'celestia',
+    name: 'Celestia',
+    description:
+      "She has watched over the night sky since before there were names for the stars, and she remembers when each of them was lit. Celestia came down to walk the fracture because the constellations have started going out. She moves like falling light, and when she calls, the stars themselves come down to answer her.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1e1b4b', y: '#818cf8', d: '#3730a3', e: '#fef9c3' },
+    stats: { maxHp: 7, moveMs: 110, attackCooldownMs: 190, attackDurationMs: 145, invulnS: 1.2, bulletSpeed: 14, passiveName: 'Starlit', passiveDesc: 'Fast, sturdy and very hard to pin down.' },
+  },
+  {
+    id: 'archon',
+    name: 'Archon',
+    description:
+      "He was the highest judge of a court that sat above every timeline, until he ruled against his own order and was cast down for it. The Archon still carries the great blade and the broken wings. He is grave, immovable and terrifyingly fair, and he will hear your side of things right before he brings it down.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#422006', y: '#fbbf24', d: '#b45309', e: '#fffbeb' },
+    stats: { maxHp: 10, moveMs: 135, attackCooldownMs: 210, attackDurationMs: 160, invulnS: 1.1, bulletSpeed: 12, passiveName: 'Divine Mandate', passiveDesc: 'Huge health, strong in every other way.' },
+  },
+  {
+    id: 'genesis',
+    name: 'Genesis',
+    description:
+      "She was there at the first second of the first timeline, and everything that has ever grown carries a little of her in it. Genesis has never hurried in her life, because she has never needed to. Wherever she walks the broken places start to heal, and whatever she cuts down feeds what comes next, including her.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#14532d', y: '#4ade80', d: '#15803d', e: '#f0fdf4' },
+    stats: { maxHp: 9, moveMs: 105, attackCooldownMs: 170, attackDurationMs: 130, invulnS: 1.4, bulletSpeed: 15, passiveName: 'First Bloom', passiveDesc: 'Every stat is far beyond the baseline, with great health.' },
+  },
+  {
+    id: 'oblivion',
+    name: 'Oblivion',
+    description:
+      "He is what is left after the last timeline ends, and he came back to see what all the fuss was about. Oblivion wears a crown of nothing and a face nobody can quite describe. He has erased more worlds than anyone can count, and for reasons he has never explained, he has decided to save this one instead.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#000000', y: '#27272a', d: '#09090b', e: '#f43f5e' },
+    stats: { maxHp: 6, moveMs: 100, attackCooldownMs: 160, attackDurationMs: 125, invulnS: 1.5, bulletSpeed: 16, passiveName: 'Unmaking', passiveDesc: 'Every stat is pushed to the edge of what is possible.' },
+  },
 ];
 
 // Human look (story mode). Each character gets a unique 16×16 sprite assembled from layers:
@@ -689,6 +815,16 @@ const SKULL_FACE: Layer = { 3: '.....wwwwww.....', 4: '.....wawwaw.....', 5: '..
 const SUN_CROWN: Layer = { 0: '.a..a.a..a.a..a.', 1: '..a.aaaaaaaa.a..' };
 const AURORA_TIARA: Layer = { 0: '....a.w..w.a....', 1: '....awaaaawa....' };
 const HALO: Layer = { 0: '.....aaaaaa.....' };
+const BIRD: Layer = { 6: '.aa.............', 7: 'aaaa............', 8: '.aa.............' };
+const HARD_HAT: Layer = { 1: '.....aaaaaa.....', 2: '....aaaaaaaa....', 3: '...aaaaaaaaaa...' };
+const LUTE: Layer = { 9: '............dd..', 10: '...........dad..', 11: '..........dad...', 12: '.........dd.....' };
+const TOPKNOT: Layer = { 0: '.......kk.......', 1: '.....kkkkkk.....', 2: '....khhhhhhk....', 3: '....khhsshhk....' };
+const CREST_HELM: Layer = { 0: '.....aaaaaa.....', 1: '....oaaaaaao....', 2: '....ommmmmmo....', 3: '....ommmmmmo....' };
+const STRINGS: Layer = { 8: '.a............a.', 9: '.a............a.', 10: '.a............a.', 11: '.a............a.' };
+const ROBOT_FACE: Layer = { 2: '.....oooooo.....', 3: '....ommmmmmo....', 4: '....omammamo....', 5: '....ommmmmmo....', 6: '.....ommmmo.....', 7: '......ommo......' };
+const WINGS: Layer = { 8: 'w..............w', 9: 'ww............ww', 10: 'www..........www', 11: '.ww..........ww.' };
+const BLANK_FACE: Layer = { 4: '.....ssssss.....' };
+const LEAF_CROWN: Layer = { 0: '....a.a..a.a....', 1: '.....aaaaaa.....' };
 const APRON: Layer = { 9: '......dddd......', 10: '.....dddddd.....', 11: '.....dadadd.....', 12: '.....dddddd.....' };
 const HOOD: Layer = {
   0: '......oooo......',
@@ -758,6 +894,20 @@ const HUMAN_LOOKS: Record<string, HumanLook> = {
   solaris: { layers: [BROAD, HEAD, BEARD, SHORT, SUN_CROWN], s: '#8d5524', h: '#fbbf24', a: '#fde047' },
   aurora: { layers: [DRESS, HEAD, LIPS, LONG, AURORA_TIARA], s: '#ffdbac', h: '#f0fdfa', a: '#a78bfa' },
   paradox: { layers: [NEUTRAL, HEAD, MEDIUM, HALF_MASK, HALO], s: '#d6d3d1', h: '#f8fafc', a: '#f43f5e' },
+  falconer: { layers: [SLIM, HEAD, LIPS, PONYTAIL, FEATHER_CAP, BIRD], s: '#e0ac69', h: '#422006', a: '#d6d3d1' },
+  prospector: { layers: [BROAD, HEAD, BEARD, HARD_HAT], s: '#d4a373', h: '#78716c', a: '#facc15' },
+  bard: { layers: [NEUTRAL, HEAD, MEDIUM, LUTE], s: '#f1c27d', h: '#be185d', a: '#fde047' },
+  alchemist: { layers: [ROBE, HEAD, LIPS, BOB, EYE_GOGGLES], s: '#8d5524', h: '#1c1917', a: '#6ee7b7' },
+  ronin: { layers: [BROAD, HEAD, TOPKNOT], s: '#f1c27d', h: '#0c0a09', a: '#e2e8f0' },
+  gladiator: { layers: [SLIM, BARE_ARMS, HEAD, LIPS, CREST_HELM], s: '#c68642', h: '#451a03', a: '#ef4444' },
+  puppeteer: { layers: [NEUTRAL, HEAD, MESSY, DOMINO, STRINGS], s: '#e2e8f0', h: '#312e81', a: '#e0e7ff' },
+  dragoon: { layers: [SLIM, HEAD, LIPS, LONG, HORNED_HELM], s: '#ffdbac', h: '#b91c1c', a: '#fdba74' },
+  tidecaller: { layers: [BROAD, HEAD, BEARD, LONG, LEAF_CROWN], s: '#5c3a21', h: '#67e8f9', a: '#22d3ee' },
+  automaton: { layers: [BULKY, HEAD, ROBOT_FACE], s: '#a1a1aa', h: '#3f3f46', a: '#fbbf24' },
+  celestia: { layers: [DRESS, HEAD, LIPS, LONG, HALO], s: '#5c3a21', h: '#e0e7ff', a: '#fde047' },
+  archon: { layers: [BULKY, WINGS, HEAD, BEARD, SHORT, HALO], s: '#e0ac69', h: '#f8fafc', a: '#fbbf24' },
+  genesis: { layers: [FLOAT, HEAD, LIPS, LONG, LEAF_CROWN], s: '#c68642', h: '#166534', a: '#86efac' },
+  oblivion: { layers: [BROAD, HEAD, SHADOW_FACE, CROWN], s: '#27272a', h: '#000000', a: '#f43f5e' },
 };
 
 const DEFAULT_HUMAN: HumanLook = HUMAN_LOOKS.wanderer;
@@ -832,14 +982,14 @@ export function getEnemyLook(kind: EnemyKind, appearance: Appearance): Look {
 }
 
 // Story actors: the guide, the Guardian (boss) and each hero's nemesis.
-// One nemesis per hero. Bad characters (nemeses + the Guardian) are 14 women, 14 men and 4 they.
+// One nemesis per hero. Bad characters (nemeses + the Guardian) are 20 women, 20 men and 6 they.
 export type VillainId =
   // women
-  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse'
+  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse' | 'vein' | 'kuro' | 'strings' | 'maris' | 'seraph' | 'aurelia'
   // men
-  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw'
+  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw' | 'harrow' | 'ichor' | 'crassus' | 'kael' | 'krell' | 'omega'
   // they
-  | 'hollow' | 'mirror' | 'lantern' | 'unmaker';
+  | 'hollow' | 'mirror' | 'lantern' | 'unmaker' | 'silence' | 'voidmaw';
 export type ActorId = 'oren' | 'guardian' | VillainId;
 
 interface ActorDef {
@@ -880,7 +1030,19 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   moth: villain(['#1c1917', '#78716c', '#44403c'], [DRESS, HEAD, LIPS, LONG, ANTENNAE], '#e2e8f0', '#d6d3d1', '#fde68a', ['#292524', '#a8a29e', '#fde68a']),
   grave: villain(['#022c22', '#1f2937', '#064e3b'], [DRESS, HEAD, LIPS, PIGTAILS], '#d6d3d1', '#111827', '#6ee7b7', ['#022c22', '#374151', '#6ee7b7']),
   eclipse: villain(['#020617', '#312e81', '#0f0a1e'], [DRESS, HEAD, LIPS, LONG, SUN_CROWN], '#5c3a21', '#0f0a1e', '#1e1b4b', ['#0f0a1e', '#4338ca', '#c7d2fe']),
+  vein: villain(['#1c1917', '#57534e', '#292524'], [SLIM, HEAD, LIPS, BOB, HARD_HAT], '#d4a373', '#7f1d1d', '#a8a29e', ['#1c1917', '#78716c', '#fde047']),
+  kuro: villain(['#000000', '#18181b', '#7f1d1d'], [DRESS, HEAD, LIPS, TOPKNOT], '#f5f5f4', '#000000', '#dc2626', ['#000000', '#3f3f46', '#fecaca']),
+  strings: villain(['#2e1065', '#a21caf', '#4a044e'], [DRESS, HEAD, LIPS, BUN, STRINGS], '#fef3c7', '#fda4af', '#f5d0fe', ['#4a044e', '#c026d3', '#f5d0fe']),
+  maris: villain(['#042f2e', '#0f766e', '#134e4a'], [DRESS, HEAD, LIPS, LONG, SCARF], '#99f6e4', '#134e4a', '#5eead4', ['#042f2e', '#14b8a6', '#99f6e4']),
+  seraph: villain(['#3f3f46', '#f4f4f5', '#a1a1aa'], [ROBE, WINGS, HEAD, LIPS, LONG, HALO], '#ffdbac', '#fde047', '#facc15', ['#52525b', '#f4f4f5', '#fde047']),
+  aurelia: villain(['#451a03', '#fef3c7', '#d97706'], [DRESS, HEAD, LIPS, BUN, HALO], '#8d5524', '#422006', '#fbbf24', ['#78350f', '#fde68a', '#fffbeb']),
   // men
+  harrow: villain(['#1c0a0a', '#7f1d1d', '#292524'], [BROAD, HEAD, BEARD, FEATHER_CAP], '#ffdbac', '#44403c', '#fde047', ['#450a0a', '#991b1b', '#fde047']),
+  ichor: villain(['#052e16', '#3f6212', '#1a2e05'], [ROBE, HEAD, MUSTACHE, MESSY, EYE_GOGGLES], '#d9f99d', '#1a2e05', '#a3e635', ['#1a2e05', '#84cc16', '#ecfccb']),
+  crassus: villain(['#450a0a', '#f8fafc', '#a21caf'], [BULKY, HEAD, SHORT, LEAF_CROWN], '#e0ac69', '#1c1917', '#facc15', ['#581c87', '#e9d5ff', '#facc15']),
+  kael: villain(['#1c0500', '#7c2d12', '#431407'], [BULKY, HEAD, BEARD, HORNED_HELM], '#c68642', '#7f1d1d', '#fb923c', ['#431407', '#c2410c', '#fb923c']),
+  krell: villain(['#1c1917', '#a16207', '#57534e'], [BROAD, APRON, HEAD, MUSTACHE, HARD_HAT], '#f1c27d', '#292524', '#fbbf24', ['#422006', '#ca8a04', '#fef08a']),
+  omega: villain(['#000000', '#1e293b', '#0f172a'], [BULKY, HEAD, SHORT, VISOR], '#94a3b8', '#000000', '#38bdf8', ['#0f172a', '#334155', '#38bdf8'], '#38bdf8'),
   gale: villain(['#0c1a3a', '#1e3a8a', '#fbbf24'], [BROAD, HEAD, BEARD, TRICORN], '#ffdbac', '#e5e7eb', '#fbbf24', ['#172554', '#1d4ed8', '#fde68a']),
   frostjaw: villain(['#082f49', '#bae6fd', '#0369a1'], [BULKY, HEAD, BEARD, SPIKY], '#e0f2fe', '#f8fafc', '#7dd3fc', ['#0c4a6e', '#7dd3fc', '#f0f9ff']),
   kestrel: villain(['#1c0a0a', '#7f1d1d', '#450a0a'], [BROAD, HEAD, BEARD, OPEN_HELM], '#e0ac69', '#57534e', '#fca5a5', ['#450a0a', '#b91c1c', '#fecaca']),
@@ -896,6 +1058,8 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   rocco: villain(['#0c0a09', '#7c3aed', '#3b0764'], [BULKY, HEAD, MUSTACHE, SHORT, SCARF], '#5c3a21', '#0c0a09', '#facc15', ['#2e1065', '#8b5cf6', '#facc15']),
   // they
   hollow: villain(['#020617', '#1f2937', '#111827'], [FLOAT, HEAD, HOOD, SHADOW_FACE], '#64748b', '#020617', '#ef4444', ['#020617', '#334155', '#94a3b8'], '#ef4444'),
+  silence: villain(['#000000', '#e5e7eb', '#9ca3af'], [FLOAT, HEAD, HOOD, BLANK_FACE], '#f3f4f6', '#000000', '#f3f4f6', ['#374151', '#e5e7eb', '#ffffff'], '#e5e7eb'),
+  voidmaw: villain(['#000000', '#1e1b4b', '#020617'], [FLOAT, HEAD, SHADOW_FACE, SMALL_HORNS], '#1e1b4b', '#000000', '#a855f7', ['#020617', '#312e81', '#a855f7'], '#a855f7'),
   unmaker: villain(['#000000', '#18181b', '#450a0a'], [FLOAT, HEAD, MESSY, VISOR], '#71717a', '#09090b', '#ef4444', ['#000000', '#27272a', '#ef4444'], '#ef4444'),
   lantern: villain(['#422006', '#fde68a', '#f59e0b'], [FLOAT, HEAD, HOOD, GLOW_FACE], '#fef3c7', '#fde68a', '#fb923c', ['#78350f', '#fde68a', '#fffbeb'], '#fb923c'),
 };

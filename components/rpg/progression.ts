@@ -154,8 +154,8 @@ export function heroSnapshot(hero: { id: string; stats: CoreStats }, level: numb
 // ----- Earning Aizodon -----
 
 export const RUN_RANKS = [
-  { rank: 'S', maxRatio: 0.5, reward: 50 },
-  { rank: 'A', maxRatio: 0.75, reward: 35 },
+  { rank: 'S', maxRatio: 0.6, reward: 50 },
+  { rank: 'A', maxRatio: 0.8, reward: 35 },
   { rank: 'B', maxRatio: 1, reward: 25 },
   { rank: 'C', maxRatio: 1.5, reward: 15 },
   { rank: 'D', maxRatio: 2.5, reward: 10 },
@@ -163,9 +163,10 @@ export const RUN_RANKS = [
 ];
 
 // Target time grows with how many enemies a level has and how much health they carry.
+// Tuned so the target is about a typical player's personal best on that level.
 export function targetTimeMs(enemies: { hp: number }[]): number {
   const extraHp = enemies.reduce((sum, e) => sum + Math.max(0, e.hp - 1), 0);
-  return (15 + enemies.length * 5 + extraHp * 0.5) * 1000;
+  return (4 + enemies.length * 1.5 + extraHp * 0.15) * 1000;
 }
 
 export function runReward(timeMs: number, enemies: { hp: number }[], usedAbility: boolean): { rank: string; earned: number } {
@@ -176,5 +177,5 @@ export function runReward(timeMs: number, enemies: { hp: number }[], usedAbility
 
 // Fastest run time the server will credit, so forged times can't be claimed in rapid succession.
 export function minimumCreditedMs(enemies: { hp: number }[]): number {
-  return Math.max(2000, targetTimeMs(enemies) * 0.25);
+  return Math.max(5000, targetTimeMs(enemies) * 0.5);
 }

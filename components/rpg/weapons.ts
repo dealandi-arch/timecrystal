@@ -83,6 +83,20 @@ export const SIGNATURE_WEAPONS: Record<string, WeaponDef> = {
   solaris: W({ name: 'Sunspears', desc: 'Three beams of sunlight fanned out ahead.', kind: 'beam', color: '#fbbf24', cooldownMs: 900, damage: 2, beams: 3 }, 'sunspears'),
   aurora: W({ name: 'Aurora Prism', desc: 'Three bouncing light shards that freeze.', kind: 'shot', color: '#5eead4', cooldownMs: 600, damage: 2, count: 3, spreadDeg: 20, speed: 12, range: 18, bounce: 2, freezeMs: 1200 }, 'prism'),
   paradox: W({ name: 'Paradox Engine', desc: 'Twin seeking bolts that explode and chain.', kind: 'shot', color: '#f43f5e', cooldownMs: 700, damage: 2, count: 2, spreadDeg: 16, speed: 10, range: 18, homing: 4, explode: 1, chain: 2, size: 6 }, 'engine'),
+  falconer: W({ name: 'Hawk Talons', desc: 'A hawk that hunts enemies down and rips through one.', kind: 'shot', color: '#d6d3d1', cooldownMs: 420, damage: 1, speed: 13, range: 20, homing: 7, pierce: 1, size: 3 }, 'talons'),
+  prospector: W({ name: 'TNT Charge', desc: 'A big blast, two tiles wide, when an enemy comes close.', kind: 'mine', color: '#facc15', cooldownMs: 900, damage: 2, radius: 2 }, 'tnt'),
+  bard: W({ name: 'Sonic Chord', desc: 'Three short waves of sound that pass through everything.', kind: 'shot', color: '#f0abfc', cooldownMs: 650, damage: 1, count: 3, spreadDeg: 60, speed: 8, range: 6, pierce: Infinity, size: 6 }, 'chord'),
+  alchemist: W({ name: 'Acid Flask', desc: 'Bursts on impact and freezes everything in the splash.', kind: 'shot', color: '#6ee7b7', cooldownMs: 700, damage: 1, speed: 9, range: 9, explode: 1, freezeMs: 1000, size: 5 }, 'flask'),
+  ronin: W({ name: 'Katana', desc: 'A blindingly fast cut across the three tiles ahead.', kind: 'melee', color: '#e2e8f0', cooldownMs: 230, damage: 1, pattern: 'sweep' }, 'katana'),
+  gladiator: W({ name: 'Trident Thrust', desc: 'A brutal stab through the two tiles ahead.', kind: 'melee', color: '#fca5a5', cooldownMs: 560, damage: 3, pattern: 'lunge' }, 'trident'),
+  puppeteer: W({ name: 'Razor Strings', desc: 'A fast string that stuns and leaps between four more enemies.', kind: 'shot', color: '#e0e7ff', cooldownMs: 650, damage: 1, speed: 20, range: 10, chain: 4, freezeMs: 500, size: 2 }, 'strings'),
+  dragoon: W({ name: 'Dragon Breath', desc: 'A wide, short gout of seven flames.', kind: 'shot', color: '#fb923c', cooldownMs: 700, damage: 1, count: 7, spreadDeg: 70, speed: 8, range: 4 }, 'breath'),
+  tidecaller: W({ name: 'Tidal Wave', desc: 'A surge two tiles wide that hits and freezes all around you.', kind: 'nova', color: '#22d3ee', cooldownMs: 1100, damage: 1, radius: 2, freezeMs: 1000 }, 'wave'),
+  automaton: W({ name: 'Gatling Arm', desc: 'Small bullets, as fast as you can tap.', kind: 'shot', color: '#fbbf24', cooldownMs: 90, damage: 1, speed: 16, range: 16, size: 3 }, 'gatling'),
+  celestia: W({ name: 'Starfall', desc: 'Five falling stars that seek out your enemies.', kind: 'shot', color: '#fde047', cooldownMs: 900, damage: 2, count: 5, spreadDeg: 120, speed: 9, range: 18, homing: 5, size: 4 }, 'starfall'),
+  archon: W({ name: 'Judgment Blade', desc: 'A huge spinning cut that stuns everything around you.', kind: 'melee', color: '#fbbf24', cooldownMs: 850, damage: 4, pattern: 'spin', freezeMs: 1200 }, 'judgment'),
+  genesis: W({ name: 'Genesis Bloom', desc: 'A vast bloom, three tiles wide. Each kill restores 1 HP.', kind: 'nova', color: '#4ade80', cooldownMs: 1300, damage: 3, radius: 3, lifesteal: true }, 'bloom'),
+  oblivion: W({ name: 'Erasure', desc: 'Three beams of nothing. Each kill restores 1 HP.', kind: 'beam', color: '#f43f5e', cooldownMs: 1000, damage: 4, beams: 3, lifesteal: true }, 'erasure'),
 };
 
 export function getSignatureWeapon(characterId: string): WeaponDef {

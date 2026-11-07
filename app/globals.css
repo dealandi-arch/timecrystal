@@ -1214,3 +1214,142 @@ body {
 .wallet-item { color: #6ee7b7; text-decoration: none; font-weight: 600; }
 .wallet-aizodon { color: #fbbf24; }
 .wallet-note { font-size: 0.85rem; opacity: 0.75; }
+
+/* Touch controls and phone layout. Hidden unless the device has a touch screen. */
+.touch-controls { display: none; }
+
+@media (hover: none) and (pointer: coarse) {
+  .keyboard-hint { display: none; }
+  .rpg-shell { padding-bottom: 12.5rem; scroll-margin-top: 0.25rem; }
+  .rpg-hud { gap: 0.4rem 0.75rem; font-size: 0.85rem; padding-right: 8.2rem; }
+  .rpg-hud .ability-btn { margin-left: 0; padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+
+  .mute-btn, .restart-btn, .settings-btn {
+    top: 0.4rem;
+    width: 2.3rem;
+    height: 2.3rem;
+    font-size: 1.05rem;
+  }
+  .mute-btn { right: 0.4rem; }
+  .restart-btn { right: 2.9rem; }
+  .settings-btn { right: 5.4rem; }
+
+  .touch-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    padding: 0.75rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .touch-pad, .touch-actions button { pointer-events: auto; touch-action: none; }
+  .touch-pad {
+    position: relative;
+    width: 9.5rem;
+    height: 9.5rem;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.6);
+    border: 2px solid rgba(148, 163, 184, 0.35);
+  }
+  .touch-arrow {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    color: #e2e8f0;
+    font-size: 1.15rem;
+    opacity: 0.75;
+    pointer-events: none;
+  }
+  .touch-arrow.on { color: #38bdf8; opacity: 1; transform: scale(1.25); }
+  .touch-arrow.up { top: 0.3rem; left: calc(50% - 1.3rem); }
+  .touch-arrow.down { bottom: 0.3rem; left: calc(50% - 1.3rem); }
+  .touch-arrow.left { left: 0.3rem; top: calc(50% - 1.3rem); }
+  .touch-arrow.right { right: 0.3rem; top: calc(50% - 1.3rem); }
+
+  .touch-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem; }
+  .touch-attack {
+    width: 5.5rem;
+    height: 5.5rem;
+    border-radius: 50%;
+    border: 3px solid rgba(253, 224, 71, 0.75);
+    background: rgba(202, 138, 4, 0.55);
+    color: #fff;
+    font-size: 2rem;
+  }
+  .touch-attack.on { background: rgba(250, 204, 21, 0.85); }
+  .touch-weapon {
+    max-width: 9rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 999px;
+    border: 2px solid;
+    background: rgba(15, 23, 42, 0.75);
+    color: #f8fafc;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+}
+
+/* Phone on its side: everything has to fit one screen, so the board sits between the thumbs. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .rpg-shell { padding-bottom: 0; }
+  .rpg-hud {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-bottom: 0.25rem;
+    min-height: 2.4rem;
+  }
+  .rpg-canvas-wrap { width: min(100%, calc((100dvh - 3.2rem) * 1.5)); margin: 0 auto; }
+  .touch-controls { top: auto; padding: 0.5rem; }
+  .touch-pad { width: 8.5rem; height: 8.5rem; }
+  .touch-attack { width: 4.5rem; height: 4.5rem; font-size: 1.6rem; }
+  .game-controls { display: none; }
+}
+
+/* The win screen has too much on it for a small board, so it takes over the whole screen. */
+@media (hover: none) and (pointer: coarse), (max-width: 720px) {
+  .game-overlay {
+    position: fixed;
+    z-index: 30;
+    justify-content: flex-start;
+    overflow-y: auto;
+    border-radius: 0;
+    background: rgba(2, 6, 23, 0.95);
+  }
+}
+
+/* Phone layout fixes: the sign-in bar scrolls away, and the top row stays clear of the icons. */
+@media (hover: none) and (pointer: coarse) {
+  .auth-widget { position: static; flex-wrap: wrap; max-width: 100%; }
+  .journey-bar { scroll-margin-top: 3rem; }
+  .rpg-shell { scroll-margin-top: 3rem; }
+  .rpg-hud { padding-right: 0; }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .journey-bar { display: none; }
+  .rpg-shell { margin-top: 0; scroll-margin-top: 0.1rem; }
+  .rpg-hud { padding-right: 8.2rem; }
+}
+
+/* Keep phone top rows from sliding under the fixed icons. */
+@media (hover: none) and (pointer: coarse) {
+  .auth-widget { margin: 0.4rem 8.2rem 0 0.75rem; }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .rpg-hud { padding-right: 0; max-width: calc(100vw - 11rem); scrollbar-width: none; }
+  .rpg-hud::-webkit-scrollbar { display: none; }
+}

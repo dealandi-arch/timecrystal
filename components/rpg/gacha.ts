@@ -19,11 +19,25 @@ export const CHARACTER_RARITY: Record<string, GachaRarity> = {
   ghost: 'rare',
   grimsby: 'rare',
   corsair: 'rare',
+  falconer: 'rare',
+  prospector: 'rare',
+  bard: 'rare',
+  alchemist: 'rare',
+  ronin: 'rare',
+  gladiator: 'rare',
   null: 'epic',
   revenant: 'epic',
+  puppeteer: 'epic',
+  dragoon: 'epic',
+  tidecaller: 'epic',
+  automaton: 'epic',
   solaris: 'legendary',
   aurora: 'legendary',
+  celestia: 'legendary',
+  archon: 'legendary',
   paradox: 'mythic',
+  genesis: 'mythic',
+  oblivion: 'mythic',
 };
 
 export function rarityOf(characterId: string): Rarity {
@@ -41,7 +55,7 @@ export const PULL_RATES: Record<PullType, Record<GachaRarity, number>> = {
 };
 
 // Buying a specific character outright always costs more than summoning for one on average.
-export const SHOP_PRICE: Record<GachaRarity, number> = { rare: 120, epic: 300, legendary: 700, mythic: 1500 };
+export const SHOP_PRICE: Record<GachaRarity, number> = { rare: 300, epic: 650, legendary: 1300, mythic: 4500 };
 
 // Pulling a character you already own gives some shards back.
 export const DUPLICATE_REFUND: Record<GachaRarity, number> = { rare: 5, epic: 12, legendary: 30, mythic: 80 };

@@ -1,3 +1,5 @@
+import { loadSettings } from './settings';
+
 // Brazilian phonk: faster, denser "tamborzao"-style kick pattern, backbeat claps,
 // a busy cowbell, and a descending tom roll at the end of every bar.
 const BPM = 152;
@@ -30,12 +32,21 @@ const VOCAL_CHOP: { step: number; freq: number }[] = [
   { step: 9, freq: 390 }
 ];
 
+// While a sound effect plays the music dips, so effects stay clear instead of blurring into the beat.
+const DUCK_LEVEL = 0.25;
+const DUCK_HOLD_S = 0.14;
+const MUSIC_VOLUME = 0.3;
+const SFX_VOLUME = 0.55;
+
 export class SoundEngine {
   private ctx: AudioContext | null = null;
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private masterGain: GainNode | null = null;
+  private duckGain: GainNode | null = null;
   private muted = false;
+  private musicOn = true;
+  private sfxOn = true;
   private musicTimer: ReturnType<typeof setInterval> | null = null;
   private nextNoteTime = 0;
   private currentStep = 0;
@@ -52,10 +63,12 @@ export class SoundEngine {
       this.masterGain.gain.value = this.muted ? 0 : 1;
       this.masterGain.connect(this.ctx.destination);
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = 0.3;
-      this.musicGain.connect(this.masterGain);
+      this.musicGain.gain.value = this.musicOn ? MUSIC_VOLUME : 0;
+      this.duckGain = this.ctx.createGain();
+      this.musicGain.connect(this.duckGain);
+      this.duckGain.connect(this.masterGain);
       this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = 0.55;
+      this.sfxGain.gain.value = this.sfxOn ? SFX_VOLUME : 0;
       this.sfxGain.connect(this.masterGain);
     }
     return this.ctx;
@@ -70,6 +83,30 @@ export class SoundEngine {
   setMuted(muted: boolean) {
     this.muted = muted;
     if (this.masterGain) this.masterGain.gain.value = muted ? 0 : 1;
+  }
+
+  setMusicEnabled(on: boolean) {
+    this.musicOn = on;
+    if (this.musicGain) this.musicGain.gain.value = on ? MUSIC_VOLUME : 0;
+  }
+
+  setSfxEnabled(on: boolean) {
+    this.sfxOn = on;
+    if (this.sfxGain) this.sfxGain.gain.value = on ? SFX_VOLUME : 0;
+  }
+
+  // Phones may hold audio suspended until a touch; called from any touch or key press.
+  unlock() {
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  }
+
+  private duck() {
+    if (!this.ctx || !this.duckGain || !this.sfxOn) return;
+    const time = this.ctx.currentTime;
+    const param = this.duckGain.gain;
+    param.cancelScheduledValues(time);
+    param.setTargetAtTime(DUCK_LEVEL, time, 0.008);
+    param.setTargetAtTime(1, time + DUCK_HOLD_S, 0.1);
   }
 
   isMuted() {
@@ -274,6 +311,7 @@ export class SoundEngine {
   private blip(freq: number, duration: number, type: OscillatorType, peak: number, slideTo?: number) {
     const ctx = this.getCtx();
     if (!ctx || !this.sfxGain) return;
+    this.duck();
     const time = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = type;
@@ -292,6 +330,7 @@ export class SoundEngine {
   playHit() {
     const ctx = this.getCtx();
     if (!ctx || !this.sfxGain) return;
+    this.duck();
     const time = ctx.currentTime;
     const bufferSize = ctx.sampleRate * 0.06;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -327,6 +366,7 @@ export class SoundEngine {
   playSecretFound() {
     const ctx = this.getCtx();
     if (!ctx || !this.sfxGain) return;
+    this.duck();
     const time = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = 'sine';
@@ -347,4 +387,22 @@ export class SoundEngine {
   playMenuClick() {
     this.blip(700, 0.05, 'square', 0.15);
   }
+}
+
+let shared: SoundEngine | null = null;
+
+// One engine for the whole site, so moving between pages can't stack extra copies of the music.
+export function getSoundEngine(): SoundEngine {
+  if (typeof window === 'undefined') return new SoundEngine();
+  if (!shared) {
+    const engine = new SoundEngine();
+    const settings = loadSettings();
+    engine.setMusicEnabled(settings.musicOn);
+    engine.setSfxEnabled(settings.sfxOn);
+    for (const event of ['pointerup', 'touchend', 'keydown']) {
+      window.addEventListener(event, () => engine.unlock(), { passive: true });
+    }
+    shared = engine;
+  }
+  return shared;
 }

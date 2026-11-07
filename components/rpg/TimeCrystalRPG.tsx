@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ABILITIES } from './abilities';
-import { SoundEngine } from './audio';
+import { type SoundEngine, getSoundEngine } from './audio';
+import TouchControls from './TouchControls';
 import { COLS, FLOOR, ROWS, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
 import { getEffectiveLevel } from './levelOverrides';
 import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
@@ -360,6 +361,26 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     stateRef.current.weaponSlot = 1;
     setWeaponSlot(1);
   }, [autoWeapon]);
+
+  // On a touch device, bring the game to the top of the screen when a level starts.
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+      // Include the crystal counter above the game when it's showing (it's hidden on a phone held sideways).
+      const shell = shellRef.current;
+      const counter = shell?.previousElementSibling as HTMLElement | null | undefined;
+      (counter?.offsetParent ? counter : shell)?.scrollIntoView({ block: 'start' });
+    }
+  }, []);
+
+  function touchPress(key: string) {
+    sound.resume();
+    stateRef.current.keys.add(key);
+  }
+
+  function touchRelease(key: string) {
+    stateRef.current.keys.delete(key);
+  }
 
   function toggleWeapon() {
     const s = stateRef.current;
@@ -776,7 +797,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   const canUseAbility = !!save.ability && !save.abilityUsed && !abilityBlockedHere;
 
   return (
-    <div className="rpg-shell">
+    <div className="rpg-shell" ref={shellRef}>
       <div className="rpg-hud">
         <span>{displayName ?? level.name}</span>
         <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, effectiveMaxHp - hp))}</span>
@@ -845,9 +866,18 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           </div>
         )}
       </div>
+      {!won && (
+        <TouchControls
+          onPress={touchPress}
+          onRelease={touchRelease}
+          onToggleWeapon={toggleWeapon}
+          weaponName={currentWeapon.name}
+          weaponColor={currentWeapon.color}
+        />
+      )}
       <p className="game-controls">
-        Move: Arrow keys / WASD &nbsp;·&nbsp; Attack: Space / J &nbsp;·&nbsp; Switch weapon: Q &nbsp;·&nbsp; Clear every
-        enemy, then catch the crystal. Five Emerald Shards are hidden on random tiles — step on them to collect.
+        <span className="keyboard-hint">Move: Arrow keys / WASD &nbsp;·&nbsp; Attack: Space / J &nbsp;·&nbsp; Switch weapon: Q &nbsp;·&nbsp; </span>
+        Clear every enemy, then catch the crystal. Five Emerald Shards are hidden on random tiles — step on them to collect.
       </p>
     </div>
   );
@@ -992,7 +1022,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
   const [save, setSave] = useState<Save | null>(null);
   const [muted, setMutedFlag] = useState(false);
   const soundRef = useRef<SoundEngine | null>(null);
-  if (!soundRef.current) soundRef.current = new SoundEngine();
+  if (!soundRef.current) soundRef.current = getSoundEngine();
   const sound = soundRef.current;
   const { profile, submitRun } = useProfile();
   const { addShards } = useCollection();
@@ -1028,6 +1058,8 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
   function changeSettings(next: GameSettings) {
     setSettings(next);
     persistSettings(next);
+    sound.setMusicEnabled(next.musicOn);
+    sound.setSfxEnabled(next.sfxOn);
   }
 
   function updateSave(next: Save) {

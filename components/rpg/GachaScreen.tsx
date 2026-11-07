@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { SoundEngine } from './audio';
+import { type SoundEngine, getSoundEngine } from './audio';
 import { CHARACTERS, type Appearance, type CharacterDef, getCharacterLook, getSpriteCanvas } from './pixelArt';
 import {
   DUPLICATE_REFUND,
@@ -99,7 +99,7 @@ export default function GachaScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<PullResult | null>(null);
   const soundRef = useRef<SoundEngine | null>(null);
-  if (!soundRef.current) soundRef.current = new SoundEngine();
+  if (!soundRef.current) soundRef.current = getSoundEngine();
   const sound = soundRef.current;
 
   useEffect(() => {

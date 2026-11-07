@@ -46,6 +46,28 @@ export default function SettingsPanel({ settings, onChange, onClose }: SettingsP
             <small>Start every level holding your hero’s special weapon. You can still switch with Q.</small>
           </span>
         </label>
+        <label className="settings-row">
+          <input
+            type="checkbox"
+            checked={settings.musicOn}
+            onChange={(e) => onChange({ ...settings, musicOn: e.target.checked })}
+          />
+          <span>
+            <strong>Music</strong>
+            <small>The soundtrack. It dips briefly whenever a sound effect plays.</small>
+          </span>
+        </label>
+        <label className="settings-row">
+          <input
+            type="checkbox"
+            checked={settings.sfxOn}
+            onChange={(e) => onChange({ ...settings, sfxOn: e.target.checked })}
+          />
+          <span>
+            <strong>Sound effects</strong>
+            <small>Shots, hits, pickups and menu clicks.</small>
+          </span>
+        </label>
         <button className="ability-btn settings-done" onClick={onClose}>Done</button>
       </div>
     </div>
