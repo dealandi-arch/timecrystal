@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useProfile } from './ProfileContext';
 
 // Aizodon and hero levels. Signed-in players only: guests always play at level 1.
@@ -9,6 +9,7 @@ export interface ClaimResult {
   earned: number;
   rank: string;
   reason?: string;
+  pending?: boolean; // couldn't be saved yet; kept and re-sent later
 }
 
 interface ProgressionContextValue {
@@ -21,8 +22,36 @@ interface ProgressionContextValue {
   levelUp: (characterId: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
+// Run rewards whose save failed, kept per profile and re-sent when the server is reachable.
+interface PendingClaim {
+  levelId: number;
+  timeMs: number;
+  usedAbility: boolean;
+}
+const MAX_PENDING_CLAIMS = 20;
+const RETRY_TOO_SOON_MS = 15000;
+const pendingKey = (profileId: string) => `timeCrystalPendingClaims:${profileId}`;
+
+function readPending(profileId: string): PendingClaim[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(pendingKey(profileId)) ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePending(profileId: string, claims: PendingClaim[]) {
+  try {
+    if (claims.length) window.localStorage.setItem(pendingKey(profileId), JSON.stringify(claims.slice(-MAX_PENDING_CLAIMS)));
+    else window.localStorage.removeItem(pendingKey(profileId));
+  } catch {
+    /* storage unavailable: the reward can't be kept for a retry */
+  }
+}
+
 async function postJson(url: string, body: unknown) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
   return { res, data };
 }
@@ -36,6 +65,36 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signedIn = !!profile;
+  const profileId = profile?.id ?? null;
+  const flushingRef = useRef(false);
+  const profileIdRef = useRef(profileId);
+  profileIdRef.current = profileId;
+
+  // Sends saved-up rewards oldest first, stopping at the first one the server can't take yet.
+  const flushPending = useCallback(async (id: string) => {
+    if (flushingRef.current || profileIdRef.current !== id) return;
+    flushingRef.current = true;
+    let tooSoon = false;
+    try {
+      let left = readPending(id);
+      while (left.length && profileIdRef.current === id) {
+        const { res, data } = await postJson('/api/progression/claim', left[0]);
+        if (!res.ok) break;
+        if (data.earned === 0) {
+          tooSoon = true; // the server spaces out rewards, so try this one again shortly
+          break;
+        }
+        left = left.slice(1);
+        writePending(id, left);
+        setAizodon(data.aizodon);
+      }
+    } catch {
+      /* still offline: try again next time */
+    } finally {
+      flushingRef.current = false;
+    }
+    if (tooSoon) window.setTimeout(() => flushPending(id), RETRY_TOO_SOON_MS);
+  }, []);
 
   useEffect(() => {
     setAizodon(0);
@@ -54,6 +113,7 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           setAizodon(data.aizodon ?? 0);
           setLevels(data.levels ?? {});
+          flushPending(profile.id);
         } else {
           setError(data?.error ?? 'Could not load your hero levels.');
         }
@@ -67,23 +127,32 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [profile, loading]);
+  }, [profile, loading, flushPending]);
 
   const levelOf = useCallback((characterId: string) => levels[characterId] ?? 1, [levels]);
 
   const claimRun = useCallback(
     async (levelId: number, timeMs: number, usedAbility: boolean): Promise<ClaimResult | null> => {
-      if (!signedIn) return null;
+      if (!profileId) return null;
+      const claim = { levelId, timeMs, usedAbility };
+      const keepForLater = (): ClaimResult => {
+        writePending(profileId, [...readPending(profileId), claim]);
+        return { earned: 0, rank: '', pending: true };
+      };
       try {
-        const { res, data } = await postJson('/api/progression/claim', { levelId, timeMs, usedAbility });
-        if (!res.ok) return null;
+        const { res, data } = await postJson('/api/progression/claim', claim);
+        if (!res.ok) return keepForLater();
         setAizodon(data.aizodon);
-        return { earned: data.earned, rank: data.rank, reason: data.reason };
+        // The server spaces out rewards, so one refused as too soon is kept and paid shortly.
+        const refused = data.earned === 0;
+        const result = refused ? keepForLater() : { earned: data.earned, rank: data.rank };
+        flushPending(profileId);
+        return result;
       } catch {
-        return null;
+        return keepForLater();
       }
     },
-    [signedIn]
+    [profileId, flushPending]
   );
 
   const levelUp = useCallback(async (characterId: string) => {

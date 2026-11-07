@@ -817,7 +817,11 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             </p>
             {signedIn && reward && (
               <p className="run-reward">
-                {reward.earned > 0 ? <>Rank {reward.rank} &nbsp;·&nbsp; ⬡ +{reward.earned} Aizodon</> : reward.reason}
+                {reward.pending
+                  ? 'Your Aizodon couldn’t be saved yet. It’s kept and will be added automatically.'
+                  : reward.earned > 0
+                    ? <>Rank {reward.rank} &nbsp;·&nbsp; ⬡ +{reward.earned} Aizodon</>
+                    : reward.reason}
               </p>
             )}
             {!signedIn && <p className="run-reward">Sign in to earn Aizodon and level up your heroes.</p>}

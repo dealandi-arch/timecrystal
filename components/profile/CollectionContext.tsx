@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useProfile } from './ProfileContext';
-import { CHARACTER_RARITY, PULL_COST, type PullResult, type PullType, SHOP_PRICE, rarityOf, rollPull } from '../rpg/gacha';
+import { CHARACTER_RARITY, PULL_COST, type PullResult, type PullType, SHARDS_PER_LEVEL, SHOP_PRICE, rarityOf, rollPull } from '../rpg/gacha';
 
 // Emerald Shards + gacha heroes. Signed-in players keep them on their profile (the server rolls
 // the gacha); guests keep them in this browser.
@@ -49,8 +49,29 @@ function writeLocal(c: Collection) {
   }
 }
 
+// Shards whose save failed, kept per profile and re-sent on the next successful load or pickup.
+const pendingKey = (profileId: string) => `timeCrystalPendingShards:${profileId}`;
+
+function readPending(profileId: string): number {
+  try {
+    const n = Number(window.localStorage.getItem(pendingKey(profileId)));
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writePending(profileId: string, count: number) {
+  try {
+    if (count > 0) window.localStorage.setItem(pendingKey(profileId), String(count));
+    else window.localStorage.removeItem(pendingKey(profileId));
+  } catch {
+    /* storage unavailable: the shard can't be kept for a retry */
+  }
+}
+
 async function postJson(url: string, body: unknown) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
   return { res, data };
 }
@@ -65,6 +86,31 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const storageRef = useRef(storage);
   storageRef.current = storage;
+  const profileIdRef = useRef<string | null>(null);
+  profileIdRef.current = profile?.id ?? null;
+  const flushingRef = useRef(false);
+
+  // Sends any shards whose earlier save failed, in batches the server accepts.
+  const flushPending = useCallback(async () => {
+    const profileId = profileIdRef.current;
+    if (!profileId || flushingRef.current) return;
+    flushingRef.current = true;
+    try {
+      let left = readPending(profileId);
+      while (left > 0) {
+        const count = Math.min(left, SHARDS_PER_LEVEL);
+        const { res, data } = await postJson('/api/collection/shards', { count });
+        if (!res.ok) break;
+        left -= count;
+        writePending(profileId, left);
+        setCollection({ shards: data.shards + left, owned: data.owned });
+      }
+    } catch {
+      /* still offline: try again next time */
+    } finally {
+      flushingRef.current = false;
+    }
+  }, []);
 
   const fallBackToBrowser = useCallback((message: string | null) => {
     setStorage('browser');
@@ -88,8 +134,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           setStorage('profile');
           setWarning(null);
-          setCollection({ shards: data.shards ?? 0, owned: data.owned ?? [] });
+          setCollection({ shards: (data.shards ?? 0) + readPending(profile.id), owned: data.owned ?? [] });
           setReady(true);
+          flushPending();
         } else {
           fallBackToBrowser(`Couldn’t load your profile collection (${data?.error ?? 'server error'}). Saving in this browser for now.`);
         }
@@ -100,7 +147,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [profile, profileLoading, fallBackToBrowser]);
+  }, [profile, profileLoading, fallBackToBrowser, flushPending]);
 
   const updateLocal = useCallback((fn: (c: Collection) => Collection) => {
     setCollection((prev) => {
@@ -112,16 +159,22 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
 
   const addShards = useCallback(
     (count: number) => {
-      if (storageRef.current === 'browser') {
+      const profileId = profileIdRef.current;
+      if (!profileId) {
         updateLocal((c) => ({ ...c, shards: c.shards + count }));
         return;
       }
       setCollection((c) => ({ ...c, shards: c.shards + count })); // optimistic
-      postJson('/api/collection/shards', { count }).then(({ res, data }) => {
-        if (res.ok) setCollection({ shards: data.shards, owned: data.owned });
-      });
+      const keepForLater = () => writePending(profileId, readPending(profileId) + count);
+      postJson('/api/collection/shards', { count })
+        .then(({ res, data }) => {
+          if (!res.ok) return keepForLater();
+          setCollection({ shards: data.shards + readPending(profileId), owned: data.owned });
+          flushPending();
+        })
+        .catch(keepForLater);
     },
-    [updateLocal]
+    [updateLocal, flushPending]
   );
 
   const pull = useCallback(

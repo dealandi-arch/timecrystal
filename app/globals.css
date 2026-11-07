@@ -1199,3 +1199,18 @@ body {
   .levelup-layout { grid-template-columns: minmax(0, 1fr); }
   .levelup-roster { max-height: 260px; }
 }
+
+/* Saved currency on the home page */
+.wallet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  background: rgba(148, 163, 184, 0.12);
+}
+.wallet-item { color: #6ee7b7; text-decoration: none; font-weight: 600; }
+.wallet-aizodon { color: #fbbf24; }
+.wallet-note { font-size: 0.85rem; opacity: 0.75; }
