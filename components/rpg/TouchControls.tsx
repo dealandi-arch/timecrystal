@@ -15,12 +15,13 @@ interface TouchControlsProps {
   weaponColor: string;
   skillName?: string;
   skillReady?: boolean;
+  skillWait?: number;
   onSkill?: () => void;
 }
 
 const DEAD_ZONE = 0.15; // fraction of the pad's width around the centre that means "not moving"
 
-export default function TouchControls({ onPress, onRelease, onToggleWeapon, weaponName, weaponColor, skillName, skillReady, onSkill }: TouchControlsProps) {
+export default function TouchControls({ onPress, onRelease, onToggleWeapon, weaponName, weaponColor, skillName, skillReady, skillWait, onSkill }: TouchControlsProps) {
   const [dir, setDir] = useState<Direction | null>(null);
   const [attacking, setAttacking] = useState(false);
   const dirRef = useRef<Direction | null>(null);
@@ -67,7 +68,7 @@ export default function TouchControls({ onPress, onRelease, onToggleWeapon, weap
       <div className="touch-actions">
         {skillName && onSkill && (
           <button type="button" className="touch-skill" disabled={!skillReady} aria-label={`Use skill: ${skillName}`} onClick={onSkill}>
-            ✦ {skillName}
+            ✦ {skillName}{skillWait ? ` ${skillWait}s` : ''}
           </button>
         )}
         <button

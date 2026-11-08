@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ABILITIES } from './abilities';
 import { type SoundEngine, getSoundEngine } from './audio';
 import TouchControls from './TouchControls';
+import type { CameraMode, Renderer3D } from './Renderer3D';
 import { COLS, FLOOR, ROWS, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
 import { getEffectiveLevel } from './levelOverrides';
 import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
@@ -32,7 +33,7 @@ import { useCollection } from '../profile/CollectionContext';
 import { type ClaimResult, useProgression } from '../profile/ProgressionContext';
 import { applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
 import { getPerkValues, getPerks } from './perks';
-import { ELEMENT_INFO, type SkillDef, areaBonus, describeSkill, elementOf, skillAmount } from './skills';
+import { ELEMENT_INFO, type SkillDef, areaBonus, describeSkill, elementOf, skillAmount, skillCooldown } from './skills';
 import { useProfile } from '../profile/ProfileContext';
 import AuthWidget from '../profile/AuthWidget';
 import SignInBanner from '../profile/SignInBanner';
@@ -249,14 +250,13 @@ function pickEmeralds(level: LevelDef): Set<string> {
 
 // Speciality perk timers and counters; reset when the level restarts.
 function freshPerkState() {
-  return { regenT: 0, shieldUp: true, shieldT: 0, hasteT: 0, attacks: 0, kills: 0, revived: false, started: false, echoT: -1 };
+  return { regenT: 0, shieldUp: true, shieldT: 0, hasteT: 0, attacks: 0, kills: 0, revived: false, started: false, echoT: -1, frenzyT: 0 };
 }
 
-// The equipped skill: one use per level, plus the timers its effects run on.
-function freshSkillState(skill: SkillDef | null) {
+// The equipped skill: its cooldown (ready at the start of every level), plus the timers its effects run on.
+function freshSkillState() {
   return {
-    usesLeft: skill ? 1 : 0,
-    used: false,
+    cooldown: 0,
     radarT: 0,
     cloakT: 0,
     blizzardT: 0,
@@ -300,11 +300,12 @@ interface LevelRunnerProps {
   paused: boolean;
   heroLevel: number;
   skill: SkillDef | null;
+  view3d?: boolean;
   onRunFinished: (stats: LevelRunStats) => Promise<ClaimResult | null>;
   signedIn: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, onRunFinished, signedIn }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
   const baseSignature = getSignatureWeapon(charDef.id);
@@ -316,8 +317,16 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   // Gear and perks in a ref so the game loop always reads the latest values.
   const gearRef = useRef({ hero: charStats, base: BASELINE_STATS, signature, basicGun, perks, area, skill, heroLevel });
   gearRef.current = { hero: charStats, base: BASELINE_STATS, signature, basicGun, perks, area, skill, heroLevel };
-  const [skillUses, setSkillUses] = useState(skill ? 1 : 0);
+  const [skillWait, setSkillWait] = useState(0); // whole seconds until the skill is ready again
   const useSkillRef = useRef<() => void>(() => {});
+  const skillWaitRef = useRef(0);
+  const view3dRef = useRef<HTMLDivElement | null>(null);
+  const rendererRef = useRef<Renderer3D | null>(null);
+  const [camera, setCamera] = useState<CameraMode>('overview');
+  const [view3dError, setView3dError] = useState<string | null>(null);
+  useEffect(() => {
+    if (rendererRef.current) rendererRef.current.mode = camera;
+  }, [camera]);
   const emeraldRef = useRef(onEmeraldFound);
   emeraldRef.current = onEmeraldFound;
 
@@ -368,7 +377,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     startTime: performance.now(),
     usedAbilityThisRun: false,
     perk: freshPerkState(),
-    skill: freshSkillState(skill)
+    skill: freshSkillState()
   });
 
   function resetLevelRuntime() {
@@ -379,22 +388,14 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     s.crystal = makeCrystal(level);
     s.combat = makeCombat(); // shards already found stay found
     s.perk = freshPerkState();
-    s.skill = freshSkillState(gearRef.current.skill);
-    setSkillUses(s.skill.usesLeft);
+    s.skill = freshSkillState();
+    setSkillWait(0);
     s.shake = 0.3;
     s.won = false;
     s.startTime = performance.now();
     setHp(maxHp);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
   }
-
-  // Saved skills can finish loading after a level starts; pick them up if the skill hasn't been used yet.
-  useEffect(() => {
-    const st = stateRef.current.skill;
-    if (st.used) return;
-    st.usesLeft = skill ? 1 : 0;
-    setSkillUses(st.usesLeft);
-  }, [skill?.id]);
 
   // Turning the setting on mid-level equips the weapon straight away.
   useEffect(() => {
@@ -481,6 +482,21 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     let lastTime = performance.now();
     let rafId = 0;
     let attackWasPressed = false;
+    let disposed = false;
+    if (view3d) {
+      import('./Renderer3D')
+        .then(({ Renderer3D: R }) => {
+          if (disposed || !view3dRef.current) return;
+          const wallSource = getSpriteCanvas(`wall:${level.id}`, WALL, theme.wallPalette, PIXEL_SIZE);
+          try {
+            rendererRef.current = new R(view3dRef.current, level, wallSource, canvas);
+            rendererRef.current.mode = cameraRef.current;
+          } catch {
+            setView3dError('Your browser could not start 3D graphics (WebGL).');
+          }
+        })
+        .catch(() => setView3dError('The 3D view could not be loaded.'));
+    }
 
     const hooks: CombatHooks = {
       get enemies() {
@@ -493,6 +509,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         s.shake = Math.max(s.shake, amount);
       },
       push: (enemy, tiles) => knockBack(enemy as RuntimeEnemy, tiles),
+      pullToward: (enemy, x, y, tiles) => pullEnemy(enemy as RuntimeEnemy, x, y, tiles),
       modifyDamage: (enemy, amount) => {
         const perk = activePerks();
         let dmg = amount;
@@ -551,6 +568,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     function onPerkKill(enemy: RuntimeEnemy) {
       const perk = activePerks();
       if (perk.killHaste) s.perk.hasteT = perk.killHaste;
+      if (perk.frenzy) s.perk.frenzyT = perk.frenzy;
+      if (perk.overcharge && s.skill.cooldown > 0) s.skill.cooldown = Math.max(0, s.skill.cooldown - perk.overcharge);
       if (perk.vampire) {
         s.perk.kills++;
         if (s.perk.kills % perk.vampire === 0) heal(1, '#f43f5e');
@@ -559,6 +578,30 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       if (perk.momentum && Math.random() < perk.momentum) s.player.attackCooldown = 0;
       if (perk.deathBurst) {
         explode(s.combat, hooks, enemy.gx, enemy.gy, perk.deathBurst, { ...gearRef.current.basicGun, color: '#fb923c', damage: 1 });
+      }
+    }
+
+    // Drags an enemy step by step toward a cell, never onto the hero or into walls or other enemies.
+    function pullEnemy(enemy: RuntimeEnemy, x: number, y: number, tiles: number) {
+      for (let i = 0; i < tiles; i++) {
+        const ddx = x - enemy.gx;
+        const ddy = y - enemy.gy;
+        if (!ddx && !ddy) return;
+        const stepX = Math.abs(ddx) >= Math.abs(ddy) ? Math.sign(ddx) : 0;
+        const stepY = stepX ? 0 : Math.sign(ddy);
+        const nx = enemy.gx + stepX;
+        const ny = enemy.gy + stepY;
+        const blocked =
+          !isWalkable(level, nx, ny, true) ||
+          (nx === s.player.gx && ny === s.player.gy) ||
+          s.enemies.some((o) => o !== enemy && o.alive && o.gx === nx && o.gy === ny);
+        if (blocked) return;
+        enemy.fromX = enemy.gx;
+        enemy.fromY = enemy.gy;
+        enemy.gx = nx;
+        enemy.gy = ny;
+        enemy.moveT = 0;
+        enemy.moving = true;
       }
     }
 
@@ -582,10 +625,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
     function useSkill() {
       const skillDef = gearRef.current.skill;
-      if (!skillDef || s.skill.usesLeft <= 0 || s.won || pausedRef.current) return;
-      s.skill.usesLeft--;
-      s.skill.used = true;
-      setSkillUses(s.skill.usesLeft);
+      if (!skillDef || s.skill.cooldown > 0 || s.won || pausedRef.current) return;
+      s.skill.cooldown = skillCooldown(skillDef, gearRef.current.heroLevel);
+      setSkillWait(Math.ceil(s.skill.cooldown));
       sound.playSecretFound();
       const p = s.player;
       const amount = skillAmount(skillDef, gearRef.current.heroLevel);
@@ -737,8 +779,17 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
       const perk = activePerks();
       if (s.perk.hasteT > 0) s.perk.hasteT -= dt;
+      if (s.perk.frenzyT > 0) s.perk.frenzyT -= dt;
       for (const key of ['radarT', 'cloakT', 'blizzardT', 'guidingT', 'crystalFreezeT', 'flashT'] as const) {
         if (s.skill[key] > 0) s.skill[key] -= dt;
+      }
+      if (s.skill.cooldown > 0) {
+        s.skill.cooldown = Math.max(0, s.skill.cooldown - dt);
+        const wait = Math.ceil(s.skill.cooldown);
+        if (wait !== skillWaitRef.current) {
+          skillWaitRef.current = wait;
+          setSkillWait(wait);
+        }
       }
       const turret = s.skill.turret;
       if (turret) {
@@ -776,7 +827,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
 
       const attackKey = s.keys.has(' ') || s.keys.has('j');
-      if (p.attackCooldown > 0) p.attackCooldown -= dt * 1000;
+      // Frenzy: weapons recharge 40% faster for a while after a kill.
+      if (p.attackCooldown > 0) p.attackCooldown -= dt * 1000 * (s.perk.frenzyT > 0 ? 1 / 0.6 : 1);
       if (attackKey && !attackWasPressed && p.attackCooldown <= 0) {
         const weapon = s.weaponSlot === 0 ? gearRef.current.basicGun : gearRef.current.signature;
         p.attackTimer = effectiveStats.attackDurationMs;
@@ -880,6 +932,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           s.shake = 0.2;
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#f87171', '#fecaca'], 10, 110, 180);
           sound.playPlayerHurt();
+          if (perk.retaliate) {
+            explode(s.combat, hooks, p.gx, p.gy, 1, { ...gearRef.current.basicGun, color: '#f87171', damage: perk.retaliate });
+          }
           if (perk.frostOnHurt) {
             for (const other of s.enemies) {
               if (other.alive && Math.max(Math.abs(other.gx - p.gx), Math.abs(other.gy - p.gy)) <= 1 + gearRef.current.area) other.stunMs = Math.max(other.stunMs, perk.frostOnHurt * 1000);
@@ -910,10 +965,13 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         }
       }
 
-      const emeraldKey = `${p.gx},${p.gy}`;
-      if (s.emeralds.has(emeraldKey)) {
-        s.emeralds.delete(emeraldKey);
-        spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#10b981', '#6ee7b7', '#d1fae5', '#fff'], 24, 150, -50);
+      // Shards are collected by stepping on them, or from a few tiles away with Shard Magnet.
+      const reach = activePerks().magnet ?? 0;
+      for (const key of [...s.emeralds]) {
+        const [ex, ey] = key.split(',').map(Number);
+        if (Math.max(Math.abs(ex - p.gx), Math.abs(ey - p.gy)) > reach) continue;
+        s.emeralds.delete(key);
+        spawnBurst(s.particles, (ex + 0.5) * TILE, (ey + 0.5) * TILE, ['#10b981', '#6ee7b7', '#d1fae5', '#fff'], 24, 150, -50);
         sound.playCrystalPickup();
         setEmeraldsFound((n) => n + 1);
         emeraldRef.current();
@@ -1025,10 +1083,10 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
       const crystalPos = entityPixelPos(s.crystal);
       const bob = Math.sin(time * 3) * 4;
-      drawDiamond(ctx, crystalPos.x + TILE / 2, crystalPos.y + TILE / 2 + bob, 14, '#67e8f9');
+      if (!view3d) drawDiamond(ctx, crystalPos.x + TILE / 2, crystalPos.y + TILE / 2 + bob, 14, '#67e8f9');
 
       for (const enemy of s.enemies) {
-        if (!enemy.alive) continue;
+        if (!enemy.alive || view3d) continue;
         const pos = entityPixelPos(enemy);
         const kind = enemy.isBoss ? 'boss' : enemy.frozen || enemy.stunMs > 0 ? 'frozen' : 'enemy';
         const enemyLook = getEnemyLook(kind, appearanceRef.current);
@@ -1053,7 +1111,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const look = getCharacterLook(charDef, appearanceRef.current);
       const playerSprite = getSpriteCanvas(`player:${characterId}:${appearanceRef.current}`, look.sprite, look.palette, TILE / look.sprite.length);
       const walkBob = p.moving ? Math.sin(time * 16) * 1.5 : 0;
-      ctx.drawImage(playerSprite, px, py + walkBob);
+      if (!view3d) ctx.drawImage(playerSprite, px, py + walkBob);
       if (s.perk.shieldUp && (drawPerks.shield || drawPerks.killShield)) {
         ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
         ctx.lineWidth = 2;
@@ -1063,7 +1121,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
       if (s.perk.hasteT > 0 && p.moving) spawnBurst(s.particles, px + TILE / 2, py + TILE - 4, ['#facc15'], 1, 20, 0);
       const flashing = p.invuln > 0 && Math.floor(time * 10) % 2 === 0;
-      if (flashing) {
+      if (flashing && !view3d) {
         ctx.globalCompositeOperation = 'source-atop';
         ctx.fillStyle = 'rgba(248, 113, 113, 0.6)';
         ctx.fillRect(px, py + walkBob, TILE, TILE);
@@ -1125,6 +1183,29 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
       drawParticles(ctx, s.particles);
       ctx.restore();
+
+      const r3d = rendererRef.current;
+      if (r3d) {
+        r3d.render({
+          player: { key: `player:${characterId}:${appearanceRef.current}`, canvas: playerSprite, x: px / TILE, y: py / TILE, lift: Math.abs(walkBob) / TILE, tint: flashing ? '#f87171' : null },
+          enemies: s.enemies.filter((e) => e.alive).map((enemy) => {
+            const pos = entityPixelPos(enemy);
+            const kind = enemy.isBoss ? 'boss' : enemy.frozen || enemy.stunMs > 0 ? 'frozen' : 'enemy';
+            const enemyLook = getEnemyLook(kind, appearanceRef.current);
+            const key = `enemy:${kind}:${appearanceRef.current}`;
+            return {
+              key,
+              canvas: getSpriteCanvas(key, enemyLook.sprite, enemyLook.palette, TILE / enemyLook.sprite.length),
+              x: pos.x / TILE,
+              y: pos.y / TILE,
+              lift: (Math.sin(time * 4 + pos.x) + 1) * 0.03,
+              hp: enemy.maxHp > 1 ? enemy.hp / enemy.maxHp : undefined,
+            };
+          }),
+          crystal: { x: crystalPos.x / TILE, y: crystalPos.y / TILE, lift: bob / TILE },
+          openSecrets: s.discoveredSecrets,
+        });
+      }
     }
 
     function drawDiamond(c: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
@@ -1152,6 +1233,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     rafId = requestAnimationFrame(loop);
 
     return () => {
+      disposed = true;
+      rendererRef.current?.dispose();
+      rendererRef.current = null;
       cancelAnimationFrame(rafId);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
@@ -1160,10 +1244,18 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   }, [level]);
 
   const skillButton = skill ? (
-    <button className="ability-btn skill-btn" disabled={skillUses <= 0} onClick={() => useSkillRef.current()} title={describeSkill(skill, heroLevel)} style={{ borderColor: ELEMENT_INFO[skill.element].color }}>
-      {ELEMENT_INFO[skill.element].icon} {skill.name} {skillUses > 0 ? '' : '(used)'} <kbd>E</kbd>
+    <button
+      className={`ability-btn skill-btn${skillWait > 0 ? ' cooling' : ''}`}
+      disabled={skillWait > 0}
+      onClick={() => useSkillRef.current()}
+      title={`${describeSkill(skill, heroLevel)} Cooldown ${skillCooldown(skill, heroLevel)}s.`}
+      style={{ borderColor: ELEMENT_INFO[skill.element].color }}
+    >
+      {ELEMENT_INFO[skill.element].icon} {skill.name} {skillWait > 0 ? `${skillWait}s` : 'ready'} <kbd>E</kbd>
     </button>
   ) : null;
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
   const toggleWeaponRef = useRef(toggleWeapon);
   toggleWeaponRef.current = toggleWeapon;
   const currentWeapon = weaponSlot === 0 ? BASIC_GUN : signature;
@@ -1203,8 +1295,18 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           </button>
         )}
       </div>
-      <div className="rpg-canvas-wrap">
+      {view3d && (
+        <div className="view3d-bar">
+          <span className="view3d-tag">3D test</span>
+          <button className="ability-btn story-skip" onClick={() => setCamera(camera === 'overview' ? 'follow' : 'overview')}>
+            🎥 Camera: {camera === 'overview' ? 'Overview' : 'Follow'}
+          </button>
+        </div>
+      )}
+      <div className={`rpg-canvas-wrap${view3d ? ' is-3d' : ''}`}>
         <canvas ref={canvasRef} width={WIDTH} height={HEIGHT} />
+        {view3d && <div ref={view3dRef} className="view3d" />}
+        {view3dError && <div className="rpg-toast">{view3dError}</div>}
         {toast && <div className="rpg-toast">{toast}</div>}
         {won && runStats && (
           <div className="game-overlay">
@@ -1231,7 +1333,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
               })()}
             </p>
             {runStats.usedAbility && <p className="ability-disqualified-note">A help ability was used on this level, so this run will not count toward the world record.</p>}
-            <LeaderboardPanel levelId={level.id} />
+            {!view3d && <LeaderboardPanel levelId={level.id} />}
+            {view3d && <p className="gacha-fine">3D test runs don’t go on the World’s Best list.</p>}
             <button
               onClick={() => {
                 sound.playMenuClick();
@@ -1251,7 +1354,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           weaponName={currentWeapon.name}
           weaponColor={currentWeapon.color}
           skillName={skill?.name}
-          skillReady={skillUses > 0}
+          skillReady={skillWait <= 0}
+          skillWait={skillWait}
           onSkill={() => useSkillRef.current()}
         />
       )}
@@ -1395,11 +1499,11 @@ function AbilitySelectScreen({ onChoose }: { onChoose: (id: AbilityId) => void }
   );
 }
 
-function FinaleScreen({ onRestart, story }: { onRestart: () => void; story?: boolean }) {
+function FinaleScreen({ onRestart, story, threeD }: { onRestart: () => void; story?: boolean; threeD?: boolean }) {
   return (
     <div className="ability-select">
-      <h1>{story ? 'The End' : 'Time Crystal Restored'}</h1>
-      <p>All eleven shards are yours. The timeline holds.</p>
+      <h1>{threeD ? '3D Test Complete' : story ? 'The End' : 'Time Crystal Restored'}</h1>
+      <p>{threeD ? 'You cleared both 3D test levels. Thanks for testing the 3D update!' : 'All eleven shards are yours. The timeline holds.'}</p>
       <button className="ability-card" onClick={onRestart}>
         Play again
       </button>
@@ -1409,7 +1513,9 @@ function FinaleScreen({ onRestart, story }: { onRestart: () => void; story?: boo
 
 export const MUTE_STORAGE_KEY = 'timeCrystalMuted';
 
-export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' | 'story' }) {
+export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' | 'story' | '3d' }) {
+  const is3d = mode === '3d';
+  const levelCount = is3d ? 2 : TOTAL_LEVELS; // the 3D test only has the first two levels
   const [save, setSave] = useState<Save | null>(null);
   const [muted, setMutedFlag] = useState(false);
   const soundRef = useRef<SoundEngine | null>(null);
@@ -1423,7 +1529,8 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
-    if (profile) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
+    // 3D test runs are kept off the World's Best list.
+    if (profile && !is3d) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
     updateSave({
       ...currentSave,
       crystalsCollected: currentSave.crystalsCollected + 1,
@@ -1518,10 +1625,11 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
         }}
       />
     );
-  } else if (save && save.currentLevel > TOTAL_LEVELS) {
+  } else if (save && save.currentLevel > levelCount) {
     body = (
       <FinaleScreen
         story={isStory}
+        threeD={is3d}
         onRestart={() => updateSave({ ...defaultSave(), appearance: save.appearance })}
       />
     );
@@ -1551,10 +1659,10 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
         <div>
           <div className="journey-bar">
             <span>
-              Time Crystals: {save.crystalsCollected}/{TOTAL_LEVELS}
+              Time Crystals: {save.crystalsCollected}/{levelCount}
             </span>
             <div className="journey-track">
-              <div className="journey-fill" style={{ width: `${(save.crystalsCollected / TOTAL_LEVELS) * 100}%` }} />
+              <div className="journey-fill" style={{ width: `${(save.crystalsCollected / levelCount) * 100}%` }} />
             </div>
           </div>
           <LevelRunner
@@ -1572,6 +1680,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             onEmeraldFound={() => addShards(1)}
             heroLevel={levelOf(save.characterId ?? 'wanderer')}
             skill={signedIn ? equippedSkill(save.characterId ?? 'wanderer') : null}
+            view3d={is3d}
             signedIn={signedIn}
             onRunFinished={(stats) => claimRun(level.id, stats.timeMs, stats.usedAbility)}
             autoWeapon={settings.autoWeapon}

@@ -3,7 +3,7 @@ import { type Rarity, rarityOf } from './gacha';
 // Every hero carries the basic gun plus one signature weapon of their own (switch with Q).
 // Weapons are data: the game reads these fields to decide how each one behaves.
 
-export type WeaponKind = 'shot' | 'melee' | 'beam' | 'mine' | 'nova' | 'zone' | 'pulse' | 'wave';
+export type WeaponKind = 'shot' | 'melee' | 'beam' | 'mine' | 'nova' | 'zone' | 'pulse' | 'wave' | 'orbit' | 'eruption' | 'meteor' | 'vortex';
 export type MeleePattern = 'front' | 'sweep' | 'spin' | 'lunge' | 'arc' | 'x' | 'spear' | 'dash';
 export type BlastShape = 'square' | 'diamond' | 'cross';
 
@@ -39,6 +39,11 @@ export interface WeaponDef {
   durationMs?: number; // zone: how long it stays on the ground
   knockback?: number; // tiles a hit pushes enemies back
   width?: number; // wave: tiles wide (3 by default)
+  zap?: number; // shot: zaps enemies within this many tiles as it travels
+  ricochet?: number; // shot: after a hit, flies on to this many more enemies
+  plant?: boolean; // shot: leaves a damaging patch (radius, durationMs) where it lands
+  pull?: number; // shot: drags the enemy it hits this many tiles toward you
+  prism?: boolean; // beam: fires two diagonal beams that bounce off walls (bounce times)
   poison?: number; // extra damage dealt one second after the hit
   explodeAtEnd?: boolean; // shot: blows up where it lands, not only on contact
   // heal 1 HP for each enemy this weapon finishes off
@@ -106,6 +111,15 @@ export const SIGNATURE_WEAPONS: Record<string, WeaponDef> = {
   archon: W({ name: 'Judgment Blade', desc: 'Strikes in a great X, 3 tiles along each diagonal, and stuns.', kind: 'melee', color: '#fbbf24', cooldownMs: 850, damage: 4, pattern: 'x', freezeMs: 1200 }, 'judgment'),
   genesis: W({ name: 'Genesis Bloom', desc: 'Blooms in a wide diamond around you. Each kill restores 1 HP.', kind: 'nova', shape: 'diamond', color: '#4ade80', cooldownMs: 1300, damage: 3, radius: 3, lifesteal: true }, 'bloom'),
   oblivion: W({ name: 'Erasure', desc: 'Beams of nothing in all four directions at once. Each kill restores 1 HP.', kind: 'beam', color: '#f43f5e', cooldownMs: 1000, damage: 4, beams: 4, lifesteal: true }, 'erasure'),
+  cinder: W({ name: 'Sun Orbs', desc: 'Two fireballs circle you for 3 seconds, burning whatever they touch.', kind: 'orbit', color: '#fb923c', cooldownMs: 3000, damage: 1, count: 2, radius: 1, durationMs: 3000 }, 'sunorbs'),
+  glacius: W({ name: 'Glacier Spikes', desc: 'Ice spikes burst out of the ground tile by tile in a line ahead, freezing what they hit.', kind: 'eruption', color: '#bae6fd', cooldownMs: 650, damage: 1, range: 5, freezeMs: 1200 }, 'spikes'),
+  tempest: W({ name: 'Ball Lightning', desc: 'A slow ball of lightning that drifts ahead and zaps every enemy near it.', kind: 'shot', color: '#facc15', cooldownMs: 1100, damage: 1, speed: 4, range: 8, pierce: Infinity, zap: 1, size: 8 }, 'balllightning'),
+  terra: W({ name: 'Meteor Call', desc: 'Call a meteor down 3 tiles ahead. It lands after a short warning, hitting everything around it.', kind: 'meteor', color: '#a16207', cooldownMs: 900, damage: 3, range: 3, explode: 1 }, 'meteor'),
+  briar: W({ name: 'Seed Bomb', desc: 'Throw a seed that bursts into a thorn patch, stinging enemies inside it for 3 seconds.', kind: 'shot', color: '#4ade80', cooldownMs: 1000, damage: 1, speed: 8, range: 4, plant: true, radius: 1, durationMs: 3000, size: 5 }, 'seedbomb'),
+  wraith: W({ name: 'Shadow Hook', desc: 'A fast hook that drags the enemy it catches 3 tiles toward you.', kind: 'shot', color: '#a78bfa', cooldownMs: 700, damage: 2, speed: 16, range: 7, pull: 3, size: 4 }, 'hook'),
+  seraphine: W({ name: 'Prism Beam', desc: 'Two diagonal beams of light that bounce off walls twice.', kind: 'beam', color: '#fde68a', cooldownMs: 800, damage: 2, prism: true, bounce: 2 }, 'prism'),
+  weaver: W({ name: 'Singularity', desc: 'Open a vortex 3 tiles ahead that drags nearby enemies into its centre and grinds them.', kind: 'vortex', color: '#e879f9', cooldownMs: 1400, damage: 1, range: 3, radius: 2, durationMs: 2500 }, 'vortex'),
+  vector: W({ name: 'Ricochet Disc', desc: 'A disc that bounces from enemy to enemy, up to 3 more times.', kind: 'shot', color: '#94a3b8', cooldownMs: 600, damage: 2, speed: 14, range: 10, ricochet: 3, size: 5 }, 'disc'),
 };
 
 // Higher tiers carry better weapons: harder hits and faster recharge on top of each weapon's own style.

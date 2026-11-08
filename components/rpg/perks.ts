@@ -8,7 +8,8 @@ import { areaBonus } from './skills';
 export type PerkKind =
   | 'regen' | 'shield' | 'thorns' | 'crit' | 'dodge' | 'killHaste' | 'deathBurst' | 'slowAura'
   | 'frostOnHurt' | 'revive' | 'shardSense' | 'crystalSense' | 'echoShot' | 'lastStand' | 'vampire'
-  | 'timeSlow' | 'stunTouch' | 'secretSight' | 'knockback' | 'killShield' | 'headstart' | 'momentum' | 'giantSlayer';
+  | 'timeSlow' | 'stunTouch' | 'secretSight' | 'knockback' | 'killShield' | 'headstart' | 'momentum' | 'giantSlayer'
+  | 'magnet' | 'overcharge' | 'retaliate' | 'frenzy';
 
 export interface Perk {
   kind: PerkKind;
@@ -47,6 +48,10 @@ const PERK_DEFS: Record<PerkKind, { name: string; value: (s: number) => number; 
   killShield: { name: 'Spoils of War', value: (s) => Math.min(1, round1(0.35 * s * 100) / 100), desc: (v) => `${pct(v)} chance for a kill to give you a barrier that blocks one hit.` },
   headstart: { name: 'Ambush', value: (s) => round1(3 * s), desc: (v) => `Invulnerable for the first ${v}s of every level and after every restart.` },
   momentum: { name: 'Momentum', value: (s) => Math.min(1, round1(0.4 * s * 100) / 100), desc: (v) => `${pct(v)} chance for a kill to recharge your weapon instantly.` },
+  magnet: { name: 'Shard Magnet', value: (s) => Math.round(s), desc: (v) => `Collect hidden Emerald Shards from up to ${v} tile${v > 1 ? 's' : ''} away.` },
+  overcharge: { name: 'Overcharge', value: (s) => round1(1.5 * s), desc: (v) => `Each kill cuts your skill's cooldown by ${v}s.` },
+  retaliate: { name: 'Retaliation', value: (s) => round1(s), desc: (v) => `When you're hit, burst for ${v} damage to every enemy next to you.` },
+  frenzy: { name: 'Frenzy', value: (s) => round1(2 * s), desc: (v) => `After a kill, your weapons recharge 40% faster for ${v}s.` },
   giantSlayer: { name: 'Giant Slayer', value: (s) => round1(1 + 0.5 * s), desc: (v) => `Deal ${v}× damage to tough enemies like the boss.` },
 };
 
@@ -75,7 +80,13 @@ const HERO_PERKS: Record<string, PerkKind[]> = {
   ranger: ['giantSlayer'],
   tinker: ['knockback'],
   valkyrie: ['slowAura'],
+  cinder: ['frenzy'],
+  glacius: ['retaliate'],
+  tempest: ['overcharge'],
+  terra: ['magnet'],
   // rare: two perks
+  briar: ['magnet', 'regen'],
+  wraith: ['dodge', 'frenzy'],
   ghost: ['dodge', 'killHaste'],
   grimsby: ['shardSense', 'revive'],
   corsair: ['momentum', 'crit'],
@@ -92,19 +103,22 @@ const HERO_PERKS: Record<string, PerkKind[]> = {
   dragoon: ['deathBurst', 'knockback'],
   tidecaller: ['frostOnHurt', 'timeSlow'],
   automaton: ['shield', 'thorns'],
+  seraphine: ['retaliate', 'shield'],
   // legendary: three perks
+  weaver: ['overcharge', 'slowAura', 'crystalSense'],
   solaris: ['regen', 'deathBurst', 'secretSight'],
   aurora: ['dodge', 'frostOnHurt', 'timeSlow'],
   celestia: ['crystalSense', 'shardSense', 'crit'],
   archon: ['killShield', 'giantSlayer', 'knockback'],
   // mythic: three of the strongest perks
+  vector: ['frenzy', 'crit', 'overcharge'],
   paradox: ['echoShot', 'timeSlow', 'dodge'],
   genesis: ['regen', 'vampire', 'revive'],
   oblivion: ['lastStand', 'deathBurst', 'headstart'],
 };
 
 // Perks that cover an area reach one tile further at hero levels 5, 12 and 20.
-export const AREA_PERKS: PerkKind[] = ['deathBurst', 'slowAura', 'shardSense'];
+export const AREA_PERKS: PerkKind[] = ['deathBurst', 'slowAura', 'shardSense', 'magnet'];
 
 export function getPerks(heroId: string, heroLevel = 1): Perk[] {
   const strength = TIER_STRENGTH[rarityOf(heroId)];

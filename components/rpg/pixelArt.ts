@@ -599,6 +599,87 @@ const RAW_CHARACTERS: CharacterDef[] = [
     palette: { o: '#000000', y: '#27272a', d: '#09090b', e: '#f43f5e' },
     stats: { maxHp: 6, moveMs: 100, attackCooldownMs: 160, attackDurationMs: 125, invulnS: 1.5, bulletSpeed: 16, passiveName: 'Unmaking', passiveDesc: 'Every stat is pushed to the edge of what is possible.' },
   },
+  {
+    id: 'cinder',
+    name: 'Cinder',
+    description:
+      "She was a blacksmith's apprentice until the forge-fires of every timeline started going out at once. Now she carries her own flame, and it circles her like a pair of loyal suns. She is small, quick and very hard to put out, and she gets fiercer with every fight.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#431407', y: '#fb923c', d: '#c2410c', e: '#fef3c7' },
+    stats: { maxHp: 4, moveMs: 140, attackCooldownMs: 220, attackDurationMs: 160, invulnS: 0.7, bulletSpeed: 10, passiveName: 'Kindling', passiveDesc: 'Quick hands that burn hotter the longer she fights.' },
+  },
+  {
+    id: 'glacius',
+    name: 'Glacius',
+    description:
+      "He has walked beside the glaciers of the far north for longer than the glaciers have had names. He is slow, enormous and as patient as ice, and when he strikes, spikes of frozen water burst out of the ground ahead of him. Nothing hurts him for long, and anything that tries regrets it.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#082f49', y: '#bae6fd', d: '#38bdf8', e: '#0c4a6e' },
+    stats: { maxHp: 8, moveMs: 190, attackCooldownMs: 290, attackDurationMs: 200, invulnS: 0.8, bulletSpeed: 8, passiveName: 'Permafrost', passiveDesc: 'Very sturdy and slow, like the glaciers he walks with.' },
+  },
+  {
+    id: 'tempest',
+    name: 'Tempest',
+    description:
+      "They ride the storms that roll between timelines, never staying anywhere longer than the weather does. Tempest carries a crackling sphere of lightning that drifts along and zaps anything that wanders too close. They are fast, restless and impossible to pin down.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1e1b4b', y: '#facc15', d: '#a16207', e: '#f8fafc' },
+    stats: { maxHp: 4, moveMs: 115, attackCooldownMs: 260, attackDurationMs: 180, invulnS: 0.8, bulletSpeed: 11, passiveName: 'Tailwind', passiveDesc: 'Moves like a gust and is hard to keep up with.' },
+  },
+  {
+    id: 'terra',
+    name: 'Terra',
+    description:
+      "She can hear mountains. Not the wind on them, but the mountains themselves, slow and deep and patient. Terra fights like a landslide: unhurried, unstoppable, and with very little warning. When she calls the sky for help, it answers with falling rock.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#292524', y: '#a16207', d: '#57534e', e: '#fef3c7' },
+    stats: { maxHp: 7, moveMs: 175, attackCooldownMs: 270, attackDurationMs: 190, invulnS: 0.75, bulletSpeed: 8, passiveName: 'Bedrock', passiveDesc: 'Solid and steady, with plenty of health.' },
+  },
+  {
+    id: 'briar',
+    name: 'Briar',
+    description:
+      "They tend the wild places between timelines, coaxing gardens out of broken ground. Briar's seeds burst into thorn patches that keep stinging long after they land. They are gentle until something threatens the green, and then they are not gentle at all.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#14532d', y: '#4ade80', d: '#166534', e: '#fefce8' },
+    stats: { maxHp: 5, moveMs: 140, attackCooldownMs: 250, attackDurationMs: 175, invulnS: 0.9, bulletSpeed: 10, passiveName: 'Overgrowth', passiveDesc: 'Hard to pin down in the undergrowth.' },
+  },
+  {
+    id: 'wraith',
+    name: 'Wraith',
+    description:
+      "He lives in the corners light forgets and moves through them like smoke. The Wraith carries a hook on a chain of shadow and drags his enemies close before they know he is there. He is fast, quiet and almost impossible to land a hand on.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#020617', y: '#4c1d95', d: '#1e1b4b', e: '#c4b5fd' },
+    stats: { maxHp: 4, moveMs: 120, attackCooldownMs: 230, attackDurationMs: 165, invulnS: 1.1, bulletSpeed: 11, passiveName: 'Haunting', passiveDesc: 'Fast and slippery, gone before you can strike back.' },
+  },
+  {
+    id: 'seraphine',
+    name: 'Seraphine',
+    description:
+      "She guards the dawn of every timeline, and her wings are made of the first light of morning. Seraphine fights with prisms that split her light into beams that bounce off every wall in the room. She is graceful, tough and very bright, in every sense.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#78350f', y: '#fef9c3', d: '#fde68a', e: '#78350f' },
+    stats: { maxHp: 6, moveMs: 135, attackCooldownMs: 220, attackDurationMs: 160, invulnS: 1, bulletSpeed: 12, passiveName: 'Radiant Wings', passiveDesc: 'Graceful and resilient, bathed in light.' },
+  },
+  {
+    id: 'weaver',
+    name: 'Weaver',
+    description:
+      "They sit at the loom where time is spun and keep the threads from tangling. Weaver can tie space itself into a knot, opening a vortex that drags everything nearby into its centre. They are calm, precise, and capable of unravelling almost anyone.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#3b0764', y: '#e879f9', d: '#86198f', e: '#fdf4ff' },
+    stats: { maxHp: 6, moveMs: 130, attackCooldownMs: 200, attackDurationMs: 150, invulnS: 1.2, bulletSpeed: 12, passiveName: 'Thread of Fate', passiveDesc: 'Every strand of time bends a little in their favour.' },
+  },
+  {
+    id: 'vector',
+    name: 'Vector',
+    description:
+      "He was built to maintain the machinery of every timeline, and he was built very, very well. Vector computes trajectories in an instant and throws a disc that ricochets from one target to the next. He is fast, durable and precise to the millimetre.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#0f172a', y: '#38bdf8', d: '#1e293b', e: '#f43f5e' },
+    stats: { maxHp: 7, moveMs: 105, attackCooldownMs: 170, attackDurationMs: 130, invulnS: 1.3, bulletSpeed: 15, passiveName: 'Overclocked Core', passiveDesc: 'A machine-perfect fighter, beyond any normal limit.' },
+  },
 ];
 
 // Same stat budget for everyone in a tier; see balanceStats.
@@ -914,6 +995,15 @@ const HUMAN_LOOKS: Record<string, HumanLook> = {
   archon: { layers: [BULKY, WINGS, HEAD, BEARD, SHORT, HALO], s: '#e0ac69', h: '#f8fafc', a: '#fbbf24' },
   genesis: { layers: [FLOAT, HEAD, LIPS, LONG, LEAF_CROWN], s: '#c68642', h: '#166534', a: '#86efac' },
   oblivion: { layers: [BROAD, HEAD, SHADOW_FACE, CROWN], s: '#27272a', h: '#000000', a: '#f43f5e' },
+  cinder: { layers: [SLIM, HEAD, LIPS, SPIKY, FLAME_TIPS], s: '#f1c27d', h: '#dc2626', a: '#fde047' },
+  glacius: { layers: [BULKY, HEAD, BEARD, CREST_HELM], s: '#e0f2fe', h: '#e0f2fe', a: '#38bdf8' },
+  tempest: { layers: [NEUTRAL, HEAD, MESSY, GOGGLES], s: '#c68642', h: '#fde047', a: '#38bdf8' },
+  terra: { layers: [SLIM, HEAD, LIPS, BUN, LEAF_CROWN], s: '#8d5524', h: '#422006', a: '#a3e635' },
+  briar: { layers: [NEUTRAL, HEAD, LONG, LEAF_CROWN], s: '#d4a373', h: '#15803d', a: '#f472b6' },
+  wraith: { layers: [BROAD, HEAD, SKULL_FACE, CROWN], s: '#cbd5e1', h: '#020617', a: '#a78bfa' },
+  seraphine: { layers: [DRESS, WINGS, HEAD, LIPS, BOB, HALO], s: '#ffdbac', h: '#fde68a', a: '#fde047' },
+  weaver: { layers: [ROBE, HEAD, MESSY, THIRD_EYE, STRINGS], s: '#e0ac69', h: '#a21caf', a: '#f0abfc' },
+  vector: { layers: [BROAD, APRON, HEAD, SPIKY, EYE_GOGGLES], s: '#c68642', h: '#0f172a', a: '#38bdf8' },
 };
 
 const DEFAULT_HUMAN: HumanLook = HUMAN_LOOKS.wanderer;
@@ -988,14 +1078,14 @@ export function getEnemyLook(kind: EnemyKind, appearance: Appearance): Look {
 }
 
 // Story actors: the guide, the Guardian (boss) and each hero's nemesis.
-// One nemesis per hero. Bad characters (nemeses + the Guardian) are 20 women, 20 men and 6 they.
+// One nemesis per hero. Bad characters (nemeses + the Guardian) are 24 women, 24 men and 7 they.
 export type VillainId =
   // women
-  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse' | 'vein' | 'kuro' | 'strings' | 'maris' | 'seraph' | 'aurelia'
+  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse' | 'vein' | 'kuro' | 'strings' | 'maris' | 'seraph' | 'aurelia' | 'thaw' | 'blight' | 'lumen' | 'knot'
   // men
-  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw' | 'harrow' | 'ichor' | 'crassus' | 'kael' | 'krell' | 'omega'
+  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw' | 'harrow' | 'ichor' | 'crassus' | 'kael' | 'krell' | 'omega' | 'smog' | 'bram' | 'dusk' | 'rook'
   // they
-  | 'hollow' | 'mirror' | 'lantern' | 'unmaker' | 'silence' | 'voidmaw';
+  | 'hollow' | 'mirror' | 'lantern' | 'unmaker' | 'silence' | 'voidmaw' | 'static';
 export type ActorId = 'oren' | 'guardian' | VillainId;
 
 interface ActorDef {
@@ -1042,6 +1132,10 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   maris: villain(['#042f2e', '#0f766e', '#134e4a'], [DRESS, HEAD, LIPS, LONG, SCARF], '#99f6e4', '#134e4a', '#5eead4', ['#042f2e', '#14b8a6', '#99f6e4']),
   seraph: villain(['#3f3f46', '#f4f4f5', '#a1a1aa'], [ROBE, WINGS, HEAD, LIPS, LONG, HALO], '#ffdbac', '#fde047', '#facc15', ['#52525b', '#f4f4f5', '#fde047']),
   aurelia: villain(['#451a03', '#fef3c7', '#d97706'], [DRESS, HEAD, LIPS, BUN, HALO], '#8d5524', '#422006', '#fbbf24', ['#78350f', '#fde68a', '#fffbeb']),
+  thaw: villain(['#7c2d12', '#f97316', '#9a3412'], [DRESS, HEAD, LIPS, LONG, CIRCLET], '#ffdbac', '#7dd3fc', '#f97316', ['#7c2d12', '#f97316', '#bae6fd']),
+  blight: villain(['#1a2e05', '#65a30d', '#3f6212'], [ROBE, HEAD, LIPS, LONG, SMALL_HORNS], '#d9f99d', '#3f6212', '#a855f7', ['#1a2e05', '#4d7c0f', '#d8b4fe']),
+  lumen: villain(['#78716c', '#fafaf9', '#d6d3d1'], [ROBE, HEAD, LIPS, HOOD, HALO], '#ffdbac', '#78716c', '#fde047', ['#57534e', '#fafaf9', '#fde047']),
+  knot: villain(['#450a0a', '#b91c1c', '#0c0a09'], [SLIM, HEAD, LIPS, PIGTAILS, DOMINO], '#f1c27d', '#7f1d1d', '#fecaca', ['#450a0a', '#dc2626', '#0c0a09']),
   // men
   harrow: villain(['#1c0a0a', '#7f1d1d', '#292524'], [BROAD, HEAD, BEARD, FEATHER_CAP], '#ffdbac', '#44403c', '#fde047', ['#450a0a', '#991b1b', '#fde047']),
   ichor: villain(['#052e16', '#3f6212', '#1a2e05'], [ROBE, HEAD, MUSTACHE, MESSY, EYE_GOGGLES], '#d9f99d', '#1a2e05', '#a3e635', ['#1a2e05', '#84cc16', '#ecfccb']),
@@ -1049,6 +1143,10 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   kael: villain(['#1c0500', '#7c2d12', '#431407'], [BULKY, HEAD, BEARD, HORNED_HELM], '#c68642', '#7f1d1d', '#fb923c', ['#431407', '#c2410c', '#fb923c']),
   krell: villain(['#1c1917', '#a16207', '#57534e'], [BROAD, APRON, HEAD, MUSTACHE, HARD_HAT], '#f1c27d', '#292524', '#fbbf24', ['#422006', '#ca8a04', '#fef08a']),
   omega: villain(['#000000', '#1e293b', '#0f172a'], [BULKY, HEAD, SHORT, VISOR], '#94a3b8', '#000000', '#38bdf8', ['#0f172a', '#334155', '#38bdf8'], '#38bdf8'),
+  smog: villain(['#1c1917', '#44403c', '#292524'], [BULKY, HEAD, MUSTACHE, SHORT, GOGGLES], '#a8a29e', '#1c1917', '#84cc16', ['#1c1917', '#57534e', '#a3e635']),
+  bram: villain(['#422006', '#a16207', '#78350f'], [BULKY, HEAD, BEARD, HARD_HAT], '#c68642', '#78350f', '#facc15', ['#422006', '#a16207', '#fde68a']),
+  dusk: villain(['#1e1b4b', '#4c1d95', '#0f0a1e'], [BROAD, HEAD, BEARD, CROWN], '#8d5524', '#312e81', '#c4b5fd', ['#1e1b4b', '#6d28d9', '#c4b5fd']),
+  rook: villain(['#0f172a', '#64748b', '#334155'], [BROAD, HEAD, OPEN_HELM, VISOR], '#94a3b8', '#0f172a', '#ef4444', ['#0f172a', '#64748b', '#ef4444'], '#ef4444'),
   gale: villain(['#0c1a3a', '#1e3a8a', '#fbbf24'], [BROAD, HEAD, BEARD, TRICORN], '#ffdbac', '#e5e7eb', '#fbbf24', ['#172554', '#1d4ed8', '#fde68a']),
   frostjaw: villain(['#082f49', '#bae6fd', '#0369a1'], [BULKY, HEAD, BEARD, SPIKY], '#e0f2fe', '#f8fafc', '#7dd3fc', ['#0c4a6e', '#7dd3fc', '#f0f9ff']),
   kestrel: villain(['#1c0a0a', '#7f1d1d', '#450a0a'], [BROAD, HEAD, BEARD, OPEN_HELM], '#e0ac69', '#57534e', '#fca5a5', ['#450a0a', '#b91c1c', '#fecaca']),
@@ -1066,6 +1164,7 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   hollow: villain(['#020617', '#1f2937', '#111827'], [FLOAT, HEAD, HOOD, SHADOW_FACE], '#64748b', '#020617', '#ef4444', ['#020617', '#334155', '#94a3b8'], '#ef4444'),
   silence: villain(['#000000', '#e5e7eb', '#9ca3af'], [FLOAT, HEAD, HOOD, BLANK_FACE], '#f3f4f6', '#000000', '#f3f4f6', ['#374151', '#e5e7eb', '#ffffff'], '#e5e7eb'),
   voidmaw: villain(['#000000', '#1e1b4b', '#020617'], [FLOAT, HEAD, SHADOW_FACE, SMALL_HORNS], '#1e1b4b', '#000000', '#a855f7', ['#020617', '#312e81', '#a855f7'], '#a855f7'),
+  static: villain(['#18181b', '#a1a1aa', '#3f3f46'], [FLOAT, HEAD, BLANK_FACE, ANTENNAE], '#e4e4e7', '#18181b', '#facc15', ['#27272a', '#a1a1aa', '#facc15'], '#facc15'),
   unmaker: villain(['#000000', '#18181b', '#450a0a'], [FLOAT, HEAD, MESSY, VISOR], '#71717a', '#09090b', '#ef4444', ['#000000', '#27272a', '#ef4444'], '#ef4444'),
   lantern: villain(['#422006', '#fde68a', '#f59e0b'], [FLOAT, HEAD, HOOD, GLOW_FACE], '#fef3c7', '#fde68a', '#fb923c', ['#78350f', '#fde68a', '#fffbeb'], '#fb923c'),
 };

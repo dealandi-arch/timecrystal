@@ -37,6 +37,10 @@ export const VILLAINS: Record<VillainId, { name: string; blurb: string }> = {
   maris: { name: 'Siren Maris', blurb: 'Her song drags sailors from a hundred timelines down to a sea that has no bottom.' },
   seraph: { name: 'High Judge Seraph', blurb: 'The judge who took the bench after casting down her predecessor, and sentences entire timelines.' },
   aurelia: { name: 'Saint Aurelia', blurb: 'A holy crusader who will burn any world to be rid of one thing she calls evil.' },
+  thaw: { name: 'Madame Thaw', blurb: 'She melts ancient glaciers and sells the water by the bottle.' },
+  blight: { name: 'Lady Blight', blurb: 'A rot that walks, withering every garden she touches.' },
+  lumen: { name: 'Sister Lumen', blurb: 'A shadow-hunting nun with a lantern and no mercy.' },
+  knot: { name: 'Madam Knot', blurb: 'She ties time into loops so that nothing ever changes.' },
   // men
   kestrel: { name: 'Captain Kestrel', blurb: 'A fallen Vault Guard captain who decided he was owed the crystal.' },
   tick: { name: 'Baron Tick', blurb: 'A clockwork tyrant grinding time into parts and charging tolls on every second.' },
@@ -57,6 +61,10 @@ export const VILLAINS: Record<VillainId, { name: string; blurb: string }> = {
   kael: { name: 'Wyrmlord Kael', blurb: 'The man who slew the last dragons so that he alone would command their fire.' },
   krell: { name: 'Foreman Krell', blurb: 'He builds machines to work until they break, then scraps them for parts.' },
   omega: { name: 'Omega', blurb: 'A cold machine mind that has calculated the end of all things and wants it on schedule.' },
+  smog: { name: 'Baron Smog', blurb: 'An industrialist who smothers every flame and sells clean air back.' },
+  bram: { name: 'Quarry King Bram', blurb: 'He quarries whole mountains flat and sells the stone.' },
+  dusk: { name: 'Duke Dusk', blurb: 'A night-court noble dragging every evening into endless dark.' },
+  rook: { name: 'Overseer Rook', blurb: 'A machine overseer who seized the maintenance network of every timeline.' },
   // they
   hollow: { name: 'The Hollow', blurb: 'An echo of every path not taken, hungry for what is real.' },
   mirror: { name: 'The Mirror', blurb: 'A dark copy built from every piece of yourself you left behind.' },
@@ -64,6 +72,7 @@ export const VILLAINS: Record<VillainId, { name: string; blurb: string }> = {
   unmaker: { name: 'The Unmaker', blurb: 'Another impossibility, determined to unmake time so nothing can go wrong ever again.' },
   silence: { name: 'The Silence', blurb: 'A faceless quiet that spreads through the fracture and swallows every sound.' },
   voidmaw: { name: 'Voidmaw', blurb: 'A hunger older than the stars, eating the night sky one constellation at a time.' },
+  static: { name: 'The Static', blurb: 'A hissing noise that lives inside lightning and feeds on it.' },
 };
 
 export const SPEAKER_NAMES: Record<'oren' | 'guardian', string> = {
@@ -494,6 +503,69 @@ const ARCS: Record<string, PersonalArc> = {
     rival: [v('Monster! I have followed you through a thousand burned worlds, and I will end you here.'), h('Saint Aurelia. You have burned quite a few of them yourself.'), v('In your name! To stop you!')],
     clash: [v('This world can burn too, if that is what it takes!'), h('Listen to yourself. You sound just like me.'), n('Oblivion lets her blade land and does not raise a hand. In the quiet that follows, Saint Aurelia finally looks at what she has done, and she lays down her sword.')],
     ending: [h('I have never seen a morning before. I was usually gone by then.'), o('What do you think of it?'), h('Hm. Let us leave it where it is.')],
+  },
+  cinder: {
+    nemesis: 'smog',
+    intro: [h('Every fire I light goes out within a minute, Oren. Something is smothering them.'), o('Smothering?'), h('Smoke. Thick, grey, and it smells like money.')],
+    rival: [v('A little spark! Fires are so wasteful. My smog keeps everything nice and dim.'), h('Baron Smog. People need fire to stay warm.'), v('People need my filters to breathe. For a price.')],
+    clash: [v('Choke, little spark!'), h('A spark only needs a little air. Watch.'), n('Cinder’s orbs blaze bright enough to burn the smog away, and the sky clears for the first time in years.')],
+    ending: [h('Every hearth in the valley is lit again.'), o('And the Baron?'), h('Selling fans, last I heard. Honest work.')],
+  },
+  glacius: {
+    nemesis: 'thaw',
+    intro: [h('The glaciers I guard are melting, Oren. Not from the sun. From a furnace.'), o('Someone is melting them on purpose?'), h('Someone is bottling the meltwater and selling it.')],
+    rival: [v('The ice-warden! Do you know what a thousand-year-old glacier sells for? Neither did I, until I sold one.'), h('Madame Thaw. Those glaciers hold back the sea.'), v('Then the sea will need buying too.')],
+    clash: [v('Everything melts eventually!'), h('Not while I am standing here.'), n('Glacier spikes burst up around Thaw’s furnaces and freeze them solid.')],
+    ending: [h('The ice is growing back. Slowly. Ice is patient.'), o('So are you.'), h('That is the point.')],
+  },
+  tempest: {
+    nemesis: 'static',
+    intro: [n('Tempest rides the storms between timelines. Lately, the storms have been hissing.'), h('There is noise in the thunder, Oren. Something is living in it.'), o('The Static. It feeds on lightning.')],
+    rival: [v('Kssh. Little storm. Kssh. Your lightning tastes delicious.'), h('Static. Get out of my weather.'), v('Make. Kssh. Me.')],
+    clash: [v('Every bolt belongs to me! Kssh!'), h('Then catch this one.'), n('Tempest’s ball lightning overloads the Static with more charge than it can swallow, and it bursts into silent sparks.')],
+    ending: [h('The thunder is clean again. Just noise, no voices.'), o('Do you miss the company?'), h('I have the rain.')],
+  },
+  terra: {
+    nemesis: 'bram',
+    intro: [h('Mountains are disappearing, Oren. Whole ones. Overnight.'), o('Someone is moving them?'), h('Someone is quarrying them flat and selling the stone.')],
+    rival: [v('The mountain girl! Your peaks make excellent paving slabs.'), h('Quarry King Bram. Mountains are not for sale.'), v('Everything is for sale if you dig deep enough.')],
+    clash: [v('I own every rock from here to the horizon!'), h('Then you can have these.'), n('Terra calls down a meteor that buries Bram’s quarry under the mountain he stole.')],
+    ending: [h('The mountains are settling back. They will take a while to feel like themselves.'), o('Will you wait?'), h('I am made of stone. I am good at waiting.')],
+  },
+  briar: {
+    nemesis: 'blight',
+    intro: [n('Briar tends the wild places between timelines.'), h('The forests are rotting from the roots up, Oren. That is not autumn.'), o('A blight?'), h('A Lady Blight. She signs her work.')],
+    rival: [v('The little gardener. Everything you plant, I can wither.'), h('Lady Blight. Rot is part of life, but you are not.'), v('I am the end of every garden.')],
+    clash: [v('Wither! All of it, wither!'), h('Every ending feeds a beginning.'), n('Briar’s seed bombs burst into thorny bloom, and the blight is choked out by green.')],
+    ending: [h('Something is growing where the rot was. I do not know what yet.'), o('Is that a good thing?'), h('That is the best thing.')],
+  },
+  wraith: {
+    nemesis: 'lumen',
+    intro: [n('The Wraith lives in the corners light forgets.'), h('Someone is hunting my kind, Oren. Anyone who lives in shadow.'), o('A hunter of shadows?'), h('A nun with a lantern and no mercy.')],
+    rival: [v('Wraith. The light finds everything in the end. Step out and be judged.'), h('Sister Lumen. Not everything in the dark is wicked.'), v('Everything that hides is guilty.')],
+    clash: [v('Into the light with you!'), h('You first.'), n('The Wraith’s hook drags Lumen into the shadows, and for the first time she sees how gentle the dark can be.')],
+    ending: [h('Lumen left her lantern behind. She said she would rather sit in the dusk a while.'), o('Will she hunt again?'), h('I think she is done hunting.')],
+  },
+  seraphine: {
+    nemesis: 'dusk',
+    intro: [h('The light is fading earlier every evening, Oren. Someone is dragging the night in.'), o('Who would want longer nights?'), h('Someone who rules them.')],
+    rival: [v('Seraphine. Your wings glare so. In my court, we prefer candlelight.'), h('Duke Dusk. Your court is everyone you have kept from the morning.'), v('And they are so very loyal.')],
+    clash: [v('The night is mine forever!'), h('Light always finds a way in, even through the cracks.'), n('Seraphine’s prism beams bounce through Dusk’s court, and every window floods with dawn.')],
+    ending: [h('The mornings are back on time.'), o('And the Duke?'), h('Learning to enjoy a sunrise. He is not very good at it yet.')],
+  },
+  weaver: {
+    nemesis: 'knot',
+    intro: [n('Weaver tends the threads that tie every moment to the next.'), h('Someone is tying the threads of time in knots, Oren. Days repeat. People get stuck.'), o('Can you untangle them?'), h('If I can find the one tying them.')],
+    rival: [v('Weaver! A knot is just a thread that has made up its mind. Leave mine alone.'), h('Madam Knot. People are trapped in your loops.'), v('Trapped? They are safe. Nothing changes in a loop.')],
+    clash: [v('Pull one thread and everything unravels!'), h('Then I will pull the right one.'), n('Weaver’s singularity drags every knot to its centre and pulls them all loose at once.')],
+    ending: [h('Tuesdays only happen once again. Everyone is very relieved.'), o('Even Madam Knot?'), h('She is learning to knit instead.')],
+  },
+  vector: {
+    nemesis: 'rook',
+    intro: [h('I was built to run the timeline’s maintenance network, Oren. Someone has taken it over.'), o('Taken it over how?'), h('Every machine reports to a new overseer. It is not me.')],
+    rival: [v('Unit Vector. Your access has been revoked. Report for recycling.'), h('Overseer Rook. The network serves the timelines, not you.'), v('The network serves whoever controls it.')],
+    clash: [v('All units, stop that machine!'), h('All units: ignore the last instruction.'), n('Vector’s ricochet disc bounces through every relay in Rook’s tower, and the whole network reboots under its proper keeper.')],
+    ending: [h('Maintenance is back on schedule.'), o('What will you do with your spare cycles?'), h('Calculate the perfect cup of tea. For you.')],
   },
 };
 

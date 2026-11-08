@@ -22,12 +22,13 @@ import {
   usesStat,
 } from './progression';
 import { getPerks } from './perks';
-import { ELEMENTS, ELEMENT_INFO, SKILLS, describeSkill, elementOf, skillsFor } from './skills';
+import { ELEMENTS, ELEMENT_INFO, SKILLS, describeSkill, elementOf, skillCooldown, skillsFor } from './skills';
 
 const num = (v: number, digits = 1) => (Number.isInteger(v) ? String(v) : v.toFixed(digits));
 
 function rangeText(w: WeaponDef): string {
-  if (w.kind === 'shot' || w.kind === 'wave') return `${num(w.range ?? 0)} tiles`;
+  if (w.kind === 'shot' || w.kind === 'wave' || w.kind === 'eruption') return `${num(w.range ?? 0)} tiles`;
+  if (w.kind === 'meteor') return `${w.explode ?? 1} tile blast`;
   if (w.kind === 'melee') return `+${w.reach ?? 0} tile reach`;
   return `${w.radius ?? 0} tile radius`;
 }
@@ -87,7 +88,7 @@ export default function LevelUpScreen() {
     range: (s: Snapshot) => rangeText(s.weapon),
     amount: (s: Snapshot) => `${s.weapon.count ?? 1} per attack`,
     bounce: (s: Snapshot) => `${s.weapon.bounce ?? 0}`,
-    pierce: (s: Snapshot) => (s.weapon.chain ? `chains to ${s.weapon.chain}` : `${s.weapon.pierce ?? 0} enemies`),
+    pierce: (s: Snapshot) => (s.weapon.chain ? `chains to ${s.weapon.chain}` : s.weapon.ricochet ? `ricochets ${s.weapon.ricochet}×` : `${s.weapon.pierce ?? 0} enemies`),
   };
   const nextUp = nextUpgradeLevel(level, baseWeapon);
   const perks = getPerks(hero.id, level);
@@ -156,7 +157,7 @@ export default function LevelUpScreen() {
             protection {now.stats.invulnS.toFixed(2)}s come from {hero.name}’s tier and stay the same.
           </p>
           <div className="levelup-skills">
-            <strong>Skill slot</strong> <small>(only {ELEMENT_INFO[element].name} skills fit · press E in a level to use it once)</small>
+            <strong>Skill slot</strong> <small>(only {ELEMENT_INFO[element].name} skills fit · press E or the skill button to use it, then wait for the cooldown)</small>
             {!skillsReady && <p className="gacha-warning">Skills need the latest supabase/schema.sql before they can be bought.</p>}
             <div className="skill-slot">
               {skillsFor(element).map((skill) => {
@@ -166,7 +167,7 @@ export default function LevelUpScreen() {
                   <div key={skill.id} className={`skill-option ${equipped ? 'equipped' : ''}`}>
                     <div>
                       <strong>{skill.name}</strong>
-                      <p>{describeSkill(skill, level)}</p>
+                      <p>{describeSkill(skill, level)} Cooldown {skillCooldown(skill, level)}s.</p>
                     </div>
                     {!owned ? (
                       <button className="ability-btn" disabled={busy || !skillsReady || aizodon < skill.cost} onClick={() => skillAction(() => buySkill(skill.id))}>
@@ -211,7 +212,7 @@ export default function LevelUpScreen() {
 
       <div className="skill-shop">
         <h3>All skills</h3>
-        <p className="gacha-fine">Buy a skill once, then equip it on any hero of its element. Area skills cover more tiles at hero levels 5, 12 and 20.</p>
+        <p className="gacha-fine">Buy a skill once, then equip it on any hero of its element. Area skills cover more tiles at hero levels 5, 12 and 20, and every skill recharges faster as the hero levels up.</p>
         {ELEMENTS.map((el) => (
           <div key={el}>
             <h4 style={{ color: ELEMENT_INFO[el].color }}>{ELEMENT_INFO[el].icon} {ELEMENT_INFO[el].name}</h4>
@@ -221,7 +222,7 @@ export default function LevelUpScreen() {
                 return (
                   <div key={sk.id} className="skill-card" style={{ borderColor: ELEMENT_INFO[el].color }}>
                     <h4>{sk.name}</h4>
-                    <p>{describeSkill(sk)}</p>
+                    <p>{describeSkill(sk)} Cooldown {sk.cooldown}s at Lv 1, {skillCooldown(sk, 20)}s at Lv 20.</p>
                     <button className="ability-btn" disabled={owned || busy || !skillsReady || aizodon < sk.cost} onClick={() => skillAction(() => buySkill(sk.id))}>
                       {owned ? 'Owned' : `Buy ⬡ ${sk.cost}`}
                     </button>

@@ -28,6 +28,8 @@ interface Projectile {
   hit: Set<CombatEnemy>;
   alive: boolean;
   spin: number;
+  zapT: number;
+  ricochetLeft: number;
 }
 
 interface Fx {
@@ -43,6 +45,10 @@ interface Zone { gx: number; gy: number; life: number; maxLife: number; tick: nu
 interface Pulse { x: number; y: number; r: number; maxR: number; hit: Set<CombatEnemy>; weapon: WeaponDef }
 interface Wave { x: number; y: number; dx: number; dy: number; travelled: number; hit: Set<CombatEnemy>; weapon: WeaponDef }
 interface Dot { enemy: CombatEnemy; t: number; amount: number; weapon: WeaponDef }
+interface Orbit { weapon: WeaponDef; t: number; angle: number; cooldowns: Map<CombatEnemy, number> }
+interface Eruption { x: number; y: number; dx: number; dy: number; step: number; next: number; weapon: WeaponDef }
+interface Meteor { gx: number; gy: number; t: number; maxT: number; weapon: WeaponDef }
+interface Vortex { gx: number; gy: number; life: number; maxLife: number; tick: number; weapon: WeaponDef }
 
 export interface Combat {
   projectiles: Projectile[];
@@ -54,10 +60,15 @@ export interface Combat {
   pulses: Pulse[];
   waves: Wave[];
   dots: Dot[];
+  orbits: Orbit[];
+  eruptions: Eruption[];
+  meteors: Meteor[];
+  vortexes: Vortex[];
+  player: { x: number; y: number }; // last known hero cell, for orbiting weapons
 }
 
 export function makeCombat(): Combat {
-  return { projectiles: [], slashes: [], lines: [], rings: [], mines: [], zones: [], pulses: [], waves: [], dots: [] };
+  return { projectiles: [], slashes: [], lines: [], rings: [], mines: [], zones: [], pulses: [], waves: [], dots: [], orbits: [], eruptions: [], meteors: [], vortexes: [], player: { x: 0, y: 0 } };
 }
 
 export interface CombatHooks {
@@ -72,6 +83,8 @@ export interface CombatHooks {
   shake: (amount: number) => void;
   // Pushes an enemy away from the player (knockback weapons).
   push?: (enemy: CombatEnemy, tiles: number) => void;
+  // Drags an enemy up to `tiles` steps toward a cell (hooks and vortexes).
+  pullToward?: (enemy: CombatEnemy, x: number, y: number, tiles: number) => void;
 }
 
 const MAX_MINES = 3;
@@ -81,6 +94,11 @@ const ZONE_TICK_S = 0.6;
 const PULSE_SPEED = 8; // tiles per second
 const WAVE_SPEED = 7;
 const POISON_DELAY_S = 1;
+const ZAP_EVERY_S = 0.3;
+const ERUPT_EVERY_S = 0.07;
+const METEOR_DELAY_S = 0.6;
+const VORTEX_TICK_S = 0.4;
+const ORB_HIT_COOLDOWN_S = 0.5;
 
 function damage(h: CombatHooks, enemy: CombatEnemy, amount: number, weapon: WeaponDef) {
   if (!enemy.alive) return;
@@ -200,6 +218,7 @@ function fireInner(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: nu
         weapon, travelled: 0,
         pierceLeft: weapon.pierce ?? 0, bounceLeft: weapon.bounce ?? 0,
         returning: false, hit: new Set(), alive: true, spin: 0,
+        zapT: 0, ricochetLeft: weapon.ricochet ?? 0,
       });
     }
     return;
@@ -234,6 +253,28 @@ function fireInner(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: nu
     return { dashTo };
   }
 
+  if (weapon.kind === 'orbit') {
+    c.orbits = [{ weapon, t: (weapon.durationMs ?? 3000) / 1000, angle: 0, cooldowns: new Map() }];
+    return;
+  }
+
+  if (weapon.kind === 'eruption') {
+    c.eruptions.push({ x: origin.x, y: origin.y, dx: fx, dy: fy, step: 0, next: 0, weapon });
+    return;
+  }
+
+  if (weapon.kind === 'meteor' || weapon.kind === 'vortex') {
+    // Lands on the furthest open tile ahead, up to the weapon's range.
+    const path = ray(h, origin.x, origin.y, fx, fy, Math.floor(weapon.range ?? 3));
+    const target = path[path.length - 1] ?? { x: origin.x, y: origin.y };
+    if (weapon.kind === 'meteor') c.meteors.push({ gx: target.x, gy: target.y, t: METEOR_DELAY_S, maxT: METEOR_DELAY_S, weapon });
+    else {
+      const life = (weapon.durationMs ?? 2500) / 1000;
+      c.vortexes.push({ gx: target.x, gy: target.y, life, maxLife: life, tick: 0, weapon });
+    }
+    return;
+  }
+
   if (weapon.kind === 'zone') {
     const life = (weapon.durationMs ?? 3000) / 1000;
     c.zones.push({ gx: origin.x, gy: origin.y, life, maxLife: life, tick: 0, weapon });
@@ -247,6 +288,42 @@ function fireInner(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: nu
 
   if (weapon.kind === 'wave') {
     c.waves.push({ x: ocx, y: ocy, dx: fx, dy: fy, travelled: 0, hit: new Set(), weapon });
+    return;
+  }
+
+  if (weapon.kind === 'beam' && weapon.prism) {
+    // Two diagonal beams that reflect off walls.
+    for (const [startDx, startDy] of [[fx + px, fy + py], [fx - px, fy - py]]) {
+      let x = origin.x;
+      let y = origin.y;
+      let dx = startDx;
+      let dy = startDy;
+      let bounces = weapon.bounce ?? 0;
+      let segStart = { x: ocx, y: ocy };
+      const hit = new Set<CombatEnemy>();
+      for (let step = 0; step < 40; step++) {
+        if (!h.walkable(x + dx, y + dy)) {
+          if (bounces <= 0) break;
+          bounces--;
+          c.lines.push({ x1: segStart.x * h.tile, y1: segStart.y * h.tile, x2: (x + 0.5) * h.tile, y2: (y + 0.5) * h.tile, width: 5, life: 0.25, maxLife: 0.25, color: weapon.color });
+          segStart = { x: x + 0.5, y: y + 0.5 };
+          const blockX = !h.walkable(x + dx, y);
+          const blockY = !h.walkable(x, y + dy);
+          if (blockX) dx = -dx;
+          if (blockY) dy = -dy;
+          if (!blockX && !blockY) { dx = -dx; dy = -dy; }
+          if (!h.walkable(x + dx, y + dy)) break;
+        }
+        x += dx;
+        y += dy;
+        for (const e of enemiesAt(h, x, y)) {
+          if (hit.has(e)) continue;
+          hit.add(e);
+          damage(h, e, weapon.damage, weapon);
+        }
+      }
+      c.lines.push({ x1: segStart.x * h.tile, y1: segStart.y * h.tile, x2: (x + 0.5) * h.tile, y2: (y + 0.5) * h.tile, width: 5, life: 0.25, maxLife: 0.25, color: weapon.color });
+    }
     return;
   }
 
@@ -308,11 +385,33 @@ export function updateCombat(c: Combat, h: CombatHooks, dt: number, player: { x:
   c_dots = null;
 }
 
+// A seed bomb leaves a patch where it lands.
+function land(c: Combat, p: Projectile) {
+  const w = p.weapon;
+  if (!w.plant) return;
+  const life = (w.durationMs ?? 3000) / 1000;
+  c.zones.push({ gx: Math.floor(p.x), gy: Math.floor(p.y), life, maxLife: life, tick: 0, weapon: { ...w, kind: 'zone', plant: false } });
+}
+
 function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number; y: number }) {
+  c.player = player;
   for (const p of c.projectiles) {
     if (!p.alive) continue;
     const w = p.weapon;
     p.spin += dt * 14;
+    if (w.zap) {
+      p.zapT -= dt;
+      if (p.zapT <= 0) {
+        p.zapT = ZAP_EVERY_S;
+        const cx = Math.floor(p.x);
+        const cy = Math.floor(p.y);
+        for (const e of h.enemies) {
+          if (!e.alive || Math.max(Math.abs(e.gx - cx), Math.abs(e.gy - cy)) > w.zap) continue;
+          c.lines.push({ x1: p.x * h.tile, y1: p.y * h.tile, x2: (e.gx + 0.5) * h.tile, y2: (e.gy + 0.5) * h.tile, width: 2, life: 0.15, maxLife: 0.15, color: w.color });
+          damage(h, e, w.damage, w);
+        }
+      }
+    }
 
     if (p.returning) {
       const dx = player.x + 0.5 - p.x;
@@ -369,6 +468,7 @@ function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number;
         continue;
       }
       if (w.explode) explode(c, h, Math.floor(p.x), Math.floor(p.y), w.explode, w);
+      land(c, p);
       p.alive = false;
       continue;
     }
@@ -381,6 +481,7 @@ function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number;
         p.hit.clear();
       } else {
         if (w.explodeAtEnd && w.explode) explode(c, h, Math.floor(p.x), Math.floor(p.y), w.explode, w);
+        land(c, p);
         p.alive = false;
       }
       continue;
@@ -397,7 +498,28 @@ function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number;
         damage(h, e, w.damage, w);
       }
       if (w.chain) chain(c, h, e, w.chain, w);
+      if (w.pull && e.alive && h.pullToward) h.pullToward(e, player.x, player.y, w.pull);
+      if (p.ricochetLeft > 0) {
+        // Fly on toward the nearest enemy not yet hit.
+        let next: CombatEnemy | null = null;
+        let bestD = 6;
+        for (const o of h.enemies) {
+          if (!o.alive || p.hit.has(o)) continue;
+          const d = Math.hypot(o.gx + 0.5 - p.x, o.gy + 0.5 - p.y);
+          if (d < bestD) { bestD = d; next = o; }
+        }
+        if (next) {
+          p.ricochetLeft--;
+          const ang = Math.atan2(next.gy + 0.5 - p.y, next.gx + 0.5 - p.x);
+          p.vx = Math.cos(ang) * p.speed;
+          p.vy = Math.sin(ang) * p.speed;
+          p.travelled = 0;
+          spawnBurst(h.particles, p.x * h.tile, p.y * h.tile, [w.color, '#fff'], 5, 80, 0);
+          break;
+        }
+      }
       if (w.explode || p.pierceLeft <= 0) {
+        land(c, p);
         p.alive = false;
         break;
       }
@@ -471,6 +593,68 @@ function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number;
   }
   if (c.waves.length) c.waves = c.waves.filter((wave) => Number.isFinite(wave.travelled));
 
+  // Orbiting orbs: circle the hero and burn whatever they touch.
+  for (const o of c.orbits) {
+    o.t -= dt;
+    o.angle += dt * 4;
+    for (const [e, t] of o.cooldowns) o.cooldowns.set(e, t - dt);
+    const count = o.weapon.count ?? 2;
+    const r = (o.weapon.radius ?? 1) + 0.15;
+    for (let i = 0; i < count; i++) {
+      const a = o.angle + (i * Math.PI * 2) / count;
+      const ox = player.x + 0.5 + Math.cos(a) * r;
+      const oy = player.y + 0.5 + Math.sin(a) * r;
+      for (const e of h.enemies) {
+        if (!e.alive || (o.cooldowns.get(e) ?? 0) > 0) continue;
+        if (Math.hypot(e.gx + 0.5 - ox, e.gy + 0.5 - oy) <= 0.65) {
+          o.cooldowns.set(e, ORB_HIT_COOLDOWN_S);
+          damage(h, e, o.weapon.damage, o.weapon);
+        }
+      }
+    }
+  }
+  if (c.orbits.length) c.orbits = c.orbits.filter((o) => o.t > 0);
+
+  // Erupting spikes: one tile further every few hundredths of a second, until a wall or their range.
+  for (const er of c.eruptions) {
+    er.next -= dt;
+    if (er.next > 0) continue;
+    er.next = ERUPT_EVERY_S;
+    er.step++;
+    const x = er.x + er.dx * er.step;
+    const y = er.y + er.dy * er.step;
+    if (er.step > (er.weapon.range ?? 5) || !h.walkable(x, y)) {
+      er.step = Infinity;
+      continue;
+    }
+    for (const e of enemiesAt(h, x, y)) damage(h, e, er.weapon.damage, er.weapon);
+    c.slashes.push({ cells: [{ x, y }], life: 0.3, maxLife: 0.3, color: er.weapon.color });
+    spawnBurst(h.particles, (x + 0.5) * h.tile, (y + 0.7) * h.tile, [er.weapon.color, '#fff'], 5, 90, 200);
+  }
+  if (c.eruptions.length) c.eruptions = c.eruptions.filter((er) => Number.isFinite(er.step));
+
+  // Meteors: land after a short warning.
+  for (const m of c.meteors) {
+    m.t -= dt;
+    if (m.t <= 0) explode(c, h, m.gx, m.gy, m.weapon.explode ?? 1, m.weapon);
+  }
+  if (c.meteors.length) c.meteors = c.meteors.filter((m) => m.t > 0);
+
+  // Vortexes: drag nearby enemies toward the middle and grind them.
+  for (const v of c.vortexes) {
+    v.life -= dt;
+    v.tick -= dt;
+    if (v.tick > 0) continue;
+    v.tick = VORTEX_TICK_S;
+    const r = v.weapon.radius ?? 2;
+    for (const e of h.enemies) {
+      if (!e.alive || Math.max(Math.abs(e.gx - v.gx), Math.abs(e.gy - v.gy)) > r) continue;
+      if (h.pullToward && (e.gx !== v.gx || e.gy !== v.gy)) h.pullToward(e, v.gx, v.gy, 1);
+      damage(h, e, v.weapon.damage, v.weapon);
+    }
+  }
+  if (c.vortexes.length) c.vortexes = c.vortexes.filter((v) => v.life > 0);
+
   // Poison: the delayed second bite.
   for (const d of c.dots) {
     d.t -= dt;
@@ -509,6 +693,61 @@ export function drawCombat(ctx: CanvasRenderingContext2D, c: Combat, tile: numbe
     ctx.moveTo(x, y);
     ctx.lineTo(x + Math.cos(angle) * r * 0.8, y + Math.sin(angle) * r * 0.8);
     ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  for (const o of c.orbits) {
+    const count = o.weapon.count ?? 2;
+    const r = ((o.weapon.radius ?? 1) + 0.15) * tile;
+    for (let i = 0; i < count; i++) {
+      const a = o.angle + (i * Math.PI * 2) / count;
+      const x = (c.player.x + 0.5) * tile + Math.cos(a) * r;
+      const y = (c.player.y + 0.5) * tile + Math.sin(a) * r;
+      ctx.fillStyle = o.weapon.color;
+      ctx.shadowColor = o.weapon.color;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  for (const m of c.meteors) {
+    const x = (m.gx + 0.5) * tile;
+    const y = (m.gy + 0.5) * tile;
+    const t = m.t / m.maxT;
+    const r = ((m.weapon.explode ?? 1) + 0.5) * tile;
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, r * (0.3 + 0.7 * t), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = m.weapon.color;
+    ctx.beginPath();
+    ctx.arc(x + t * 40, y - t * 140, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const v of c.vortexes) {
+    const x = (v.gx + 0.5) * tile;
+    const y = (v.gy + 0.5) * tile;
+    const r = ((v.weapon.radius ?? 2) + 0.5) * tile;
+    ctx.globalAlpha = Math.min(1, v.life / 0.3) * 0.8;
+    ctx.strokeStyle = v.weapon.color;
+    ctx.lineWidth = 3;
+    for (let arm = 0; arm < 3; arm++) {
+      ctx.beginPath();
+      for (let i = 0; i <= 20; i++) {
+        const a = time * 6 + arm * ((Math.PI * 2) / 3) + i * 0.3;
+        const rr = (r * i) / 20;
+        const px = x + Math.cos(a) * rr;
+        const py = y + Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
   }
   ctx.globalAlpha = 1;
 

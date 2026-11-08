@@ -50,9 +50,9 @@ export function usesBounce(weapon: WeaponDef): boolean {
   return finite(weapon.bounce);
 }
 
-// Pierce covers anything that hits a set number of extra enemies: piercing shots and chain lightning.
+// Pierce covers anything that hits a set number of extra enemies: piercing shots, chain lightning, ricochets.
 export function usesPierce(weapon: WeaponDef): boolean {
-  return finite(weapon.pierce) || finite(weapon.chain);
+  return finite(weapon.pierce) || finite(weapon.chain) || finite(weapon.ricochet);
 }
 
 export function usesStat(stat: UpgradeStat, weapon: WeaponDef): boolean {
@@ -112,9 +112,9 @@ export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boo
     speed: weapon.speed ? weapon.speed * Math.pow(1.05, q) : weapon.speed,
     freezeMs: weapon.freezeMs ? weapon.freezeMs * (1 + q * 0.2) : weapon.freezeMs,
     homing: weapon.homing ? weapon.homing * (1 + q * 0.2) : weapon.homing,
-    explode: weapon.explode && q >= 4 ? weapon.explode + 1 : weapon.explode,
+    explode: weapon.explode ? weapon.explode + (q >= 4 ? 1 : 0) + (weapon.kind === 'meteor' ? Math.ceil(range / 2) : 0) : weapon.explode,
     cooldownMs: Math.max(60, weapon.cooldownMs * Math.pow(0.9, ranks.recharge)),
-    range: (weapon.kind === 'shot' || weapon.kind === 'wave') && weapon.range && usesRange(weapon) ? weapon.range + range * 1.5 : weapon.range,
+    range: (weapon.kind === 'shot' || weapon.kind === 'wave' || weapon.kind === 'eruption') && weapon.range && usesRange(weapon) ? weapon.range + range * 1.5 : weapon.range,
     // Area weapons cover one more tile with every range upgrade (levels 3, 9 and 15).
     radius: weapon.radius !== undefined && usesRange(weapon) ? weapon.radius + range : weapon.radius,
     reach: weapon.kind === 'melee' ? range : undefined,
@@ -123,6 +123,7 @@ export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boo
     bounce: usesBounce(weapon) ? (weapon.bounce as number) + ranks.bounce : weapon.bounce,
     pierce: finite(weapon.pierce) ? (weapon.pierce as number) + ranks.pierce : weapon.pierce,
     chain: finite(weapon.chain) ? (weapon.chain as number) + ranks.pierce : weapon.chain,
+    ricochet: finite(weapon.ricochet) ? (weapon.ricochet as number) + ranks.pierce : weapon.ricochet,
   };
 }
 
