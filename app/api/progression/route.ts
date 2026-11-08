@@ -7,5 +7,5 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response;
   const progression = await loadProgression(auth.profileId);
   if (!progression) return progressionStorageError();
-  return NextResponse.json({ aizodon: progression.aizodon, levels: progression.levels });
+  return NextResponse.json({ aizodon: progression.aizodon, levels: progression.levels, skills: progression.skills, skillsReady: progression.skillsReady });
 }

@@ -319,7 +319,7 @@ body {
   background: rgba(15, 23, 42, 0.6);
   border-radius: 0.9rem;
   padding: 0.9rem 1.1rem;
-  max-height: 12rem;
+  max-height: 24rem;
   overflow-y: auto;
 }
 
@@ -1447,3 +1447,56 @@ body {
 .profile-heroes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 0.5rem; }
 .profile-hero { border: 2px solid; }
 .profile-hero-name { overflow-wrap: anywhere; }
+
+/* The win screen scrolls when the World's Best list is long. */
+.game-overlay { overflow-y: auto; justify-content: safe center; }
+.game-overlay .leaderboard-panel { width: min(100%, 26rem); flex-shrink: 0; }
+
+/* Elements and skills */
+.element-badge { position: absolute; top: 0.6rem; left: 0.6rem; font-size: 0.72rem; font-weight: 800; }
+.char-skill { margin: 0.4rem 0 0; font-size: 0.8rem; color: #fde68a; }
+.skill-btn { background: rgba(15, 23, 42, 0.6) !important; color: #f8fafc !important; border: 2px solid; }
+.skill-btn kbd { margin-left: 0.35rem; padding: 0 0.35rem; border-radius: 0.3rem; background: rgba(148, 163, 184, 0.3); font-size: 0.75rem; }
+.touch-skill {
+  display: none;
+}
+@media (hover: none) and (pointer: coarse) {
+  .touch-skill {
+    display: block;
+    pointer-events: auto;
+    touch-action: none;
+    max-width: 9rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 999px;
+    border: 2px solid #fde68a;
+    background: rgba(15, 23, 42, 0.75);
+    color: #fde68a;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .touch-skill:disabled { opacity: 0.4; }
+}
+.levelup-element { font-weight: 800; }
+.levelup-skills { margin-top: 0.75rem; }
+.skill-slot { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.4rem; }
+.skill-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.6rem;
+  background: rgba(15, 23, 42, 0.5);
+  border: 2px solid transparent;
+  font-size: 0.85rem;
+}
+.skill-option.equipped { border-color: #fde68a; }
+.skill-option p { margin: 0.15rem 0 0; opacity: 0.8; font-size: 0.78rem; }
+.skill-option > div { flex: 1; min-width: 0; }
+.skill-option .ability-btn { margin-left: 0; padding: 0.35rem 0.8rem; font-size: 0.8rem; white-space: nowrap; }
+.skill-shop { margin-top: 1.5rem; }
+.skill-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.75rem; }
+.skill-card { padding: 0.8rem; border-radius: 0.8rem; background: rgba(148, 163, 184, 0.12); border: 2px solid; font-size: 0.85rem; }
+.skill-card h4 { margin: 0 0 0.25rem; }
+.skill-card p { margin: 0.25rem 0 0.5rem; opacity: 0.85; }
+.skill-card .ability-btn { margin-left: 0; width: 100%; }

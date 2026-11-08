@@ -3,6 +3,7 @@
 // get more perks with stronger values. Perks work while the speciality is active.
 
 import { type Rarity, rarityOf } from './gacha';
+import { areaBonus } from './skills';
 
 export type PerkKind =
   | 'regen' | 'shield' | 'thorns' | 'crit' | 'dodge' | 'killHaste' | 'deathBurst' | 'slowAura'
@@ -102,20 +103,25 @@ const HERO_PERKS: Record<string, PerkKind[]> = {
   oblivion: ['lastStand', 'deathBurst', 'headstart'],
 };
 
-export function getPerks(heroId: string): Perk[] {
+// Perks that cover an area reach one tile further at hero levels 5, 12 and 20.
+export const AREA_PERKS: PerkKind[] = ['deathBurst', 'slowAura', 'shardSense'];
+
+export function getPerks(heroId: string, heroLevel = 1): Perk[] {
   const strength = TIER_STRENGTH[rarityOf(heroId)];
+  const bonus = areaBonus(heroLevel);
   return (HERO_PERKS[heroId] ?? []).map((kind) => {
     const def = PERK_DEFS[kind];
-    const value = def.value(strength);
-    return { kind, name: def.name, desc: def.desc(value), value };
+    const value = def.value(strength) + (AREA_PERKS.includes(kind) ? bonus : 0);
+    const extra = kind === 'frostOnHurt' && bonus ? ` Reaches ${1 + bonus} tiles around you.` : '';
+    return { kind, name: def.name, desc: def.desc(value) + extra, value };
   });
 }
 
 // Perk values by kind, for the game loop. Missing kinds mean the hero doesn't have that perk.
 export type PerkValues = Partial<Record<PerkKind, number>>;
 
-export function getPerkValues(heroId: string): PerkValues {
-  return Object.fromEntries(getPerks(heroId).map((p) => [p.kind, p.value]));
+export function getPerkValues(heroId: string, heroLevel = 1): PerkValues {
+  return Object.fromEntries(getPerks(heroId, heroLevel).map((p) => [p.kind, p.value]));
 }
 
 export const ALL_PERK_KINDS = Object.keys(PERK_DEFS) as PerkKind[];

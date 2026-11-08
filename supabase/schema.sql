@@ -39,3 +39,6 @@ alter table profiles add column if not exists aizodon_claimed_at timestamptz;
 alter table profiles add column if not exists avatar_pixels text;
 alter table profiles add column if not exists last_seen_at timestamptz;
 alter table profiles add column if not exists recent_characters text[] not null default '{}';
+
+-- Skills bought with Aizodon (safe to re-run). { "owned": [skillId], "equipped": { heroId: skillId } }
+alter table profiles add column if not exists skills jsonb not null default '{}';

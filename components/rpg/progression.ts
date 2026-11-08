@@ -115,8 +115,10 @@ export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boo
     explode: weapon.explode && q >= 4 ? weapon.explode + 1 : weapon.explode,
     cooldownMs: Math.max(60, weapon.cooldownMs * Math.pow(0.9, ranks.recharge)),
     range: (weapon.kind === 'shot' || weapon.kind === 'wave') && weapon.range && usesRange(weapon) ? weapon.range + range * 1.5 : weapon.range,
-    radius: weapon.radius !== undefined && usesRange(weapon) ? weapon.radius + (range >= 2 ? 1 : 0) : weapon.radius,
-    reach: weapon.kind === 'melee' ? Math.ceil(range / 2) : undefined,
+    // Area weapons cover one more tile with every range upgrade (levels 3, 9 and 15).
+    radius: weapon.radius !== undefined && usesRange(weapon) ? weapon.radius + range : weapon.radius,
+    reach: weapon.kind === 'melee' ? range : undefined,
+    width: weapon.kind === 'wave' ? 3 + 2 * Math.floor(range / 2) : weapon.width,
     count: weapon.count !== undefined && usesAmount(weapon) ? weapon.count + ranks.amount : weapon.count,
     bounce: usesBounce(weapon) ? (weapon.bounce as number) + ranks.bounce : weapon.bounce,
     pierce: finite(weapon.pierce) ? (weapon.pierce as number) + ranks.pierce : weapon.pierce,

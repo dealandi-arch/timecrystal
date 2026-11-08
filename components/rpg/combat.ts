@@ -299,7 +299,7 @@ function fireInner(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: nu
 
   // mine
   if (c.mines.length >= MAX_MINES) c.mines.shift();
-  c.mines.push({ gx: origin.x, gy: origin.y, life: MINE_LIFE_S, weapon });
+  c.mines.push({ gx: origin.x, gy: origin.y, life: weapon.durationMs ? weapon.durationMs / 1000 : MINE_LIFE_S, weapon });
 }
 
 export function updateCombat(c: Combat, h: CombatHooks, dt: number, player: { x: number; y: number }) {
@@ -458,7 +458,10 @@ function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number;
     }
     const px = -wave.dy;
     const py = wave.dx;
-    for (const [ox, oy] of [[0, 0], [px, py], [-px, -py]]) {
+    const half = Math.floor((wave.weapon.width ?? 3) / 2);
+    for (let k = -half; k <= half; k++) {
+      const ox = px * k;
+      const oy = py * k;
       for (const e of enemiesAt(h, cx + ox, cy + oy)) {
         if (wave.hit.has(e)) continue;
         wave.hit.add(e);
@@ -525,7 +528,7 @@ export function drawCombat(ctx: CanvasRenderingContext2D, c: Combat, tile: numbe
   for (const wave of c.waves) {
     const x = wave.x * tile;
     const y = wave.y * tile;
-    const half = tile * 1.5;
+    const half = tile * ((wave.weapon.width ?? 3) / 2);
     const px = -wave.dy;
     const py = wave.dx;
     ctx.strokeStyle = wave.weapon.color;

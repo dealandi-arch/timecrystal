@@ -22,6 +22,7 @@ import {
   usesStat,
 } from './progression';
 import { getPerks } from './perks';
+import { ELEMENTS, ELEMENT_INFO, SKILLS, describeSkill, elementOf, skillsFor } from './skills';
 
 const num = (v: number, digits = 1) => (Number.isInteger(v) ? String(v) : v.toFixed(digits));
 
@@ -44,7 +45,7 @@ function StatRow({ label, now, next, highlight }: { label: string; now: ReactNod
 export default function LevelUpScreen() {
   const { profile, loading } = useProfile();
   const { isUnlocked } = useCollection();
-  const { ready, error, aizodon, levelOf, levelUp } = useProgression();
+  const { ready, error, aizodon, levelOf, levelUp, skills, skillsReady, buySkill, equipSkill } = useProgression();
   const roster = CHARACTERS.filter((c) => isUnlocked(c.id));
   const [selectedId, setSelectedId] = useState(CHARACTERS[0].id);
   const [busy, setBusy] = useState(false);
@@ -89,7 +90,17 @@ export default function LevelUpScreen() {
     pierce: (s: Snapshot) => (s.weapon.chain ? `chains to ${s.weapon.chain}` : `${s.weapon.pierce ?? 0} enemies`),
   };
   const nextUp = nextUpgradeLevel(level, baseWeapon);
-  const perks = getPerks(hero.id);
+  const perks = getPerks(hero.id, level);
+  const element = elementOf(hero.id);
+  const equippedId = skills.equipped[hero.id] ?? null;
+
+  async function skillAction(run: () => Promise<{ ok: boolean; error?: string }>) {
+    setBusy(true);
+    setMessage(null);
+    const res = await run();
+    setBusy(false);
+    if (!res.ok) setMessage(res.error ?? 'That didn’t work.');
+  }
 
   return (
     <div className="levelup">
@@ -117,6 +128,9 @@ export default function LevelUpScreen() {
             <HeroSprite char={hero} size={96} />
             <div>
               <h2>{hero.name}</h2>
+              <p className="levelup-element" style={{ color: ELEMENT_INFO[element].color }}>
+                {ELEMENT_INFO[element].icon} {ELEMENT_INFO[element].name}
+              </p>
               <p className="levelup-weapon" style={{ color: baseWeapon.color }}>⚔ {baseWeapon.name}</p>
             </div>
           </div>
@@ -141,6 +155,33 @@ export default function LevelUpScreen() {
             Levelling only improves the special weapon, and only in ways it can use. Health {now.stats.maxHp}, speed {num(1000 / now.stats.moveMs)} tiles/s and
             protection {now.stats.invulnS.toFixed(2)}s come from {hero.name}’s tier and stay the same.
           </p>
+          <div className="levelup-skills">
+            <strong>Skill slot</strong> <small>(only {ELEMENT_INFO[element].name} skills fit · press E in a level to use it once)</small>
+            {!skillsReady && <p className="gacha-warning">Skills need the latest supabase/schema.sql before they can be bought.</p>}
+            <div className="skill-slot">
+              {skillsFor(element).map((skill) => {
+                const owned = skills.owned.includes(skill.id);
+                const equipped = equippedId === skill.id;
+                return (
+                  <div key={skill.id} className={`skill-option ${equipped ? 'equipped' : ''}`}>
+                    <div>
+                      <strong>{skill.name}</strong>
+                      <p>{describeSkill(skill, level)}</p>
+                    </div>
+                    {!owned ? (
+                      <button className="ability-btn" disabled={busy || !skillsReady || aizodon < skill.cost} onClick={() => skillAction(() => buySkill(skill.id))}>
+                        Buy ⬡ {skill.cost}
+                      </button>
+                    ) : equipped ? (
+                      <button className="ability-btn story-skip" disabled={busy} onClick={() => skillAction(() => equipSkill(hero.id, null))}>Unequip</button>
+                    ) : (
+                      <button className="ability-btn" disabled={busy} onClick={() => skillAction(() => equipSkill(hero.id, skill.id))}>Equip</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <div className="levelup-perks">
             <strong>{hero.stats.passiveName}</strong>
             <ul className="char-perks">
@@ -166,6 +207,30 @@ export default function LevelUpScreen() {
           )}
           {message && <p className="gacha-error">{message}</p>}
         </div>
+      </div>
+
+      <div className="skill-shop">
+        <h3>All skills</h3>
+        <p className="gacha-fine">Buy a skill once, then equip it on any hero of its element. Area skills cover more tiles at hero levels 5, 12 and 20.</p>
+        {ELEMENTS.map((el) => (
+          <div key={el}>
+            <h4 style={{ color: ELEMENT_INFO[el].color }}>{ELEMENT_INFO[el].icon} {ELEMENT_INFO[el].name}</h4>
+            <div className="skill-shop-grid">
+              {SKILLS.filter((sk) => sk.element === el).map((sk) => {
+                const owned = skills.owned.includes(sk.id);
+                return (
+                  <div key={sk.id} className="skill-card" style={{ borderColor: ELEMENT_INFO[el].color }}>
+                    <h4>{sk.name}</h4>
+                    <p>{describeSkill(sk)}</p>
+                    <button className="ability-btn" disabled={owned || busy || !skillsReady || aizodon < sk.cost} onClick={() => skillAction(() => buySkill(sk.id))}>
+                      {owned ? 'Owned' : `Buy ⬡ ${sk.cost}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="levelup-earn">

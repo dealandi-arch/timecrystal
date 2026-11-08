@@ -25,13 +25,14 @@ import SettingsPanel from './SettingsPanel';
 import { DEFAULT_SETTINGS, type GameSettings, loadSettings, persistSettings } from './settings';
 import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSave } from './save';
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
-import { BASIC_GUN, getSignatureWeapon } from './weapons';
+import { BASIC_GUN, type WeaponDef, getSignatureWeapon } from './weapons';
 import { type CombatHooks, drawCombat, explode, fireWeapon, makeCombat, updateCombat } from './combat';
 import { RARITY_INFO, SHARDS_PER_LEVEL, rarityOf } from './gacha';
 import { useCollection } from '../profile/CollectionContext';
 import { type ClaimResult, useProgression } from '../profile/ProgressionContext';
 import { applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
 import { getPerkValues, getPerks } from './perks';
+import { ELEMENT_INFO, type SkillDef, areaBonus, describeSkill, elementOf, skillAmount } from './skills';
 import { useProfile } from '../profile/ProfileContext';
 import AuthWidget from '../profile/AuthWidget';
 import SignInBanner from '../profile/SignInBanner';
@@ -251,6 +252,22 @@ function freshPerkState() {
   return { regenT: 0, shieldUp: true, shieldT: 0, hasteT: 0, attacks: 0, kills: 0, revived: false, started: false, echoT: -1 };
 }
 
+// The equipped skill: one use per level, plus the timers its effects run on.
+function freshSkillState(skill: SkillDef | null) {
+  return {
+    usesLeft: skill ? 1 : 0,
+    used: false,
+    radarT: 0,
+    cloakT: 0,
+    blizzardT: 0,
+    guidingT: 0,
+    crystalFreezeT: 0,
+    flashT: 0,
+    stoneHits: 0,
+    turret: null as { x: number; y: number; t: number; fireT: number; r: number } | null,
+  };
+}
+
 function makeCrystal(level: LevelDef): RuntimeCrystal {
   const first = level.crystalPath[0];
   return {
@@ -282,21 +299,25 @@ interface LevelRunnerProps {
   autoWeapon: boolean;
   paused: boolean;
   heroLevel: number;
+  skill: SkillDef | null;
   onRunFinished: (stats: LevelRunStats) => Promise<ClaimResult | null>;
   signedIn: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, onRunFinished, signedIn }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, onRunFinished, signedIn }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
   const baseSignature = getSignatureWeapon(charDef.id);
   const ranks = ranksAtLevel(heroLevel, baseSignature);
   const signature = applyWeaponRanks(baseSignature, ranks, true);
   const basicGun = applyWeaponRanks(BASIC_GUN, ranks, false);
-  const perks = getPerkValues(charDef.id);
+  const perks = getPerkValues(charDef.id, heroLevel);
+  const area = areaBonus(heroLevel);
   // Gear and perks in a ref so the game loop always reads the latest values.
-  const gearRef = useRef({ hero: charStats, base: BASELINE_STATS, signature, basicGun, perks });
-  gearRef.current = { hero: charStats, base: BASELINE_STATS, signature, basicGun, perks };
+  const gearRef = useRef({ hero: charStats, base: BASELINE_STATS, signature, basicGun, perks, area, skill, heroLevel });
+  gearRef.current = { hero: charStats, base: BASELINE_STATS, signature, basicGun, perks, area, skill, heroLevel };
+  const [skillUses, setSkillUses] = useState(skill ? 1 : 0);
+  const useSkillRef = useRef<() => void>(() => {});
   const emeraldRef = useRef(onEmeraldFound);
   emeraldRef.current = onEmeraldFound;
 
@@ -346,7 +367,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     won: false,
     startTime: performance.now(),
     usedAbilityThisRun: false,
-    perk: freshPerkState()
+    perk: freshPerkState(),
+    skill: freshSkillState(skill)
   });
 
   function resetLevelRuntime() {
@@ -357,12 +379,22 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     s.crystal = makeCrystal(level);
     s.combat = makeCombat(); // shards already found stay found
     s.perk = freshPerkState();
+    s.skill = freshSkillState(gearRef.current.skill);
+    setSkillUses(s.skill.usesLeft);
     s.shake = 0.3;
     s.won = false;
     s.startTime = performance.now();
     setHp(maxHp);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
   }
+
+  // Saved skills can finish loading after a level starts; pick them up if the skill hasn't been used yet.
+  useEffect(() => {
+    const st = stateRef.current.skill;
+    if (st.used) return;
+    st.usesLeft = skill ? 1 : 0;
+    setSkillUses(st.usesLeft);
+  }, [skill?.id]);
 
   // Turning the setting on mid-level equips the weapon straight away.
   useEffect(() => {
@@ -438,6 +470,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       s.keys.add(e.key.toLowerCase());
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
       if (e.key.toLowerCase() === 'q' && !e.repeat) toggleWeaponRef.current();
+      if (e.key.toLowerCase() === 'e' && !e.repeat) useSkillRef.current();
     }
     function onKeyUp(e: KeyboardEvent) {
       s.keys.delete(e.key.toLowerCase());
@@ -502,6 +535,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     function enemySpeed(enemy: RuntimeEnemy) {
       const perk = activePerks();
       let speed = perk.timeSlow ?? 1;
+      if (s.skill.blizzardT > 0) speed *= 0.5;
       if (perk.slowAura && Math.max(Math.abs(enemy.gx - s.player.gx), Math.abs(enemy.gy - s.player.gy)) <= perk.slowAura) speed *= 0.5;
       return speed;
     }
@@ -545,6 +579,115 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         enemy.moving = true;
       }
     }
+
+    function useSkill() {
+      const skillDef = gearRef.current.skill;
+      if (!skillDef || s.skill.usesLeft <= 0 || s.won || pausedRef.current) return;
+      s.skill.usesLeft--;
+      s.skill.used = true;
+      setSkillUses(s.skill.usesLeft);
+      sound.playSecretFound();
+      const p = s.player;
+      const amount = skillAmount(skillDef, gearRef.current.heroLevel);
+      const { dx, dy } = DIR_VECTORS[p.facing];
+      const cx = (p.gx + 0.5) * TILE;
+      const cy = (p.gy + 0.5) * TILE;
+      const color = ELEMENT_INFO[skillDef.element].color;
+      const near = (e: RuntimeEnemy, r: number) => e.alive && Math.max(Math.abs(e.gx - p.gx), Math.abs(e.gy - p.gy)) <= r;
+      const ring = (r: number) => s.combat.rings.push({ x: cx, y: cy, radius: (r + 0.5) * TILE, life: 0.5, maxLife: 0.5, color });
+      const skillWeapon = (extra: Partial<WeaponDef>): WeaponDef => ({ ...gearRef.current.basicGun, id: skillDef.id, name: skillDef.name, color, ...extra });
+      const moveTo = (x: number, y: number) => {
+        p.fromX = p.gx;
+        p.fromY = p.gy;
+        p.gx = x;
+        p.gy = y;
+        p.moveT = 0;
+        p.moving = true;
+      };
+      spawnBurst(s.particles, cx, cy, [color, '#fff'], 16, 140, 0);
+      switch (skillDef.id) {
+        case 'trapBomb':
+          fireWeapon(s.combat, hooks, skillWeapon({ kind: 'mine', damage: 3, radius: amount, durationMs: 120000 }), { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], 0);
+          break;
+        case 'inferno':
+          fireWeapon(s.combat, hooks, skillWeapon({ kind: 'nova', damage: 3, radius: amount }), { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], 0);
+          break;
+        case 'freezeField':
+          for (const e of s.enemies) if (near(e, amount)) e.stunMs = Math.max(e.stunMs, 3000);
+          ring(amount);
+          break;
+        case 'blizzard':
+          s.skill.blizzardT = amount;
+          break;
+        case 'lightning': {
+          const targets = s.enemies.filter((e) => e.alive).sort((a, b) => Math.hypot(a.gx - p.gx, a.gy - p.gy) - Math.hypot(b.gx - p.gx, b.gy - p.gy)).slice(0, amount);
+          for (const e of targets) {
+            s.combat.lines.push({ x1: (e.gx + 0.5) * TILE, y1: 0, x2: (e.gx + 0.5) * TILE, y2: (e.gy + 0.5) * TILE, width: 6, life: 0.3, maxLife: 0.3, color });
+            explode(s.combat, hooks, e.gx, e.gy, 0, skillWeapon({ damage: 2 }));
+          }
+          break;
+        }
+        case 'gust':
+          for (const e of s.enemies) if (near(e, amount)) knockBack(e, 2);
+          ring(amount);
+          break;
+        case 'stoneSkin':
+          s.skill.stoneHits = amount;
+          break;
+        case 'earthquake':
+          fireWeapon(s.combat, hooks, skillWeapon({ kind: 'nova', damage: 1, radius: amount, freezeMs: 2000 }), { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], 0);
+          s.shake = 0.5;
+          break;
+        case 'healingSpring':
+          heal(amount, color);
+          break;
+        case 'vineSnare': {
+          for (let i = 1; i <= amount; i++) {
+            const x = p.gx + dx * i;
+            const y = p.gy + dy * i;
+            if (!isWalkable(level, x, y, false)) break;
+            for (const e of s.enemies) if (e.alive && e.gx === x && e.gy === y) e.stunMs = Math.max(e.stunMs, 3000);
+            s.combat.slashes.push({ cells: [{ x, y }], life: 0.5, maxLife: 0.5, color });
+          }
+          break;
+        }
+        case 'cloak':
+          s.skill.cloakT = amount;
+          break;
+        case 'shadowStep': {
+          // Through walls: land on the furthest open tile within range.
+          for (let i = amount; i >= 1; i--) {
+            const x = p.gx + dx * i;
+            const y = p.gy + dy * i;
+            if (isWalkable(level, x, y, false)) {
+              moveTo(x, y);
+              break;
+            }
+          }
+          break;
+        }
+        case 'flash':
+          for (const e of s.enemies) if (e.alive) e.stunMs = Math.max(e.stunMs, amount * 1000);
+          s.skill.flashT = 0.35;
+          break;
+        case 'guidingLight':
+          s.skill.guidingT = amount;
+          break;
+        case 'blink':
+          moveTo(s.crystal.gx, s.crystal.gy);
+          break;
+        case 'timeFreeze':
+          s.skill.crystalFreezeT = amount;
+          break;
+        case 'radar':
+          s.skill.radarT = amount;
+          break;
+        case 'turret':
+          s.skill.turret = { x: p.gx, y: p.gy, t: 8, fireT: 0, r: amount };
+          break;
+      }
+    }
+    useSkillRef.current = useSkill;
 
     function heldDirection(): Dir | null {
       if (s.keys.has('arrowup') || s.keys.has('w')) return 'up';
@@ -594,6 +737,24 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
       const perk = activePerks();
       if (s.perk.hasteT > 0) s.perk.hasteT -= dt;
+      for (const key of ['radarT', 'cloakT', 'blizzardT', 'guidingT', 'crystalFreezeT', 'flashT'] as const) {
+        if (s.skill[key] > 0) s.skill[key] -= dt;
+      }
+      const turret = s.skill.turret;
+      if (turret) {
+        turret.t -= dt;
+        turret.fireT -= dt;
+        if (turret.t <= 0) s.skill.turret = null;
+        else if (turret.fireT <= 0) {
+          const target = s.enemies.filter((e) => e.alive && Math.max(Math.abs(e.gx - turret.x), Math.abs(e.gy - turret.y)) <= turret.r)
+            .sort((a, b) => Math.hypot(a.gx - turret.x, a.gy - turret.y) - Math.hypot(b.gx - turret.x, b.gy - turret.y))[0];
+          if (target) {
+            turret.fireT = 0.5;
+            const len = Math.hypot(target.gx - turret.x, target.gy - turret.y) || 1;
+            fireWeapon(s.combat, hooks, { ...gearRef.current.basicGun, color: '#94a3b8', speed: 12, range: turret.r + 1 }, { x: turret.x, y: turret.y }, { dx: (target.gx - turret.x) / len, dy: (target.gy - turret.y) / len }, 12);
+          }
+        }
+      }
       if (!s.perk.started) {
         s.perk.started = true;
         if (perk.shield) s.perk.shieldUp = true; // the Barrier is ready when a level starts
@@ -683,6 +844,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
         if (
           !s.abilityActive.invisibility &&
+          s.skill.cloakT <= 0 &&
           p.invuln <= 0 &&
           enemy.gx === p.gx &&
           enemy.gy === p.gy
@@ -708,13 +870,19 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             sound.playHit();
             continue;
           }
+          if (s.skill.stoneHits > 0) {
+            s.skill.stoneHits--;
+            spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#a16207', '#fde68a'], 14, 120, 0);
+            sound.playHit();
+            continue;
+          }
           p.hp -= 1;
           s.shake = 0.2;
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#f87171', '#fecaca'], 10, 110, 180);
           sound.playPlayerHurt();
           if (perk.frostOnHurt) {
             for (const other of s.enemies) {
-              if (other.alive && Math.max(Math.abs(other.gx - p.gx), Math.abs(other.gy - p.gy)) <= 1) other.stunMs = Math.max(other.stunMs, perk.frostOnHurt * 1000);
+              if (other.alive && Math.max(Math.abs(other.gx - p.gx), Math.abs(other.gy - p.gy)) <= 1 + gearRef.current.area) other.stunMs = Math.max(other.stunMs, perk.frostOnHurt * 1000);
             }
             spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#93c5fd', '#e0f2fe'], 18, 150, 0);
           }
@@ -755,7 +923,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
       const crystal = s.crystal;
       if (!crystal.moving) {
-        crystal.dwell -= dt * 1000;
+        if (s.skill.crystalFreezeT <= 0) crystal.dwell -= dt * 1000;
         if (crystal.dwell <= 0) {
           const nextIndex = (crystal.index + 1) % crystal.path.length;
           const next = crystal.path[nextIndex];
@@ -825,7 +993,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             ctx.drawImage((x + y) % 2 === 0 ? floorA : floorB, x * TILE, y * TILE);
           } else {
             ctx.drawImage(wall, x * TILE, y * TILE);
-            if (tile === SECRET && (s.abilityActive.iceAge || activePerks().secretSight)) {
+            if (tile === SECRET && (s.abilityActive.iceAge || activePerks().secretSight || s.skill.guidingT > 0)) {
               ctx.fillStyle = 'rgba(103, 232, 249, 0.3)';
               ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
             }
@@ -835,17 +1003,18 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
       const time = performance.now() / 1000;
       const drawPerks = activePerks();
-      if (drawPerks.shardSense) {
+      if (drawPerks.shardSense || s.skill.radarT > 0) {
         for (const key of s.emeralds) {
           const [ex, ey] = key.split(',').map(Number);
-          if (Math.max(Math.abs(ex - s.player.gx), Math.abs(ey - s.player.gy)) > drawPerks.shardSense) continue;
+          if (s.skill.radarT <= 0 && Math.max(Math.abs(ex - s.player.gx), Math.abs(ey - s.player.gy)) > (drawPerks.shardSense ?? 0)) continue;
           ctx.globalAlpha = 0.45 + Math.sin(time * 6 + ex) * 0.25;
           drawDiamond(ctx, (ex + 0.5) * TILE, (ey + 0.5) * TILE, 6, '#10b981');
           ctx.globalAlpha = 1;
         }
       }
-      if (drawPerks.crystalSense) {
-        for (let i = 1; i <= drawPerks.crystalSense; i++) {
+      if (drawPerks.crystalSense || s.skill.guidingT > 0) {
+        const stops = s.skill.guidingT > 0 ? s.crystal.path.length - 1 : (drawPerks.crystalSense ?? 0);
+        for (let i = 1; i <= stops; i++) {
           const stop = s.crystal.path[(s.crystal.index + i) % s.crystal.path.length];
           ctx.strokeStyle = `rgba(103, 232, 249, ${0.7 / i})`;
           ctx.lineWidth = 2;
@@ -914,6 +1083,30 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
 
       drawCombat(ctx, s.combat, TILE, time);
+      if (s.skill.turret) {
+        const tx = s.skill.turret.x * TILE;
+        const ty = s.skill.turret.y * TILE;
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(tx + 12, ty + 22, 24, 18);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(tx + 18, ty + 12, 12, 14);
+        ctx.fillStyle = Math.sin(time * 10) > 0 ? '#ef4444' : '#7f1d1d';
+        ctx.fillRect(tx + 22, ty + 16, 4, 4);
+      }
+      if (s.skill.cloakT > 0 || s.skill.stoneHits > 0) {
+        ctx.strokeStyle = s.skill.cloakT > 0 ? 'rgba(167, 139, 250, 0.8)' : 'rgba(161, 98, 7, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash(s.skill.cloakT > 0 ? [4, 4] : []);
+        ctx.beginPath();
+        ctx.arc(px + TILE / 2, py + TILE / 2, TILE * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (s.skill.blizzardT > 0 && Math.random() < 0.6) spawnBurst(s.particles, Math.random() * WIDTH, 0, ['#e0f2fe', '#fff'], 1, 30, 120);
+      if (s.skill.flashT > 0) {
+        ctx.fillStyle = `rgba(255, 251, 235, ${s.skill.flashT * 2})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      }
 
       if (s.abilityActive.navigate) {
         const pcx = px + TILE / 2;
@@ -966,6 +1159,11 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level]);
 
+  const skillButton = skill ? (
+    <button className="ability-btn skill-btn" disabled={skillUses <= 0} onClick={() => useSkillRef.current()} title={describeSkill(skill, heroLevel)} style={{ borderColor: ELEMENT_INFO[skill.element].color }}>
+      {ELEMENT_INFO[skill.element].icon} {skill.name} {skillUses > 0 ? '' : '(used)'} <kbd>E</kbd>
+    </button>
+  ) : null;
   const toggleWeaponRef = useRef(toggleWeapon);
   toggleWeaponRef.current = toggleWeapon;
   const currentWeapon = weaponSlot === 0 ? BASIC_GUN : signature;
@@ -986,6 +1184,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         <button className="ability-btn weapon-btn" onClick={toggleWeapon} title={currentWeapon.desc} style={{ borderColor: currentWeapon.color }}>
           ⚔ {currentWeapon.name} <kbd>Q</kbd>
         </button>
+        {skillButton}
         {onToggleAppearance && (
           <button className="ability-btn look-btn" onClick={() => { sound.playMenuClick(); onToggleAppearance(); }}>
             Look: {appearance === 'human' ? 'Human' : 'Original'}
@@ -1051,10 +1250,13 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           onToggleWeapon={toggleWeapon}
           weaponName={currentWeapon.name}
           weaponColor={currentWeapon.color}
+          skillName={skill?.name}
+          skillReady={skillUses > 0}
+          onSkill={() => useSkillRef.current()}
         />
       )}
       <p className="game-controls">
-        <span className="keyboard-hint">Move: Arrow keys / WASD &nbsp;·&nbsp; Attack: Space / J &nbsp;·&nbsp; Switch weapon: Q &nbsp;·&nbsp; </span>
+        <span className="keyboard-hint">Move: Arrow keys / WASD &nbsp;·&nbsp; Attack: Space / J &nbsp;·&nbsp; Switch weapon: Q &nbsp;·&nbsp; Skill: E &nbsp;·&nbsp; </span>
         Clear every enemy, then catch the crystal. Five Emerald Shards are hidden on random tiles — step on them to collect.
       </p>
     </div>
@@ -1110,7 +1312,7 @@ export function CharacterSelectScreen({
   subtitle?: string;
 }) {
   const { isUnlocked, shards } = useCollection();
-  const { signedIn, levelOf } = useProgression();
+  const { signedIn, levelOf, equippedSkill } = useProgression();
   return (
     <div className="ability-select">
       <h1>{title}</h1>
@@ -1138,6 +1340,9 @@ export function CharacterSelectScreen({
             aria-disabled={!unlocked}
           >
             <span className="rarity-badge" style={{ background: RARITY_INFO[rarity].color }}>{RARITY_INFO[rarity].name}</span>
+            <span className="element-badge" style={{ color: ELEMENT_INFO[elementOf(c.id)].color }}>
+              {ELEMENT_INFO[elementOf(c.id)].icon} {ELEMENT_INFO[elementOf(c.id)].name}
+            </span>
             <div className="char-portrait">
               <SpritePreview char={c} appearance={appearance} />
               <div className="char-portrait-name">{c.name}</div>
@@ -1148,8 +1353,11 @@ export function CharacterSelectScreen({
             {!unlocked && <p className="locked-note">🔒 Locked — get this hero from the Gacha.</p>}
             <p className="char-desc">{c.description}</p>
             <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
+            {signedIn && equippedSkill(c.id) && (
+              <p className="char-skill">✦ Skill: <strong>{equippedSkill(c.id)?.name}</strong></p>
+            )}
             <ul className="char-perks">
-              {getPerks(c.id).map((perk) => (
+              {getPerks(c.id, signedIn ? levelOf(c.id) : 1).map((perk) => (
                 <li key={perk.kind}><strong>{perk.name}:</strong> {perk.desc}</li>
               ))}
             </ul>
@@ -1209,7 +1417,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
   const sound = soundRef.current;
   const { profile, submitRun } = useProfile();
   const { addShards } = useCollection();
-  const { signedIn, levelOf, claimRun } = useProgression();
+  const { signedIn, levelOf, claimRun, equippedSkill } = useProgression();
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -1363,6 +1571,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             onPowerActivated={() => updateSave({ ...save, powerActivated: true })}
             onEmeraldFound={() => addShards(1)}
             heroLevel={levelOf(save.characterId ?? 'wanderer')}
+            skill={signedIn ? equippedSkill(save.characterId ?? 'wanderer') : null}
             signedIn={signedIn}
             onRunFinished={(stats) => claimRun(level.id, stats.timeMs, stats.usedAbility)}
             autoWeapon={settings.autoWeapon}

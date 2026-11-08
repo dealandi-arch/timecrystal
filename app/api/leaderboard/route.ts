@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
         .select(`time_ms, kills, secrets, completed_at, profiles ( ${profileColumns} )`)
         .eq('level_id', levelId)
         .order('time_ms', { ascending: true })
-        .limit(20),
+        .limit(50),
     WITH_AVATAR,
     BASE_PUBLIC
   );

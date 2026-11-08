@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useProfile } from './ProfileContext';
+import { type SkillDef, type SkillState, getSkill } from '../rpg/skills';
 
 // Aizodon and hero levels. Signed-in players only: guests always play at level 1.
 
@@ -20,6 +21,11 @@ interface ProgressionContextValue {
   levelOf: (characterId: string) => number;
   claimRun: (levelId: number, timeMs: number, usedAbility: boolean) => Promise<ClaimResult | null>;
   levelUp: (characterId: string) => Promise<{ ok: boolean; error?: string }>;
+  skills: SkillState;
+  skillsReady: boolean;
+  equippedSkill: (heroId: string) => SkillDef | null;
+  buySkill: (skillId: string) => Promise<{ ok: boolean; error?: string }>;
+  equipSkill: (heroId: string, skillId: string | null) => Promise<{ ok: boolean; error?: string }>;
 }
 
 // Run rewards whose save failed, kept per profile and re-sent when the server is reachable.
@@ -64,6 +70,8 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [skills, setSkills] = useState<SkillState>({ owned: [], equipped: {} });
+  const [skillsReady, setSkillsReady] = useState(false);
   const signedIn = !!profile;
   const profileId = profile?.id ?? null;
   const flushingRef = useRef(false);
@@ -99,6 +107,8 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setAizodon(0);
     setLevels({});
+    setSkills({ owned: [], equipped: {} });
+    setSkillsReady(false);
     setError(null);
     if (loading || !profile) {
       setReady(!loading);
@@ -113,6 +123,8 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           setAizodon(data.aizodon ?? 0);
           setLevels(data.levels ?? {});
+          setSkills(data.skills ?? { owned: [], equipped: {} });
+          setSkillsReady(!!data.skillsReady);
           flushPending(profile.id);
         } else {
           setError(data?.error ?? 'Could not load your hero levels.');
@@ -167,9 +179,25 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const equippedSkill = useCallback((heroId: string) => getSkill(skills.equipped[heroId]), [skills]);
+
+  const skillAction = useCallback(async (payload: Record<string, unknown>) => {
+    try {
+      const { res, data } = await postJson('/api/skills', payload);
+      if (!res.ok) return { ok: false, error: (data?.error as string) ?? 'That didn’t work.' };
+      setAizodon(data.aizodon);
+      setSkills(data.skills);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Could not reach the server.' };
+    }
+  }, []);
+  const buySkill = useCallback((skillId: string) => skillAction({ action: 'buy', skillId }), [skillAction]);
+  const equipSkill = useCallback((heroId: string, skillId: string | null) => skillAction({ action: 'equip', heroId, skillId }), [skillAction]);
+
   const value = useMemo(
-    () => ({ signedIn, ready, error, aizodon, levelOf, claimRun, levelUp }),
-    [signedIn, ready, error, aizodon, levelOf, claimRun, levelUp]
+    () => ({ signedIn, ready, error, aizodon, levelOf, claimRun, levelUp, skills, skillsReady, equippedSkill, buySkill, equipSkill }),
+    [signedIn, ready, error, aizodon, levelOf, claimRun, levelUp, skills, skillsReady, equippedSkill, buySkill, equipSkill]
   );
   return <ProgressionContext.Provider value={value}>{children}</ProgressionContext.Provider>;
 }

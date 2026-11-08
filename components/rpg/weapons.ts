@@ -38,6 +38,7 @@ export interface WeaponDef {
   shape?: BlastShape; // nova only; square by default
   durationMs?: number; // zone: how long it stays on the ground
   knockback?: number; // tiles a hit pushes enemies back
+  width?: number; // wave: tiles wide (3 by default)
   poison?: number; // extra damage dealt one second after the hit
   explodeAtEnd?: boolean; // shot: blows up where it lands, not only on contact
   // heal 1 HP for each enemy this weapon finishes off
