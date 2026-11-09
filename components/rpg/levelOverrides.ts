@@ -30,6 +30,11 @@ export function getEffectiveLevel(id: number): LevelDef | undefined {
   return getLevel(id);
 }
 
+// A saved override for any level id, including the 3D maps (101+).
+export function getOverride(id: number): LevelDef | undefined {
+  return loadOverrides()[id];
+}
+
 export function hasOverride(id: number): boolean {
   return !!loadOverrides()[id];
 }

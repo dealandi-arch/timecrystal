@@ -10,6 +10,8 @@ import level9 from './data/level9.json';
 import level10 from './data/level10.json';
 import level11 from './data/level11.json';
 
+import type { Terrain } from './terrain';
+
 export const TILE = 48;
 export const COLS = 15;
 export const ROWS = 10;
@@ -36,6 +38,8 @@ export interface LevelDef {
   start: Point;
   enemies: EnemyDef[];
   crystalPath: Point[];
+  themeIndex?: number; // which look to use, if not the one for its level number
+  terrain?: Terrain; // heights, stairs, ladders, fences and dark spots (3D maps)
 }
 
 // Each stage's data lives in ./data/levelN.json. Edit those files directly (or paste in

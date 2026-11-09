@@ -14,6 +14,7 @@ import {
   QUALITY_NAMES,
   RUN_RANKS,
   STAT_LABELS,
+  STAT_ORDER,
   UPGRADE_LEVELS,
   heroSnapshot,
   levelUpCost,
@@ -83,8 +84,12 @@ export default function LevelUpScreen() {
   }
 
   const fmt = {
-    quality: (s: Snapshot) => `${QUALITY_NAMES[Math.min(s.quality, QUALITY_NAMES.length - 1)]} (${num(s.weapon.damage)} dmg)`,
-    recharge: (s: Snapshot) => `${(s.weapon.cooldownMs / 1000).toFixed(2)}s`,
+    health: (s: Snapshot) => `${s.stats.maxHp} HP`,
+    speed: (s: Snapshot) => `${num(1000 / s.stats.moveMs)} tiles/s`,
+    invuln: (s: Snapshot) => `${s.stats.invulnS.toFixed(2)}s`,
+    damage: (s: Snapshot) => `${num(s.weapon.damage)} / gun ${num(s.basicDamage)}`,
+    attackSpeed: (s: Snapshot) => `${(s.weapon.cooldownMs / 1000).toFixed(2)}s / gun ${(s.stats.attackCooldownMs / 1000).toFixed(2)}s`,
+    quality: (s: Snapshot) => QUALITY_NAMES[Math.min(s.quality, QUALITY_NAMES.length - 1)],
     range: (s: Snapshot) => rangeText(s.weapon),
     amount: (s: Snapshot) => `${s.weapon.count ?? 1} per attack`,
     bounce: (s: Snapshot) => `${s.weapon.bounce ?? 0}`,
@@ -139,7 +144,7 @@ export default function LevelUpScreen() {
             <tbody>
               <StatRow label="Level" now={level} next={next?.level} highlight={!atMax} />
               <StatRow label="OVRL Power" now={now.power} next={next?.power} highlight={!atMax} />
-              {(['quality', 'recharge', 'range', 'amount', 'bounce', 'pierce'] as const)
+              {STAT_ORDER
                 .filter((stat) => usesStat(stat, baseWeapon))
                 .map((stat) => (
                   <StatRow
@@ -153,8 +158,8 @@ export default function LevelUpScreen() {
             </tbody>
           </table>
           <p className="gacha-fine">
-            Levelling only improves the special weapon, and only in ways it can use. Health {now.stats.maxHp}, speed {num(1000 / now.stats.moveMs)} tiles/s and
-            protection {now.stats.invulnS.toFixed(2)}s come from {hero.name}’s tier and stay the same.
+            Each stat rises at the levels shown. Attack amount, range, bounces and pierce only appear when {hero.name}’s weapon can use them.
+            Stats shown with the speciality on; upgrades apply either way.
           </p>
           <div className="levelup-skills">
             <strong>Skill slot</strong> <small>(only {ELEMENT_INFO[element].name} skills fit · press E or the skill button to use it, then wait for the cooldown)</small>

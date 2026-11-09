@@ -1,41 +1,51 @@
 // Hero levelling rules shared by the client UI and the server API routes (no React, no browser APIs).
 // Signed-in players earn Aizodon by finishing levels quickly and spend it levelling up heroes.
-// Levelling only improves the hero's special weapon, and each improvement comes at set levels
-// and only when that weapon can use it. A hero's own stats come from their tier, not their level.
+// Each level-up raises one or more stats, each stat at its own set levels. "If needed" stats
+// (amount, range, bounces, pierce) only apply when the hero's special weapon can use them.
 
 import { type Rarity, rarityOf } from './gacha';
 import { BASIC_GUN, type WeaponDef, getSignatureWeapon } from './weapons';
 
 export const MAX_HERO_LEVEL = 20;
 
-export type UpgradeStat = 'quality' | 'recharge' | 'range' | 'amount' | 'bounce' | 'pierce';
+export type UpgradeStat =
+  | 'health' | 'speed' | 'invuln' | 'damage' | 'attackSpeed'
+  | 'quality' | 'range' | 'amount' | 'bounce' | 'pierce';
 export type Ranks = Record<UpgradeStat, number>;
 
 export const STAT_LABELS: Record<UpgradeStat, string> = {
+  health: 'Health',
+  speed: 'Speed',
+  invuln: 'Invulnerability window',
+  damage: 'Attack damage',
+  attackSpeed: 'Attack speed',
   quality: 'Weapon quality',
-  recharge: 'Recharge',
-  range: 'Range',
-  amount: 'Amount',
+  range: 'Attack range',
+  amount: 'Attack amount',
   bounce: 'Bounces',
   pierce: 'Pierce',
 };
 
 export const QUALITY_NAMES = ['Standard', 'Fine', 'Superior', 'Exquisite', 'Masterwork', 'Ascended'];
 
-// The levels at which each upgrade arrives.
+// The levels at which each upgrade arrives. Every level from 2 to 20 raises at least one stat.
 export const UPGRADE_LEVELS: Record<UpgradeStat, number[]> = {
-  recharge: [2, 6, 10, 14, 18],
-  range: [3, 9, 15],
-  pierce: [3, 9, 15],
+  health: [2, 7, 12, 17, 20],
+  damage: [3, 8, 13, 18, 20],
+  speed: [4, 10, 16],
+  attackSpeed: [5, 9, 14, 19],
+  invuln: [6, 11, 15],
   quality: [4, 8, 12, 16, 20],
+  range: [3, 9, 15],
   amount: [5, 11, 17],
   bounce: [7, 13, 19],
+  pierce: [6, 10, 14],
 };
-const ORDER: UpgradeStat[] = ['quality', 'recharge', 'range', 'amount', 'bounce', 'pierce'];
+export const STAT_ORDER: UpgradeStat[] = ['health', 'speed', 'invuln', 'damage', 'attackSpeed', 'quality', 'range', 'amount', 'bounce', 'pierce'];
 
 const finite = (v: number | undefined) => v !== undefined && v > 0 && Number.isFinite(v);
 
-// Each upgrade only applies to weapons that can use it.
+// The "if needed" stats only apply to weapons that can use them.
 export function usesAmount(weapon: WeaponDef): boolean {
   return (weapon.count ?? 1) > 1;
 }
@@ -64,22 +74,22 @@ export function usesStat(stat: UpgradeStat, weapon: WeaponDef): boolean {
 }
 
 function plannedUpgrades(level: number): UpgradeStat[] {
-  return ORDER.filter((stat) => UPGRADE_LEVELS[stat].includes(level));
+  return STAT_ORDER.filter((stat) => UPGRADE_LEVELS[stat].includes(level));
 }
 
-// The weapon upgrades a hero gets on reaching `level` (can be none).
+// The upgrades a hero gets on reaching `level`.
 export function upgradesAtLevel(level: number, weapon: WeaponDef): UpgradeStat[] {
   return plannedUpgrades(level).filter((s) => usesStat(s, weapon));
 }
 
-// The next level (after `level`) that brings this weapon an upgrade, if any.
+// The next level (after `level`) that brings this hero an upgrade, if any.
 export function nextUpgradeLevel(level: number, weapon: WeaponDef): number | null {
   for (let l = level + 1; l <= MAX_HERO_LEVEL; l++) if (upgradesAtLevel(l, weapon).length) return l;
   return null;
 }
 
 export function ranksAtLevel(level: number, weapon: WeaponDef): Ranks {
-  const ranks: Ranks = { quality: 0, recharge: 0, range: 0, amount: 0, bounce: 0, pierce: 0 };
+  const ranks = Object.fromEntries(STAT_ORDER.map((s) => [s, 0])) as Ranks;
   for (let l = 2; l <= Math.min(level, MAX_HERO_LEVEL); l++) {
     for (const stat of upgradesAtLevel(l, weapon)) ranks[stat]++;
   }
@@ -100,20 +110,33 @@ export interface CoreStats {
   bulletSpeed: number;
 }
 
-// Quality makes hits stronger and effects last longer; the rest each improve one thing.
+// The hero's own stats: health, speed, protection after a hit, and the basic gun's fire rate.
+export function applyStatRanks<T extends CoreStats>(base: T, ranks: Ranks): T {
+  return {
+    ...base,
+    maxHp: base.maxHp + ranks.health,
+    moveMs: Math.max(60, base.moveMs * Math.pow(0.96, ranks.speed)),
+    attackCooldownMs: Math.max(60, base.attackCooldownMs * Math.pow(0.92, ranks.attackSpeed)),
+    invulnS: base.invulnS + ranks.invuln * 0.06,
+  };
+}
+
+// Damage and attack speed help every weapon; quality strengthens the special weapon's effects;
+// range, amount, bounces and pierce each improve one thing about it.
 export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boolean): WeaponDef {
+  const damage = weapon.damage * (1 + ranks.damage * 0.2);
+  if (!signature) return { ...weapon, damage }; // the basic gun's fire rate comes from the hero's stats
   const q = ranks.quality;
-  const damage = weapon.damage * (1 + q * 0.15);
-  if (!signature) return { ...weapon, damage }; // the basic gun only gains quality
   const range = ranks.range;
   return {
     ...weapon,
     damage,
+    cooldownMs: Math.max(60, weapon.cooldownMs * Math.pow(0.92, ranks.attackSpeed)),
     speed: weapon.speed ? weapon.speed * Math.pow(1.05, q) : weapon.speed,
     freezeMs: weapon.freezeMs ? weapon.freezeMs * (1 + q * 0.2) : weapon.freezeMs,
     homing: weapon.homing ? weapon.homing * (1 + q * 0.2) : weapon.homing,
+    durationMs: weapon.durationMs ? weapon.durationMs * (1 + q * 0.1) : weapon.durationMs,
     explode: weapon.explode ? weapon.explode + (q >= 4 ? 1 : 0) + (weapon.kind === 'meteor' ? Math.ceil(range / 2) : 0) : weapon.explode,
-    cooldownMs: Math.max(60, weapon.cooldownMs * Math.pow(0.9, ranks.recharge)),
     range: (weapon.kind === 'shot' || weapon.kind === 'wave' || weapon.kind === 'eruption') && weapon.range && usesRange(weapon) ? weapon.range + range * 1.5 : weapon.range,
     // Area weapons cover one more tile with every range upgrade (levels 3, 9 and 15).
     radius: weapon.radius !== undefined && usesRange(weapon) ? weapon.radius + range : weapon.radius,
@@ -132,7 +155,7 @@ export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boo
 // It's kept honest by balanceStats: a hero's level 1 stats are scaled to spend exactly their tier's budget.
 export const TIER_BASE_OVRL: Record<Rarity, number> = { common: 350, rare: 400, epic: 450, legendary: 520, mythic: 600 };
 
-const STAT_POINTS: Record<UpgradeStat, number> = { quality: 15, recharge: 10, range: 8, amount: 8, bounce: 6, pierce: 6 };
+const STAT_POINTS: Record<UpgradeStat, number> = { health: 10, speed: 8, invuln: 6, damage: 8, attackSpeed: 8, quality: 10, range: 6, amount: 6, bounce: 5, pierce: 5 };
 
 export function overallPower(rarity: Rarity, level: number): number {
   let ovrl = TIER_BASE_OVRL[rarity];
@@ -175,7 +198,7 @@ export interface HeroSnapshot {
 export function heroSnapshot(hero: { id: string; stats: CoreStats }, level: number): HeroSnapshot {
   const base = getSignatureWeapon(hero.id);
   const ranks = ranksAtLevel(level, base);
-  const stats = hero.stats; // a hero's own stats don't change with level
+  const stats = applyStatRanks(hero.stats, ranks);
   const weapon = applyWeaponRanks(base, ranks, true);
   return {
     level,

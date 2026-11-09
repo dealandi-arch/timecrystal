@@ -6,7 +6,9 @@ import { type SoundEngine, getSoundEngine } from './audio';
 import TouchControls from './TouchControls';
 import type { CameraMode, Renderer3D } from './Renderer3D';
 import { COLS, FLOOR, ROWS, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
-import { getEffectiveLevel } from './levelOverrides';
+import { getEffectiveLevel, getOverride } from './levelOverrides';
+import { LEVELS_3D } from './levels3d';
+import { canStep, heightAt, isDark, kindAt } from './terrain';
 import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
 import {
   CHARACTERS,
@@ -31,7 +33,7 @@ import { type CombatHooks, drawCombat, explode, fireWeapon, makeCombat, updateCo
 import { RARITY_INFO, SHARDS_PER_LEVEL, rarityOf } from './gacha';
 import { useCollection } from '../profile/CollectionContext';
 import { type ClaimResult, useProgression } from '../profile/ProgressionContext';
-import { applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
+import { applyStatRanks, applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
 import { getPerkValues, getPerks } from './perks';
 import { ELEMENT_INFO, type SkillDef, areaBonus, describeSkill, elementOf, skillAmount, skillCooldown } from './skills';
 import { useProfile } from '../profile/ProfileContext';
@@ -189,9 +191,15 @@ function isWalkable(level: LevelDef, x: number, y: number, forEnemy: boolean): b
   if (!row) return false;
   const tile = row[x];
   if (tile === undefined) return false;
+  if (kindAt(level, x, y) === 'fence') return false;
   if (tile === FLOOR) return true;
   if (tile === SECRET) return !forEnemy;
   return false;
+}
+
+// Walkable and not too steep: on 3D maps you can only go up or down half a level at a time (stairs), or use a ladder.
+function canMove(level: LevelDef, fx: number, fy: number, tx: number, ty: number, forEnemy: boolean): boolean {
+  return isWalkable(level, tx, ty, forEnemy) && canStep(level, fx, fy, tx, ty);
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -316,7 +324,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   const area = areaBonus(heroLevel);
   // Gear and perks in a ref so the game loop always reads the latest values.
   const gearRef = useRef({ hero: charStats, base: BASELINE_STATS, signature, basicGun, perks, area, skill, heroLevel });
-  gearRef.current = { hero: charStats, base: BASELINE_STATS, signature, basicGun, perks, area, skill, heroLevel };
+  gearRef.current = { hero: applyStatRanks(charStats, ranks), base: applyStatRanks(BASELINE_STATS, ranks), signature, basicGun, perks, area, skill, heroLevel };
   const [skillWait, setSkillWait] = useState(0); // whole seconds until the skill is ready again
   const useSkillRef = useRef<() => void>(() => {});
   const skillWaitRef = useRef(0);
@@ -504,7 +512,10 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       },
       particles: s.particles,
       tile: TILE,
-      walkable: (x, y) => isWalkable(level, x, y, false),
+      // Shots fly over fences but can't pass through a ledge higher than the hero is standing.
+      walkable: (x, y) =>
+        (isWalkable(level, x, y, false) || (kindAt(level, x, y) === 'fence' && level.grid[y]?.[x] === FLOOR)) &&
+        heightAt(level, x, y) <= heightAt(level, s.player.gx, s.player.gy) + 0.5,
       shake: (amount) => {
         s.shake = Math.max(s.shake, amount);
       },
@@ -592,7 +603,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         const nx = enemy.gx + stepX;
         const ny = enemy.gy + stepY;
         const blocked =
-          !isWalkable(level, nx, ny, true) ||
+          !canMove(level, enemy.gx, enemy.gy, nx, ny, true) ||
           (nx === s.player.gx && ny === s.player.gy) ||
           s.enemies.some((o) => o !== enemy && o.alive && o.gx === nx && o.gy === ny);
         if (blocked) return;
@@ -612,7 +623,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       for (let i = 0; i < tiles; i++) {
         const nx = enemy.gx + dx;
         const ny = enemy.gy + dy;
-        const blocked = !isWalkable(level, nx, ny, true) || s.enemies.some((o) => o !== enemy && o.alive && o.gx === nx && o.gy === ny);
+        const blocked = !canMove(level, enemy.gx, enemy.gy, nx, ny, true) || s.enemies.some((o) => o !== enemy && o.alive && o.gx === nx && o.gy === ny);
         if (blocked) break;
         enemy.fromX = enemy.gx;
         enemy.fromY = enemy.gy;
@@ -764,7 +775,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           const { dx, dy } = DIR_VECTORS[dir];
           const nx = p.gx + dx;
           const ny = p.gy + dy;
-          if (isWalkable(level, nx, ny, false)) {
+          if (canMove(level, p.gx, p.gy, nx, ny, false)) {
             p.fromX = p.gx;
             p.fromY = p.gy;
             p.gx = nx;
@@ -881,7 +892,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             const nx = enemy.gx + dx;
             const ny = enemy.gy + dy;
             const occupied = s.enemies.some((other) => other !== enemy && other.alive && other.gx === nx && other.gy === ny);
-            if (isWalkable(level, nx, ny, true) && !occupied) {
+            if (canMove(level, enemy.gx, enemy.gy, nx, ny, true) && !occupied) {
               enemy.fromX = enemy.gx;
               enemy.fromY = enemy.gy;
               enemy.gx = nx;
@@ -1059,6 +1070,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         }
       }
 
+      if (level.terrain) drawTerrain(ctx);
+
       const time = performance.now() / 1000;
       const drawPerks = activePerks();
       if (drawPerks.shardSense || s.skill.radarT > 0) {
@@ -1086,7 +1099,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       if (!view3d) drawDiamond(ctx, crystalPos.x + TILE / 2, crystalPos.y + TILE / 2 + bob, 14, '#67e8f9');
 
       for (const enemy of s.enemies) {
-        if (!enemy.alive || view3d) continue;
+        if (!enemy.alive || view3d || hiddenInDark(enemy)) continue;
         const pos = entityPixelPos(enemy);
         const kind = enemy.isBoss ? 'boss' : enemy.frozen || enemy.stunMs > 0 ? 'frozen' : 'enemy';
         const enemyLook = getEnemyLook(kind, appearanceRef.current);
@@ -1188,7 +1201,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       if (r3d) {
         r3d.render({
           player: { key: `player:${characterId}:${appearanceRef.current}`, canvas: playerSprite, x: px / TILE, y: py / TILE, lift: Math.abs(walkBob) / TILE, tint: flashing ? '#f87171' : null },
-          enemies: s.enemies.filter((e) => e.alive).map((enemy) => {
+          enemies: s.enemies.filter((e) => e.alive && !hiddenInDark(e)).map((enemy) => {
             const pos = entityPixelPos(enemy);
             const kind = enemy.isBoss ? 'boss' : enemy.frozen || enemy.stunMs > 0 ? 'frozen' : 'enemy';
             const enemyLook = getEnemyLook(kind, appearanceRef.current);
@@ -1205,6 +1218,53 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           crystal: { x: crystalPos.x / TILE, y: crystalPos.y / TILE, lift: bob / TILE },
           openSecrets: s.discoveredSecrets,
         });
+      }
+    }
+
+    // Enemies in a dark spot can't be seen until you're right next to them (or a radar is on).
+    function hiddenInDark(enemy: RuntimeEnemy): boolean {
+      if (!isDark(level, enemy.gx, enemy.gy) || s.skill.radarT > 0) return false;
+      return Math.max(Math.abs(enemy.gx - s.player.gx), Math.abs(enemy.gy - s.player.gy)) > 1;
+    }
+
+    function drawTerrain(c: CanvasRenderingContext2D) {
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          if (level.grid[y][x] !== FLOOR) continue;
+          const h = heightAt(level, x, y);
+          const kind = kindAt(level, x, y);
+          const px = x * TILE;
+          const py = y * TILE;
+          if (h > 0) {
+            c.fillStyle = `rgba(255,255,255,${0.07 * h})`;
+            c.fillRect(px, py, TILE, TILE);
+            // edge shading where a ledge drops off
+            c.fillStyle = 'rgba(0,0,0,0.35)';
+            if (heightAt(level, x, y + 1) < h - 0.6 || level.grid[y + 1]?.[x] !== FLOOR) c.fillRect(px, py + TILE - 4, TILE, 4);
+            if (heightAt(level, x + 1, y) < h - 0.6) c.fillRect(px + TILE - 3, py, 3, TILE);
+            if (heightAt(level, x - 1, y) < h - 0.6) c.fillRect(px, py, 3, TILE);
+            if (heightAt(level, x, y - 1) < h - 0.6) c.fillRect(px, py, TILE, 3);
+          }
+          if (kind === 'stair') {
+            c.fillStyle = 'rgba(0,0,0,0.28)';
+            for (let i = 1; i < 4; i++) c.fillRect(px + 2, py + (i * TILE) / 4 - 2, TILE - 4, 3);
+          } else if (kind === 'ladder') {
+            c.fillStyle = '#a16207';
+            c.fillRect(px + 12, py + 2, 4, TILE - 4);
+            c.fillRect(px + TILE - 16, py + 2, 4, TILE - 4);
+            for (let i = 0; i < 5; i++) c.fillRect(px + 12, py + 6 + i * 9, TILE - 24, 3);
+          } else if (kind === 'fence') {
+            c.fillStyle = '#78350f';
+            for (let i = 0; i < 4; i++) c.fillRect(px + 5 + i * 11, py + 8, 5, TILE - 16);
+            c.fillStyle = '#92400e';
+            c.fillRect(px + 2, py + 16, TILE - 4, 4);
+            c.fillRect(px + 2, py + TILE - 20, TILE - 4, 4);
+          }
+          if (isDark(level, x, y)) {
+            c.fillStyle = 'rgba(2,4,12,0.62)';
+            c.fillRect(px, py, TILE, TILE);
+          }
+        }
       }
     }
 
@@ -1324,7 +1384,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
                     : reward.reason}
               </p>
             )}
-            {!signedIn && <p className="run-reward">Sign in to earn Aizodon and level up your heroes.</p>}
+            {!signedIn && !view3d && <p className="run-reward">Sign in to earn Aizodon and level up your heroes.</p>}
             <p>
               Time: {formatTime(runStats.timeMs)} &nbsp;·&nbsp; Secrets found: {runStats.secrets}
               {(() => {
@@ -1334,7 +1394,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             </p>
             {runStats.usedAbility && <p className="ability-disqualified-note">A help ability was used on this level, so this run will not count toward the world record.</p>}
             {!view3d && <LeaderboardPanel levelId={level.id} />}
-            {view3d && <p className="gacha-fine">3D test runs don’t go on the World’s Best list.</p>}
+            {view3d && <p className="gacha-fine">3D test maps don’t earn Aizodon or go on the World’s Best list yet.</p>}
             <button
               onClick={() => {
                 sound.playMenuClick();
@@ -1503,7 +1563,7 @@ function FinaleScreen({ onRestart, story, threeD }: { onRestart: () => void; sto
   return (
     <div className="ability-select">
       <h1>{threeD ? '3D Test Complete' : story ? 'The End' : 'Time Crystal Restored'}</h1>
-      <p>{threeD ? 'You cleared both 3D test levels. Thanks for testing the 3D update!' : 'All eleven shards are yours. The timeline holds.'}</p>
+      <p>{threeD ? 'You climbed through every 3D test map. Thanks for testing the 3D update!' : 'All eleven shards are yours. The timeline holds.'}</p>
       <button className="ability-card" onClick={onRestart}>
         Play again
       </button>
@@ -1515,7 +1575,7 @@ export const MUTE_STORAGE_KEY = 'timeCrystalMuted';
 
 export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' | 'story' | '3d' }) {
   const is3d = mode === '3d';
-  const levelCount = is3d ? 2 : TOTAL_LEVELS; // the 3D test only has the first two levels
+  const levelCount = is3d ? LEVELS_3D.length : TOTAL_LEVELS; // the 3D test has its own climbable maps
   const [save, setSave] = useState<Save | null>(null);
   const [muted, setMutedFlag] = useState(false);
   const soundRef = useRef<SoundEngine | null>(null);
@@ -1651,9 +1711,10 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
       />
     );
   } else if (save) {
-    const level = getEffectiveLevel(save.currentLevel);
+    const map3d = is3d ? LEVELS_3D[save.currentLevel - 1] : undefined;
+    const level = map3d ? (getOverride(map3d.id) ?? map3d) : getEffectiveLevel(save.currentLevel);
     if (level) {
-      const theme = LEVEL_THEMES[Math.min(level.id - 1, LEVEL_THEMES.length - 1)];
+      const theme = LEVEL_THEMES[Math.min(level.themeIndex ?? level.id - 1, LEVEL_THEMES.length - 1)];
       const chapterTitle = isStory ? getChapterTitle(level.id - 1) : undefined;
       body = (
         <div>
@@ -1682,7 +1743,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             skill={signedIn ? equippedSkill(save.characterId ?? 'wanderer') : null}
             view3d={is3d}
             signedIn={signedIn}
-            onRunFinished={(stats) => claimRun(level.id, stats.timeMs, stats.usedAbility)}
+            onRunFinished={(stats) => (is3d ? Promise.resolve(null) : claimRun(level.id, stats.timeMs, stats.usedAbility))}
             autoWeapon={settings.autoWeapon}
             paused={settingsOpen}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
