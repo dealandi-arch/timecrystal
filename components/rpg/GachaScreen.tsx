@@ -228,7 +228,7 @@ export default function GachaScreen() {
             {gachaHeroes.map((c) => {
               const r = rarityOf(c.id);
               const have = isUnlocked(c.id);
-              const price = SHOP_PRICE[r as Exclude<typeof r, 'common'>];
+              const price = SHOP_PRICE[r as Exclude<typeof r, 'common' | 'secret'>];
               const weapon = getSignatureWeapon(c.id);
               return (
                 <div key={c.id} className={`ability-card rarity-${r}`}>

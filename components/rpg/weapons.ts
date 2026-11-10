@@ -3,7 +3,7 @@ import { type Rarity, rarityOf } from './gacha';
 // Every hero carries the basic gun plus one signature weapon of their own (switch with Q).
 // Weapons are data: the game reads these fields to decide how each one behaves.
 
-export type WeaponKind = 'shot' | 'melee' | 'beam' | 'mine' | 'nova' | 'zone' | 'pulse' | 'wave' | 'orbit' | 'eruption' | 'meteor' | 'vortex';
+export type WeaponKind = 'shot' | 'melee' | 'beam' | 'mine' | 'nova' | 'zone' | 'pulse' | 'wave' | 'orbit' | 'eruption' | 'meteor' | 'vortex' | 'rockfall';
 export type MeleePattern = 'front' | 'sweep' | 'spin' | 'lunge' | 'arc' | 'x' | 'spear' | 'dash';
 export type BlastShape = 'square' | 'diamond' | 'cross';
 
@@ -119,6 +119,13 @@ export const SIGNATURE_WEAPONS: Record<string, WeaponDef> = {
   wraith: W({ name: 'Shadow Hook', desc: 'A fast hook that drags the enemy it catches 3 tiles toward you.', kind: 'shot', color: '#a78bfa', cooldownMs: 700, damage: 2, speed: 16, range: 7, pull: 3, size: 4 }, 'hook'),
   seraphine: W({ name: 'Prism Beam', desc: 'Two diagonal beams of light that bounce off walls twice.', kind: 'beam', color: '#fde68a', cooldownMs: 800, damage: 2, prism: true, bounce: 2 }, 'prism'),
   weaver: W({ name: 'Singularity', desc: 'Open a vortex 3 tiles ahead that drags nearby enemies into its centre and grinds them.', kind: 'vortex', color: '#e879f9', cooldownMs: 1400, damage: 1, range: 3, radius: 2, durationMs: 2500 }, 'vortex'),
+  parkster: W({ name: 'Rockslide Call', desc: 'Calls a rockslide down one random row or column: every enemy on it is crushed, and any hidden Emerald Shards there are yours.', kind: 'rockfall', color: '#a8a29e', cooldownMs: 3500, damage: 6 }, 'rockslide'),
+  gamer: W({ name: 'Combo Blaster', desc: 'Three quick pixel shots in a tight spread that bounce off a wall once.', kind: 'shot', color: '#22c55e', cooldownMs: 420, damage: 1, count: 3, spreadDeg: 16, speed: 15, range: 10, bounce: 1, size: 4 }, 'combo'),
+  jbsoo: W({ name: 'Flying Kick', desc: 'A leaping kick that hits the two tiles in front of him and sends enemies flying 2 tiles back.', kind: 'melee', pattern: 'lunge', color: '#38bdf8', cooldownMs: 450, damage: 2, knockback: 2 }, 'flyingkick'),
+  leboro: W({ name: 'Lava Lance', desc: 'A line of erupting lava 6 tiles long that keeps burning whatever it hits.', kind: 'eruption', color: '#f97316', cooldownMs: 900, damage: 2, range: 6, poison: 1 }, 'lava'),
+  bunny: W({ name: 'Carrot Barrage', desc: 'Two carrots that hop off walls three times and curve toward enemies.', kind: 'shot', color: '#fb923c', cooldownMs: 380, damage: 1.5, count: 2, spreadDeg: 10, speed: 13, range: 12, bounce: 3, homing: 2, size: 5 }, 'carrot'),
+  nimbus: W({ name: 'Cloudburst', desc: 'A rain cloud settles around them, soaking and slowing every enemy within 2 tiles.', kind: 'zone', color: '#93c5fd', cooldownMs: 1500, damage: 1, radius: 2, durationMs: 3500, freezeMs: 600 }, 'cloud'),
+  glitch: W({ name: 'Bit Flip', desc: 'A glitched bolt that phases through every enemy in line, then arcs to 2 more.', kind: 'shot', color: '#e879f9', cooldownMs: 600, damage: 2, speed: 20, range: 14, pierce: Infinity, chain: 2, size: 4 }, 'bitflip'),
   vector: W({ name: 'Ricochet Disc', desc: 'A disc that bounces from enemy to enemy, up to 3 more times.', kind: 'shot', color: '#94a3b8', cooldownMs: 600, damage: 2, speed: 14, range: 10, ricochet: 3, size: 5 }, 'disc'),
 };
 
@@ -129,6 +136,7 @@ export const TIER_WEAPON: Record<Rarity, { damage: number; cooldown: number }> =
   epic: { damage: 1.4, cooldown: 0.9 },
   legendary: { damage: 1.7, cooldown: 0.85 },
   mythic: { damage: 2, cooldown: 0.8 },
+  secret: { damage: 2.2, cooldown: 0.75 },
 };
 
 export function getSignatureWeapon(characterId: string): WeaponDef {

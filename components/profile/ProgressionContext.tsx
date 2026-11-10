@@ -11,6 +11,7 @@ export interface ClaimResult {
   rank: string;
   reason?: string;
   pending?: boolean; // couldn't be saved yet; kept and re-sent later
+  secret?: string | null; // a Secret hero won on this clear
 }
 
 interface ProgressionContextValue {
@@ -19,7 +20,7 @@ interface ProgressionContextValue {
   error: string | null;
   aizodon: number;
   levelOf: (characterId: string) => number;
-  claimRun: (levelId: number, timeMs: number, usedAbility: boolean) => Promise<ClaimResult | null>;
+  claimRun: (levelId: number, timeMs: number, usedAbility: boolean, customLevelId?: number) => Promise<ClaimResult | null>;
   levelUp: (characterId: string) => Promise<{ ok: boolean; error?: string }>;
   skills: SkillState;
   skillsReady: boolean;
@@ -33,6 +34,7 @@ interface PendingClaim {
   levelId: number;
   timeMs: number;
   usedAbility: boolean;
+  customLevelId?: number; // public levels
 }
 const MAX_PENDING_CLAIMS = 20;
 const RETRY_TOO_SOON_MS = 15000;
@@ -144,9 +146,9 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
   const levelOf = useCallback((characterId: string) => levels[characterId] ?? 1, [levels]);
 
   const claimRun = useCallback(
-    async (levelId: number, timeMs: number, usedAbility: boolean): Promise<ClaimResult | null> => {
+    async (levelId: number, timeMs: number, usedAbility: boolean, customLevelId?: number): Promise<ClaimResult | null> => {
       if (!profileId) return null;
-      const claim = { levelId, timeMs, usedAbility };
+      const claim = customLevelId === undefined ? { levelId, timeMs, usedAbility } : { levelId, timeMs, usedAbility, customLevelId };
       const keepForLater = (): ClaimResult => {
         writePending(profileId, [...readPending(profileId), claim]);
         return { earned: 0, rank: '', pending: true };
@@ -156,8 +158,10 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
         if (!res.ok) return keepForLater();
         setAizodon(data.aizodon);
         // The server spaces out rewards, so one refused as too soon is kept and paid shortly.
+        // Your own public level never pays, so there's nothing to keep for later.
+        if (data.own) return { earned: 0, rank: '', reason: data.reason as string };
         const refused = data.earned === 0;
-        const result = refused ? keepForLater() : { earned: data.earned, rank: data.rank };
+        const result = refused ? keepForLater() : { earned: data.earned, rank: data.rank, secret: (data.secret as string | null) ?? null };
         flushPending(profileId);
         return result;
       } catch {

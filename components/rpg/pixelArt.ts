@@ -680,10 +680,75 @@ const RAW_CHARACTERS: CharacterDef[] = [
     palette: { o: '#0f172a', y: '#38bdf8', d: '#1e293b', e: '#f43f5e' },
     stats: { maxHp: 7, moveMs: 105, attackCooldownMs: 170, attackDurationMs: 130, invulnS: 1.3, bulletSpeed: 15, passiveName: 'Overclocked Core', passiveDesc: 'A machine-perfect fighter, beyond any normal limit.' },
   },
+  {
+    id: 'parkster',
+    name: 'Parkster',
+    description:
+      "He grew up running the rooftops of a city that was stuck in one endless rush hour, vaulting fences and clearing gaps before anyone could tell him to stop. When the crystal broke, the city froze mid-step, and Parkster is the only one still moving. He is thirty percent faster than anyone alive, almost impossible to pin down, and when he whistles, the mountains answer with a rockslide.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1c1917', y: '#f97316', d: '#9a3412', e: '#fef3c7' },
+    stats: { maxHp: 6, moveMs: 115, attackCooldownMs: 190, attackDurationMs: 140, invulnS: 2.1, bulletSpeed: 18, passiveName: 'Free Runner', passiveDesc: '30% faster than anyone, a 2.1-second recovery window after every hit, and fast shots.' },
+  },
+  {
+    id: 'gamer',
+    name: 'Gamer',
+    description:
+      "They have finished every game in every timeline on the hardest setting, and they were halfway through a world-record run when the crystal shattered and the screen went dark. Gamer treats the broken timeline like one more level to beat: learn the patterns, find the shortcuts, and never, ever stop to read the tutorial.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#052e16', y: '#22c55e', d: '#15803d', e: '#f0fdf4' },
+    stats: { maxHp: 4, moveMs: 140, attackCooldownMs: 200, attackDurationMs: 150, invulnS: 0.8, bulletSpeed: 13, passiveName: 'Speedrun', passiveDesc: 'Quick hands and a sharp eye for shortcuts.' },
+  },
+  {
+    id: 'jbsoo',
+    name: 'JBSoo',
+    description:
+      "He trained in a mountain dojo where every morning began with a thousand kicks before breakfast. When the crystal broke, his masters were frozen mid-lesson, and JBSoo came down the mountain to finish their teaching himself. He is calm, quick and balanced, and his flying kick sends a whole line of enemies sprawling.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#0c1a3a', y: '#f8fafc', d: '#38bdf8', e: '#0c1a3a' },
+    stats: { maxHp: 5, moveMs: 135, attackCooldownMs: 230, attackDurationMs: 160, invulnS: 0.9, bulletSpeed: 10, passiveName: 'Dojo Discipline', passiveDesc: 'Balanced and light on his feet.' },
+  },
+  {
+    id: 'leboro',
+    name: 'Leboro',
+    description:
+      "She was born in the heart of a volcano that has been erupting since the first second of time, and she has never once felt cold. When the crystal broke, the volcano went silent, and Leboro climbed out to find out who had dared to put out her home. She hits hard, burns long, and never backs down from a fight.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#450a0a', y: '#dc2626', d: '#7f1d1d', e: '#fde047' },
+    stats: { maxHp: 6, moveMs: 140, attackCooldownMs: 210, attackDurationMs: 150, invulnS: 1, bulletSpeed: 12, passiveName: 'Molten Heart', passiveDesc: 'Hits hard and keeps the heat on.' },
+  },
+  {
+    id: 'bunny',
+    name: 'Bunny',
+    description:
+      "She lives in a meadow at the edge of every timeline, where the clover never stops growing and the carrots are always in season. Nobody knows where she came from, and she is not telling. Bunny is the fastest thing on four paws or two, and she only shows herself to travellers who are very, very lucky.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#4a044e', y: '#fbcfe8', d: '#f472b6', e: '#4a044e' },
+    stats: { maxHp: 6, moveMs: 75, attackCooldownMs: 170, attackDurationMs: 125, invulnS: 2, bulletSpeed: 14, passiveName: 'Hop Skip', passiveDesc: 'The fastest feet in any timeline.' },
+  },
+  {
+    id: 'nimbus',
+    name: 'Nimbus',
+    description:
+      "They drift above the timelines as a small grey cloud with a very large opinion about the weather. When the crystal broke, the skies cracked open with it, and Nimbus came down to stitch them shut. They are hard to hurt and slow to anger, but nothing ruins an enemy's day quite like a personal rain cloud.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1e293b', y: '#e2e8f0', d: '#93c5fd', e: '#1e3a8a' },
+    stats: { maxHp: 6, moveMs: 140, attackCooldownMs: 210, attackDurationMs: 150, invulnS: 1.4, bulletSpeed: 11, passiveName: 'Silver Lining', passiveDesc: 'Floats through trouble with a long recovery window.' },
+  },
+  {
+    id: 'glitch',
+    name: 'Glitch',
+    description:
+      "He is a mistake in the code of time: a flicker that should have been patched out long ago. When the crystal shattered, Glitch slipped through the cracks and found he could walk through walls, skip frames and be in two places at once. He moves and shoots like the rules don't apply to him, because they mostly don't.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#2e1065', y: '#e879f9', d: '#22d3ee', e: '#f0abfc' },
+    stats: { maxHp: 5, moveMs: 115, attackCooldownMs: 170, attackDurationMs: 130, invulnS: 1.1, bulletSpeed: 16, passiveName: 'Frame Skip', passiveDesc: 'Moves and shoots like the rules don’t apply.' },
+  },
 ];
 
-// Same stat budget for everyone in a tier; see balanceStats.
-export const CHARACTERS: CharacterDef[] = RAW_CHARACTERS.map((c) => ({ ...c, stats: balanceStats(c.stats, rarityOf(c.id)) }));
+// Same stat budget for everyone in a tier; see balanceStats. Parkster's numbers are fixed by design
+// (30% faster than the baseline, a 2.1s recovery window) and skip the scaling.
+const FIXED_STATS = new Set(['parkster']);
+export const CHARACTERS: CharacterDef[] = RAW_CHARACTERS.map((c) => (FIXED_STATS.has(c.id) ? c : { ...c, stats: balanceStats(c.stats, rarityOf(c.id)) }));
 
 // Human look (story mode). Each character gets a unique 16×16 sprite assembled from layers:
 // a body build, a face, hair and gear. Presentation follows the pronouns in their description.
@@ -889,6 +954,9 @@ const SMALL_HORNS: Layer = { 0: '...a........a...', 1: '....a......a....' };
 const BLINDFOLD: Layer = { 4: '....aaaaaaaa....', 5: '...a............', 6: '..a.............' };
 const EYE_GOGGLES: Layer = { 4: '....oaaooaao....' };
 const MONOCLE: Layer = { 4: '........oao.....' };
+const BUNNY_EARS: Layer = { 0: '....owo..owo....', 1: '....oao..oao....' };
+const HEADSET: Layer = { 1: '....oaaaaaao....', 3: '...aa......aa...', 4: '...aa......aa...', 5: '....a...........' };
+const CLOUD: Layer = { 0: '...wwww.wwww....', 1: '..wwwwwwwwwwww..' };
 const MUSTACHE: Layer = { 5: '......kkkk......' };
 const STORM_CROWN: Layer = { 0: '..a..a....a..a..', 1: '...aa.aaaa.aa...' };
 const SPECTACLES: Layer = { 4: '....owewwewo....' };
@@ -1004,6 +1072,13 @@ const HUMAN_LOOKS: Record<string, HumanLook> = {
   seraphine: { layers: [DRESS, WINGS, HEAD, LIPS, BOB, HALO], s: '#ffdbac', h: '#fde68a', a: '#fde047' },
   weaver: { layers: [ROBE, HEAD, MESSY, THIRD_EYE, STRINGS], s: '#e0ac69', h: '#a21caf', a: '#f0abfc' },
   vector: { layers: [BROAD, APRON, HEAD, SPIKY, EYE_GOGGLES], s: '#c68642', h: '#0f172a', a: '#38bdf8' },
+  parkster: { layers: [BROAD, HEAD, SPIKY, BANDANA], s: '#8d5524', h: '#1c1917', a: '#f97316' },
+  gamer: { layers: [NEUTRAL, HEAD, MESSY, HEADSET], s: '#f1c27d', h: '#1e3a8a', a: '#22c55e' },
+  jbsoo: { layers: [BROAD, BARE_ARMS, HEAD, SHORT, BANDANA], s: '#f1c27d', h: '#0c0a09', a: '#38bdf8' },
+  leboro: { layers: [SLIM, BARE_ARMS, HEAD, LIPS, PONYTAIL, CROWN], s: '#c68642', h: '#7f1d1d', a: '#fde047' },
+  bunny: { layers: [DRESS, HEAD, LIPS, BOB, BUNNY_EARS], s: '#ffdbac', h: '#f8fafc', a: '#f9a8d4' },
+  nimbus: { layers: [FLOAT, HEAD, MEDIUM, CLOUD], s: '#e2e8f0', h: '#94a3b8', a: '#f8fafc' },
+  glitch: { layers: [BROAD, HEAD, SPIKY, VISOR], s: '#d6d3d1', h: '#a21caf', a: '#22d3ee' },
 };
 
 const DEFAULT_HUMAN: HumanLook = HUMAN_LOOKS.wanderer;
@@ -1078,14 +1153,14 @@ export function getEnemyLook(kind: EnemyKind, appearance: Appearance): Look {
 }
 
 // Story actors: the guide, the Guardian (boss) and each hero's nemesis.
-// One nemesis per hero. Bad characters (nemeses + the Guardian) are 24 women, 24 men and 7 they.
+// One nemesis per hero. Bad characters (nemeses + the Guardian) are 27 women, 27 men and 8 they.
 export type VillainId =
   // women
-  | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse' | 'vein' | 'kuro' | 'strings' | 'maris' | 'seraph' | 'aurelia' | 'thaw' | 'blight' | 'lumen' | 'knot'
+  | 'lag' | 'rime' | 'zero' | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse' | 'vein' | 'kuro' | 'strings' | 'maris' | 'seraph' | 'aurelia' | 'thaw' | 'blight' | 'lumen' | 'knot'
   // men
-  | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw' | 'harrow' | 'ichor' | 'crassus' | 'kael' | 'krell' | 'omega' | 'smog' | 'bram' | 'dusk' | 'rook'
+  | 'bollard' | 'grudge' | 'snare' | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw' | 'harrow' | 'ichor' | 'crassus' | 'kael' | 'krell' | 'omega' | 'smog' | 'bram' | 'dusk' | 'rook'
   // they
-  | 'hollow' | 'mirror' | 'lantern' | 'unmaker' | 'silence' | 'voidmaw' | 'static';
+  | 'drought' | 'hollow' | 'mirror' | 'lantern' | 'unmaker' | 'silence' | 'voidmaw' | 'static';
 export type ActorId = 'oren' | 'guardian' | VillainId;
 
 interface ActorDef {
@@ -1136,6 +1211,9 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   blight: villain(['#1a2e05', '#65a30d', '#3f6212'], [ROBE, HEAD, LIPS, LONG, SMALL_HORNS], '#d9f99d', '#3f6212', '#a855f7', ['#1a2e05', '#4d7c0f', '#d8b4fe']),
   lumen: villain(['#78716c', '#fafaf9', '#d6d3d1'], [ROBE, HEAD, LIPS, HOOD, HALO], '#ffdbac', '#78716c', '#fde047', ['#57534e', '#fafaf9', '#fde047']),
   knot: villain(['#450a0a', '#b91c1c', '#0c0a09'], [SLIM, HEAD, LIPS, PIGTAILS, DOMINO], '#f1c27d', '#7f1d1d', '#fecaca', ['#450a0a', '#dc2626', '#0c0a09']),
+  lag: villain(['#1e1b4b', '#6366f1', '#312e81'], [SLIM, HEAD, LIPS, BOB, GOGGLES], '#e0ac69', '#1e1b4b', '#a5b4fc', ['#1e1b4b', '#818cf8', '#e0e7ff']),
+  rime: villain(['#082f49', '#e0f2fe', '#0ea5e9'], [DRESS, HEAD, LIPS, LONG, CROWN], '#f0f9ff', '#bae6fd', '#38bdf8', ['#0c4a6e', '#bae6fd', '#f0f9ff']),
+  zero: villain(['#0f172a', '#f8fafc', '#475569'], [DRESS, HEAD, LIPS, BUN, VISOR], '#ffdbac', '#0f172a', '#22d3ee', ['#0f172a', '#e2e8f0', '#22d3ee'], '#22d3ee'),
   // men
   harrow: villain(['#1c0a0a', '#7f1d1d', '#292524'], [BROAD, HEAD, BEARD, FEATHER_CAP], '#ffdbac', '#44403c', '#fde047', ['#450a0a', '#991b1b', '#fde047']),
   ichor: villain(['#052e16', '#3f6212', '#1a2e05'], [ROBE, HEAD, MUSTACHE, MESSY, EYE_GOGGLES], '#d9f99d', '#1a2e05', '#a3e635', ['#1a2e05', '#84cc16', '#ecfccb']),
@@ -1159,11 +1237,15 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   thorne: villain(['#052e16', '#3f6212', '#1a2e05'], [BROAD, HEAD, BEARD, HOOD], '#c68642', '#422006', '#a3e635', ['#1a2e05', '#4d7c0f', '#d9f99d']),
   mallus: villain(['#1a2e05', '#4d7c0f', '#365314'], [BULKY, HEAD, MUSTACHE, SHORT], '#8d5524', '#d6d3d1', '#fde047', ['#1a2e05', '#65a30d', '#fde047']),
   ringmaster: villain(['#450a0a', '#dc2626', '#fde047'], [BROAD, HEAD, MUSTACHE, TOP_HAT], '#f1c27d', '#1c1917', '#fde047', ['#7f1d1d', '#f87171', '#fde047']),
+  bollard: villain(['#0c0a09', '#facc15', '#1c1917'], [BULKY, HEAD, MUSTACHE, OPEN_HELM], '#e0ac69', '#44403c', '#facc15', ['#1c1917', '#eab308', '#fef08a']),
+  grudge: villain(['#1c0a0a', '#f8fafc', '#7f1d1d'], [BROAD, BARE_ARMS, HEAD, BEARD, TOPKNOT], '#d4a373', '#0c0a09', '#dc2626', ['#450a0a', '#e5e7eb', '#dc2626']),
+  snare: villain(['#1a2e05', '#78350f', '#3f6212'], [BROAD, HEAD, BEARD, BRIM_HAT], '#c68642', '#422006', '#a16207', ['#1a2e05', '#854d0e', '#fde68a']),
   rocco: villain(['#0c0a09', '#7c3aed', '#3b0764'], [BULKY, HEAD, MUSTACHE, SHORT, SCARF], '#5c3a21', '#0c0a09', '#facc15', ['#2e1065', '#8b5cf6', '#facc15']),
   // they
   hollow: villain(['#020617', '#1f2937', '#111827'], [FLOAT, HEAD, HOOD, SHADOW_FACE], '#64748b', '#020617', '#ef4444', ['#020617', '#334155', '#94a3b8'], '#ef4444'),
   silence: villain(['#000000', '#e5e7eb', '#9ca3af'], [FLOAT, HEAD, HOOD, BLANK_FACE], '#f3f4f6', '#000000', '#f3f4f6', ['#374151', '#e5e7eb', '#ffffff'], '#e5e7eb'),
   voidmaw: villain(['#000000', '#1e1b4b', '#020617'], [FLOAT, HEAD, SHADOW_FACE, SMALL_HORNS], '#1e1b4b', '#000000', '#a855f7', ['#020617', '#312e81', '#a855f7'], '#a855f7'),
+  drought: villain(['#431407', '#fdba74', '#c2410c'], [FLOAT, HEAD, MESSY, BLANK_FACE], '#fed7aa', '#9a3412', '#f97316', ['#431407', '#fb923c', '#ffedd5'], '#f97316'),
   static: villain(['#18181b', '#a1a1aa', '#3f3f46'], [FLOAT, HEAD, BLANK_FACE, ANTENNAE], '#e4e4e7', '#18181b', '#facc15', ['#27272a', '#a1a1aa', '#facc15'], '#facc15'),
   unmaker: villain(['#000000', '#18181b', '#450a0a'], [FLOAT, HEAD, MESSY, VISOR], '#71717a', '#09090b', '#ef4444', ['#000000', '#27272a', '#ef4444'], '#ef4444'),
   lantern: villain(['#422006', '#fde68a', '#f59e0b'], [FLOAT, HEAD, HOOD, GLOW_FACE], '#fef3c7', '#fde68a', '#fb923c', ['#78350f', '#fde68a', '#fffbeb'], '#fb923c'),

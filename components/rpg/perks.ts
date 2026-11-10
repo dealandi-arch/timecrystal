@@ -19,7 +19,7 @@ export interface Perk {
 }
 
 // How strong perks are in each tier.
-const TIER_STRENGTH: Record<Rarity, number> = { common: 1, rare: 1.3, epic: 1.6, legendary: 2, mythic: 2.5 };
+const TIER_STRENGTH: Record<Rarity, number> = { common: 1, rare: 1.3, epic: 1.6, legendary: 2, mythic: 2.5, secret: 2.8 };
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
 const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -87,6 +87,14 @@ const HERO_PERKS: Record<string, PerkKind[]> = {
   // rare: two perks
   briar: ['magnet', 'regen'],
   wraith: ['dodge', 'frenzy'],
+  gamer: ['echoShot', 'overcharge'],
+  jbsoo: ['knockback', 'stunTouch'],
+  leboro: ['deathBurst', 'frenzy', 'lastStand'],
+  parkster: ['killHaste', 'magnet', 'dodge'],
+  // secret: three perks, strongest of all
+  bunny: ['killHaste', 'shardSense', 'revive'],
+  nimbus: ['slowAura', 'timeSlow', 'regen'],
+  glitch: ['dodge', 'momentum', 'secretSight'],
   ghost: ['dodge', 'killHaste'],
   grimsby: ['shardSense', 'revive'],
   corsair: ['momentum', 'crit'],

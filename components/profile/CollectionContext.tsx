@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useProfile } from './ProfileContext';
-import { CHARACTER_RARITY, PULL_COST, type PullResult, type PullType, SHARDS_PER_LEVEL, SHOP_PRICE, rarityOf, rollPull } from '../rpg/gacha';
+import { CHARACTER_RARITY, PULL_COST, type PullResult, type PullType, SHARDS_PER_LEVEL, SHOP_PRICE, UNLOCKABLE_CHARACTERS, rarityOf, rollPull, rollSecret } from '../rpg/gacha';
 
 // Emerald Shards + gacha heroes. Signed-in players keep them on their profile (the server rolls
 // the gacha); guests keep them in this browser.
@@ -22,9 +22,27 @@ interface CollectionContextValue extends Collection {
   addShards: (count: number) => void;
   pull: (type: PullType) => Promise<ActionResult<PullResult>>;
   buy: (characterId: string) => Promise<ActionResult>;
+  // Free trials (event tryouts and codes), kept in this browser: heroId → when it ends (ms).
+  trials: Record<string, number>;
+  trialEndsAt: (characterId: string) => number | null;
+  startTrial: (characterId: string, days: number) => ActionResult<number>;
+  // A Secret hero was won: the server already saved it for signed-in players.
+  grantSecret: (characterId: string) => void;
+  // Guests roll for a Secret hero here after each clear (signed-in players roll on the server).
+  rollSecretLocally: () => string | null;
 }
 
 const LOCAL_KEY = 'timeCrystalCollection';
+const TRIALS_KEY = 'timeCrystalTrials';
+
+function readTrials(): Record<string, number> {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(TRIALS_KEY) ?? '{}');
+    return Object.fromEntries(Object.entries(parsed).filter(([id, t]) => UNLOCKABLE_CHARACTERS.includes(id) && typeof t === 'number')) as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
 const EMPTY: Collection = { shards: 0, owned: [] };
 
 function readLocal(): Collection {
@@ -34,7 +52,7 @@ function readLocal(): Collection {
     const parsed = JSON.parse(raw);
     return {
       shards: Number.isFinite(parsed?.shards) ? Math.max(0, Math.floor(parsed.shards)) : 0,
-      owned: Array.isArray(parsed?.owned) ? parsed.owned.filter((id: unknown) => typeof id === 'string' && id in CHARACTER_RARITY) : [],
+      owned: Array.isArray(parsed?.owned) ? parsed.owned.filter((id: unknown) => typeof id === 'string' && UNLOCKABLE_CHARACTERS.includes(id)) : [],
     };
   } catch {
     return EMPTY;
@@ -89,6 +107,13 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   const profileIdRef = useRef<string | null>(null);
   profileIdRef.current = profile?.id ?? null;
   const flushingRef = useRef(false);
+  const [trials, setTrials] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setTrials(readTrials());
+    const timer = window.setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Sends any shards whose earlier save failed, in batches the server accepts.
   const flushPending = useCallback(async () => {
@@ -216,14 +241,49 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     [updateLocal]
   );
 
+  const trialEndsAt = useCallback((characterId: string) => {
+    const end = trials[characterId];
+    return end && end > now ? end : null;
+  }, [trials, now]);
+
+  // Each trial can be started once per browser; it unlocks the hero until it runs out.
+  const startTrial = useCallback((characterId: string, days: number): ActionResult<number> => {
+    const existing = readTrials();
+    if (existing[characterId]) {
+      return existing[characterId] > Date.now() ? { ok: true, value: existing[characterId] } : { ok: false, error: 'You’ve already used this trial.' };
+    }
+    const end = Date.now() + days * 24 * 60 * 60 * 1000;
+    const next = { ...existing, [characterId]: end };
+    try {
+      window.localStorage.setItem(TRIALS_KEY, JSON.stringify(next));
+    } catch {
+      /* storage unavailable: the trial lasts for this visit */
+    }
+    setTrials(next);
+    setNow(Date.now());
+    return { ok: true, value: end };
+  }, []);
+
+  const grantSecret = useCallback((characterId: string) => {
+    if (storageRef.current === 'browser') updateLocal((c) => (c.owned.includes(characterId) ? c : { ...c, owned: [...c.owned, characterId] }));
+    else setCollection((c) => (c.owned.includes(characterId) ? c : { ...c, owned: [...c.owned, characterId] }));
+  }, [updateLocal]);
+
+  const rollSecretLocally = useCallback(() => {
+    if (storageRef.current !== 'browser') return null;
+    const secret = rollSecret(readLocal().owned);
+    if (secret) grantSecret(secret);
+    return secret;
+  }, [grantSecret]);
+
   const isUnlocked = useCallback(
-    (characterId: string) => rarityOf(characterId) === 'common' || collection.owned.includes(characterId),
-    [collection.owned]
+    (characterId: string) => rarityOf(characterId) === 'common' || collection.owned.includes(characterId) || trialEndsAt(characterId) !== null,
+    [collection.owned, trialEndsAt]
   );
 
   const value = useMemo(
-    () => ({ ...collection, ready, storage, warning, isUnlocked, addShards, pull, buy }),
-    [collection, ready, storage, warning, isUnlocked, addShards, pull, buy]
+    () => ({ ...collection, ready, storage, warning, isUnlocked, addShards, pull, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally }),
+    [collection, ready, storage, warning, isUnlocked, addShards, pull, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally]
   );
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;
 }

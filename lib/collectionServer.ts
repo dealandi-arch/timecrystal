@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from './supabase';
 import { SESSION_COOKIE_NAME, verifySessionToken } from './session';
-import { GACHA_CHARACTERS } from '../components/rpg/gacha';
+import { UNLOCKABLE_CHARACTERS } from '../components/rpg/gacha';
 
 export interface Collection {
   shards: number;
@@ -34,7 +34,7 @@ export async function loadCollection(profileId: string): Promise<Collection | nu
   if (error || !data) return null;
   return {
     shards: data.emerald_shards ?? 0,
-    owned: ((data.owned_characters ?? []) as string[]).filter((id) => GACHA_CHARACTERS.includes(id)),
+    owned: ((data.owned_characters ?? []) as string[]).filter((id) => UNLOCKABLE_CHARACTERS.includes(id)),
   };
 }
 

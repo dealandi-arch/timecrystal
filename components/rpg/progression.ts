@@ -51,7 +51,7 @@ export function usesAmount(weapon: WeaponDef): boolean {
 }
 
 export function usesRange(weapon: WeaponDef): boolean {
-  if (weapon.kind === 'beam') return false; // beams already reach the next wall
+  if (weapon.kind === 'beam' || weapon.kind === 'rockfall') return false; // beams reach the next wall; rockslides cover a whole line
   if (weapon.kind === 'shot') return !!weapon.range && weapon.range <= 14;
   return true; // melee reach, blast/bubble/ripple radius, wave distance
 }
@@ -153,7 +153,7 @@ export function applyWeaponRanks(weapon: WeaponDef, ranks: Ranks, signature: boo
 // ----- OVRL power -----
 // Every hero in a tier has the same OVRL at the same level, and each tier sits above the one below.
 // It's kept honest by balanceStats: a hero's level 1 stats are scaled to spend exactly their tier's budget.
-export const TIER_BASE_OVRL: Record<Rarity, number> = { common: 350, rare: 400, epic: 450, legendary: 520, mythic: 600 };
+export const TIER_BASE_OVRL: Record<Rarity, number> = { common: 350, rare: 400, epic: 450, legendary: 520, mythic: 600, secret: 650 };
 
 const STAT_POINTS: Record<UpgradeStat, number> = { health: 10, speed: 8, invuln: 6, damage: 8, attackSpeed: 8, quality: 10, range: 6, amount: 6, bounce: 5, pierce: 5 };
 

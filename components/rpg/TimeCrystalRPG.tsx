@@ -7,7 +7,7 @@ import TouchControls from './TouchControls';
 import type { CameraMode, Renderer3D } from './Renderer3D';
 import { FLOOR, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
 import { getEffectiveLevel, getOverride } from './levelOverrides';
-import { LEVELS_3D } from './levels3d';
+import { LEVELS_3D, isRankedLevelId } from './levels3d';
 import { canStep, heightAt, isDark, kindAt } from './terrain';
 import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
 import {
@@ -30,7 +30,7 @@ import { type AbilityId, type Save, clearSave, defaultSave, loadSave, persistSav
 import { type LevelRunStats, getLocalBest, saveLocalBestIfBetter } from './runStats';
 import { BASIC_GUN, type WeaponDef, getSignatureWeapon } from './weapons';
 import { type CombatHooks, drawCombat, explode, fireWeapon, makeCombat, updateCombat } from './combat';
-import { RARITY_INFO, SHARDS_PER_LEVEL, rarityOf } from './gacha';
+import { RARITY_INFO, SHARDS_PER_LEVEL, isSecret, rarityOf } from './gacha';
 import { useCollection } from '../profile/CollectionContext';
 import { type ClaimResult, useProgression } from '../profile/ProgressionContext';
 import { applyStatRanks, applyWeaponRanks, heroSnapshot, ranksAtLevel } from './progression';
@@ -310,10 +310,11 @@ interface LevelRunnerProps {
   skill: SkillDef | null;
   view3d?: boolean;
   onRunFinished: (stats: LevelRunStats) => Promise<ClaimResult | null>;
+  ranked?: boolean; // on a World's Best list (public levels aren't)
   signedIn: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn, ranked = true }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
   const baseSignature = getSignatureWeapon(charDef.id);
@@ -523,6 +524,9 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       },
       particles: s.particles,
       tile: TILE,
+      cols: level.grid[0].length,
+      rows: level.grid.length,
+      collect: (x, y) => collectShard(x, y),
       // Shots fly over fences but can't pass through a ledge higher than the hero is standing.
       walkable: (x, y) =>
         (isWalkable(level, x, y, false) || (kindAt(level, x, y) === 'fence' && level.grid[y]?.[x] === FLOOR)) &&
@@ -643,6 +647,15 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         enemy.moveT = 0;
         enemy.moving = true;
       }
+    }
+
+    function collectShard(x: number, y: number) {
+      const key = `${x},${y}`;
+      if (!s.emeralds.delete(key)) return;
+      spawnBurst(s.particles, (x + 0.5) * TILE, (y + 0.5) * TILE, ['#10b981', '#6ee7b7', '#d1fae5', '#fff'], 24, 150, -50);
+      sound.playCrystalPickup();
+      setEmeraldsFound((n) => n + 1);
+      emeraldRef.current();
     }
 
     function useSkill() {
@@ -1031,11 +1044,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       for (const key of [...s.emeralds]) {
         const [ex, ey] = key.split(',').map(Number);
         if (Math.max(Math.abs(ex - p.gx), Math.abs(ey - p.gy)) > reach) continue;
-        s.emeralds.delete(key);
-        spawnBurst(s.particles, (ex + 0.5) * TILE, (ey + 0.5) * TILE, ['#10b981', '#6ee7b7', '#d1fae5', '#fff'], 24, 150, -50);
-        sound.playCrystalPickup();
-        setEmeraldsFound((n) => n + 1);
-        emeraldRef.current();
+        collectShard(ex, ey);
       }
 
       updateParticles(s.particles, dt);
@@ -1386,10 +1395,16 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     }
 
     function loop(now: number) {
-      const dt = Math.min(0.033, (now - lastTime) / 1000);
+      // On slow devices a frame can take longer than 33ms: catch up in small steps (up to a tenth of a
+      // second per frame) so the game runs at the same speed instead of in slow motion.
+      let left = Math.min(0.1, (now - lastTime) / 1000);
       if (pausedRef.current) s.startTime += now - lastTime; // paused time doesn't count toward the run
       lastTime = now;
-      if (!pausedRef.current) update(dt);
+      while (!pausedRef.current && left > 0) {
+        const dt = Math.min(0.033, left);
+        update(dt);
+        left -= dt;
+      }
       draw();
       rafId = requestAnimationFrame(loop);
     }
@@ -1486,7 +1501,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             <p>
               Emerald Shards found: {emeraldsFound}/{SHARDS_PER_LEVEL}
             </p>
-            {signedIn && reward && (
+            {reward?.secret && <SecretObtained heroId={reward.secret} appearance={appearance} />}
+            {signedIn && reward && (reward.earned > 0 || reward.pending || reward.reason) && (
               <p className="run-reward">
                 {reward.pending
                   ? 'Your Aizodon couldn’t be saved yet. It’s kept and will be added automatically.'
@@ -1504,8 +1520,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
               })()}
             </p>
             {runStats.usedAbility && <p className="ability-disqualified-note">A help ability was used on this level, so this run will not count toward the world record.</p>}
-            <LeaderboardPanel levelId={level.id} title={view3d ? '3D World Rank' : undefined} />
-            {view3d && (
+            {ranked && <LeaderboardPanel levelId={level.id} title={view3d ? '3D World Rank' : undefined} />}
+            {ranked && view3d && (
               <p className="gacha-fine">
                 <a href="/3d/rank" target="_blank" rel="noreferrer">See the full 3D World Rank ↗</a>
               </p>
@@ -1582,6 +1598,7 @@ export function CharacterSelectScreen({
   onAppearanceChange,
   showNemesis = false,
   title = 'Choose Your Character',
+  onlyHeroes,
   subtitle = 'Pick who travels through time. This choice is yours to keep.'
 }: {
   onChoose: (id: string) => void;
@@ -1590,15 +1607,18 @@ export function CharacterSelectScreen({
   showNemesis?: boolean;
   title?: string;
   subtitle?: string;
+  onlyHeroes?: string[];
 }) {
-  const { isUnlocked, shards } = useCollection();
+  const { isUnlocked, shards, trialEndsAt } = useCollection();
+  // Secret heroes stay hidden until you have one (or a trial); events can limit the list.
+  const heroes = CHARACTERS.filter((c) => (onlyHeroes ? onlyHeroes.includes(c.id) : !isSecret(c.id) || isUnlocked(c.id)));
   const { signedIn, levelOf, equippedSkill } = useProgression();
   return (
     <div className="ability-select">
       <h1>{title}</h1>
       <p>{subtitle}</p>
       <p className="select-shards">
-        💎 {shards} Emerald Shards &nbsp;·&nbsp; <a href="/gacha">Summon more heroes</a>
+        💎 {shards} Emerald Shards &nbsp;·&nbsp; <a href="/gacha">Summon more heroes</a> &nbsp;·&nbsp; <a href="/events">Events</a>
         {signedIn && <> &nbsp;·&nbsp; <a href="/level-up">Level up heroes</a></>}
       </p>
       {appearance && onAppearanceChange && (
@@ -1608,9 +1628,10 @@ export function CharacterSelectScreen({
         </>
       )}
       <div className="ability-grid">
-        {CHARACTERS.map((c) => {
+        {heroes.map((c) => {
           const rarity = rarityOf(c.id);
           const unlocked = isUnlocked(c.id);
+          const trialEnd = trialEndsAt(c.id);
           const weapon = getSignatureWeapon(c.id);
           return (
           <button
@@ -1630,7 +1651,8 @@ export function CharacterSelectScreen({
                 <div className="char-level">Lv {levelOf(c.id)} &nbsp;·&nbsp; OVRL {heroSnapshot(c, levelOf(c.id)).power}</div>
               )}
             </div>
-            {!unlocked && <p className="locked-note">🔒 Locked — get this hero from the Gacha.</p>}
+            {!unlocked && <p className="locked-note">🔒 Locked — {onlyHeroes ? <>start the tryout on the <a href="/events">Events</a> page.</> : 'get this hero from the Gacha.'}</p>}
+            {trialEnd && <p className="trial-note">⏳ Trial · {formatTrialLeft(trialEnd)} left</p>}
             <p className="char-desc">{c.description}</p>
             <p className="char-passive"><strong>{c.stats.passiveName}</strong> — {c.stats.passiveDesc}</p>
             {signedIn && equippedSkill(c.id) && (
@@ -1675,11 +1697,11 @@ function AbilitySelectScreen({ onChoose }: { onChoose: (id: AbilityId) => void }
   );
 }
 
-function FinaleScreen({ onRestart, story, threeD }: { onRestart: () => void; story?: boolean; threeD?: boolean }) {
+function FinaleScreen({ onRestart, story, threeD, custom }: { onRestart: () => void; story?: boolean; threeD?: boolean; custom?: { title: string; text: string } }) {
   return (
     <div className="ability-select">
-      <h1>{threeD ? '3D Test Complete' : story ? 'The End' : 'Time Crystal Restored'}</h1>
-      <p>{threeD ? 'You climbed through every 3D test map. Thanks for testing the 3D update!' : 'All eleven shards are yours. The timeline holds.'}</p>
+      <h1>{custom ? custom.title : threeD ? '3D Test Complete' : story ? 'The End' : 'Time Crystal Restored'}</h1>
+      <p>{custom ? custom.text : threeD ? 'You climbed through every 3D test map. Thanks for testing the 3D update!' : 'All eleven shards are yours. The timeline holds.'}</p>
       <button className="ability-card" onClick={onRestart}>
         Play again
       </button>
@@ -1689,23 +1711,32 @@ function FinaleScreen({ onRestart, story, threeD }: { onRestart: () => void; sto
 
 export const MUTE_STORAGE_KEY = 'timeCrystalMuted';
 
-export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' | 'story' | '3d' }) {
+export interface CustomPlay {
+  levels: LevelDef[]; // played in order
+  heroes?: string[]; // only these heroes can be picked (events)
+  customLevelId?: number; // a published public level: rewards are claimed against it
+  rewards?: boolean; // false for test plays in the level builder
+  finale: { title: string; text: string };
+}
+
+export default function TimeCrystalRPG({ mode = 'classic', custom }: { mode?: 'classic' | 'story' | '3d' | 'custom'; custom?: CustomPlay }) {
   const is3d = mode === '3d';
-  const levelCount = is3d ? LEVELS_3D.length : TOTAL_LEVELS; // the 3D test has its own climbable maps
+  const customLevels = mode === 'custom' ? custom?.levels ?? [] : null;
+  const levelCount = customLevels ? customLevels.length : is3d ? LEVELS_3D.length : TOTAL_LEVELS; // the 3D test has its own climbable maps
   const [save, setSave] = useState<Save | null>(null);
   const [muted, setMutedFlag] = useState(false);
   const soundRef = useRef<SoundEngine | null>(null);
   if (!soundRef.current) soundRef.current = getSoundEngine();
   const sound = soundRef.current;
   const { profile, submitRun } = useProfile();
-  const { addShards } = useCollection();
+  const { addShards, grantSecret, rollSecretLocally } = useCollection();
   const { signedIn, levelOf, claimRun, equippedSkill } = useProgression();
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
-    if (profile) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
+    if (profile && isRankedLevelId(level.id) && !custom?.customLevelId) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
     updateSave({
       ...currentSave,
       crystalsCollected: currentSave.crystalsCollected + 1,
@@ -1756,10 +1787,23 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
     updateSave({ ...save, appearance });
   }
 
+  // Aizodon for the run, and the 1% Secret hero roll (on the server when signed in, here for guests).
+  async function finishRun(level: LevelDef, stats: LevelRunStats): Promise<ClaimResult | null> {
+    if (custom && custom.rewards === false) return null;
+    if (signedIn) {
+      const result = await claimRun(level.id, stats.timeMs, stats.usedAbility, custom?.customLevelId);
+      if (result?.secret) grantSecret(result.secret);
+      return result;
+    }
+    const secret = rollSecretLocally();
+    return secret ? { earned: 0, rank: '', secret } : null;
+  }
+
   let body: ReactNode = null;
   if (save && save.characterId === null) {
     body = (
       <CharacterSelectScreen
+        onlyHeroes={custom?.heroes}
         appearance={save.appearance}
         onAppearanceChange={setAppearance}
         showNemesis={isStory}
@@ -1805,6 +1849,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
       <FinaleScreen
         story={isStory}
         threeD={is3d}
+        custom={custom?.finale}
         onRestart={() => updateSave({ ...defaultSave(), appearance: save.appearance })}
       />
     );
@@ -1827,7 +1872,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
     );
   } else if (save) {
     const map3d = is3d ? LEVELS_3D[save.currentLevel - 1] : undefined;
-    const level = map3d ? (getOverride(map3d.id) ?? map3d) : getEffectiveLevel(save.currentLevel);
+    const level = customLevels ? customLevels[save.currentLevel - 1] : map3d ? (getOverride(map3d.id) ?? map3d) : getEffectiveLevel(save.currentLevel);
     if (level) {
       const theme = LEVEL_THEMES[Math.min(level.themeIndex ?? level.id - 1, LEVEL_THEMES.length - 1)];
       const chapterTitle = isStory ? getChapterTitle(level.id - 1) : undefined;
@@ -1856,9 +1901,10 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             onEmeraldFound={() => addShards(1)}
             heroLevel={levelOf(save.characterId ?? 'wanderer')}
             skill={signedIn ? equippedSkill(save.characterId ?? 'wanderer') : null}
-            view3d={is3d}
+            view3d={is3d || !!level.terrain}
             signedIn={signedIn}
-            onRunFinished={(stats) => claimRun(level.id, stats.timeMs, stats.usedAbility)}
+            ranked={isRankedLevelId(level.id) && !custom?.customLevelId}
+            onRunFinished={(stats) => finishRun(level, stats)}
             autoWeapon={settings.autoWeapon}
             paused={settingsOpen}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}
@@ -1893,6 +1939,41 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
       )}
       {body}
       {settingsOpen && <SettingsPanel settings={settings} onChange={changeSettings} onClose={() => setSettingsOpen(false)} />}
+    </div>
+  );
+}
+
+export function formatTrialLeft(end: number): string {
+  const ms = Math.max(0, end - Date.now());
+  const hours = Math.floor(ms / 3600000);
+  if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+  return hours >= 1 ? `${hours}h` : `${Math.max(1, Math.ceil(ms / 60000))}m`;
+}
+
+// "Obtained Bunny!" — the hero's profile, shown when a Secret hero drops after a clear.
+export function SecretObtained({ heroId, appearance }: { heroId: string; appearance?: Appearance }) {
+  const hero = CHARACTERS.find((c) => c.id === heroId);
+  if (!hero) return null;
+  const weapon = getSignatureWeapon(hero.id);
+  return (
+    <div className="secret-obtained" role="status">
+      <h3>✨ Obtained {hero.name}! ✨</h3>
+      <p className="gacha-fine">A Secret hero — they’re yours to keep and now appear in your hero list.</p>
+      <div className="secret-card rarity-secret">
+        <span className="rarity-badge" style={{ background: RARITY_INFO.secret.color }}>{RARITY_INFO.secret.name}</span>
+        <div className="char-portrait">
+          <SpritePreview char={hero} appearance={appearance} />
+          <div className="char-portrait-name">{hero.name}</div>
+        </div>
+        <p className="char-desc">{hero.description}</p>
+        <p className="char-passive"><strong>{hero.stats.passiveName}</strong> — {hero.stats.passiveDesc}</p>
+        <ul className="char-perks">
+          {getPerks(hero.id).map((perk) => (
+            <li key={perk.kind}><strong>{perk.name}:</strong> {perk.desc}</li>
+          ))}
+        </ul>
+        <p className="char-weapon" style={{ color: weapon.color }}><strong>⚔ {weapon.name}</strong> — {weapon.desc}</p>
+      </div>
     </div>
   );
 }

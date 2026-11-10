@@ -13,6 +13,8 @@ export default function Home() {
           <Link href="/story">Story mode</Link>
           <Link href="/watch">Story animation</Link>
           <Link href="/gacha">Gacha</Link>
+          <Link href="/events">Events</Link>
+          <Link href="/levels">Public levels</Link>
           <Link href="/level-up">Level up</Link>
           <Link href="/3d">3D test</Link>
           <Link href="/3d/rank">3D World Rank</Link>

@@ -49,6 +49,7 @@ interface Orbit { weapon: WeaponDef; t: number; angle: number; cooldowns: Map<Co
 interface Eruption { x: number; y: number; dx: number; dy: number; step: number; next: number; weapon: WeaponDef }
 interface Meteor { gx: number; gy: number; t: number; maxT: number; weapon: WeaponDef }
 interface Vortex { gx: number; gy: number; life: number; maxLife: number; tick: number; weapon: WeaponDef }
+interface Rockfall { cells: { x: number; y: number }[]; t: number; maxT: number; weapon: WeaponDef }
 
 export interface Combat {
   projectiles: Projectile[];
@@ -64,11 +65,12 @@ export interface Combat {
   eruptions: Eruption[];
   meteors: Meteor[];
   vortexes: Vortex[];
+  rockfalls: Rockfall[];
   player: { x: number; y: number }; // last known hero cell, for orbiting weapons
 }
 
 export function makeCombat(): Combat {
-  return { projectiles: [], slashes: [], lines: [], rings: [], mines: [], zones: [], pulses: [], waves: [], dots: [], orbits: [], eruptions: [], meteors: [], vortexes: [], player: { x: 0, y: 0 } };
+  return { projectiles: [], slashes: [], lines: [], rings: [], mines: [], zones: [], pulses: [], waves: [], dots: [], orbits: [], eruptions: [], meteors: [], vortexes: [], rockfalls: [], player: { x: 0, y: 0 } };
 }
 
 export interface CombatHooks {
@@ -85,6 +87,12 @@ export interface CombatHooks {
   push?: (enemy: CombatEnemy, tiles: number) => void;
   // Drags an enemy up to `tiles` steps toward a cell (hooks and vortexes).
   pullToward?: (enemy: CombatEnemy, x: number, y: number, tiles: number) => void;
+  // Map size, for weapons that cover a whole row or column (defaults to 15 x 10).
+  cols?: number;
+  rows?: number;
+  // Picks up anything hidden on a tile (Rockslide Call scoops up Emerald Shards).
+  collect?: (x: number, y: number) => void;
+  random?: () => number;
 }
 
 const MAX_MINES = 3;
@@ -98,6 +106,7 @@ const ZAP_EVERY_S = 0.3;
 const ERUPT_EVERY_S = 0.07;
 const METEOR_DELAY_S = 0.6;
 const VORTEX_TICK_S = 0.4;
+const ROCKFALL_DELAY_S = 0.55;
 const ORB_HIT_COOLDOWN_S = 0.5;
 
 function damage(h: CombatHooks, enemy: CombatEnemy, amount: number, weapon: WeaponDef) {
@@ -273,6 +282,21 @@ function fireInner(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: nu
       c.vortexes.push({ gx: target.x, gy: target.y, life, maxLife: life, tick: 0, weapon });
     }
     return;
+  }
+
+  if (weapon.kind === 'rockfall') {
+    // A random row or column that has open ground on it.
+    const cols = h.cols ?? 15;
+    const rows = h.rows ?? 10;
+    const random = h.random ?? Math.random;
+    const lines: { x: number; y: number }[][] = [];
+    for (let y = 0; y < rows; y++) lines.push(Array.from({ length: cols }, (_, x) => ({ x, y })).filter((p) => h.walkable(p.x, p.y)));
+    for (let x = 0; x < cols; x++) lines.push(Array.from({ length: rows }, (_, y) => ({ x, y })).filter((p) => h.walkable(p.x, p.y)));
+    const open = lines.filter((l) => l.length > 0);
+    if (!open.length) return {};
+    const cells = open[Math.floor(random() * open.length)];
+    c.rockfalls.push({ cells, t: ROCKFALL_DELAY_S, maxT: ROCKFALL_DELAY_S, weapon });
+    return {};
   }
 
   if (weapon.kind === 'zone') {
@@ -640,6 +664,20 @@ function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number;
   }
   if (c.meteors.length) c.meteors = c.meteors.filter((m) => m.t > 0);
 
+  // Rockslides: after the warning, crush everything on the line and scoop up what's hidden there.
+  for (const r of c.rockfalls) {
+    r.t -= dt;
+    if (r.t > 0) continue;
+    for (const cell of r.cells) {
+      for (const e of enemiesAt(h, cell.x, cell.y)) damage(h, e, r.weapon.damage, r.weapon);
+      h.collect?.(cell.x, cell.y);
+      spawnBurst(h.particles, (cell.x + 0.5) * h.tile, (cell.y + 0.5) * h.tile, [r.weapon.color, '#78716c', '#e7e5e4'], 6, 140, 120);
+    }
+    c.slashes.push({ cells: r.cells, life: 0.4, maxLife: 0.4, color: r.weapon.color });
+    h.shake(0.6);
+  }
+  if (c.rockfalls.length) c.rockfalls = c.rockfalls.filter((r) => r.t > 0);
+
   // Vortexes: drag nearby enemies toward the middle and grind them.
   for (const v of c.vortexes) {
     v.life -= dt;
@@ -727,6 +765,20 @@ export function drawCombat(ctx: CanvasRenderingContext2D, c: Combat, tile: numbe
     ctx.beginPath();
     ctx.arc(x + t * 40, y - t * 140, 9, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  for (const r of c.rockfalls) {
+    const t = r.t / r.maxT; // 1 → 0 as the rocks come down
+    for (const cell of r.cells) {
+      const x = cell.x * tile;
+      const y = cell.y * tile;
+      ctx.fillStyle = `rgba(239, 68, 68, ${0.15 + 0.25 * (1 - t)})`;
+      ctx.fillRect(x, y, tile, tile);
+      ctx.fillStyle = r.weapon.color;
+      ctx.beginPath();
+      ctx.arc(x + tile / 2, y + tile / 2 - t * tile * 3, tile * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   for (const v of c.vortexes) {

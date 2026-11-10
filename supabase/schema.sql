@@ -42,3 +42,17 @@ alter table profiles add column if not exists recent_characters text[] not null 
 
 -- Skills bought with Aizodon (safe to re-run). { "owned": [skillId], "equipped": { heroId: skillId } }
 alter table profiles add column if not exists skills jsonb not null default '{}';
+
+-- Public levels made in the level builder (safe to re-run).
+-- data: { rows, dark, start, enemies, crystalPath } in the same text format as the built-in 3D maps.
+create table if not exists custom_levels (
+  id bigserial primary key,
+  author_id text not null references profiles(id) on delete cascade,
+  name text not null,
+  mode text not null check (mode in ('2d', '3d')),
+  data jsonb not null,
+  plays int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists custom_levels_created_idx on custom_levels (created_at desc);
+create index if not exists custom_levels_author_idx on custom_levels (author_id);

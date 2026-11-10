@@ -31,6 +31,7 @@ export const HERO_ELEMENT: Record<string, Element> = {
   tinker: 'tech', automaton: 'tech', drifter: 'tech', grimsby: 'tech', chronomancer: 'tech',
   cinder: 'fire', glacius: 'frost', tempest: 'storm', terra: 'earth', briar: 'nature',
   wraith: 'shadow', seraphine: 'light', weaver: 'arcane', vector: 'tech',
+  parkster: 'earth', gamer: 'tech', jbsoo: 'storm', leboro: 'fire', bunny: 'nature', nimbus: 'storm', glitch: 'arcane',
 };
 
 export function elementOf(heroId: string): Element {

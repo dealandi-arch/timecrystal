@@ -1,8 +1,8 @@
 // Gacha rules shared by the client UI and the server API routes (no React, no browser APIs).
 
-export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'secret';
 export type PullType = 'normal' | 'lucky';
-export type GachaRarity = Exclude<Rarity, 'common'>;
+export type GachaRarity = Exclude<Rarity, 'common' | 'secret'>;
 
 export const RARITY_INFO: Record<Rarity, { name: string; color: string }> = {
   common: { name: 'Common', color: '#94a3b8' },
@@ -10,6 +10,7 @@ export const RARITY_INFO: Record<Rarity, { name: string; color: string }> = {
   epic: { name: 'Epic', color: '#a855f7' },
   legendary: { name: 'Legendary', color: '#f59e0b' },
   mythic: { name: 'Mythic', color: '#f43f5e' },
+  secret: { name: 'Secret', color: '#2dd4bf' },
 };
 
 export const GACHA_RARITIES: GachaRarity[] = ['rare', 'epic', 'legendary', 'mythic'];
@@ -18,6 +19,10 @@ export const GACHA_RARITIES: GachaRarity[] = ['rare', 'epic', 'legendary', 'myth
 export const CHARACTER_RARITY: Record<string, GachaRarity> = {
   ghost: 'rare',
   grimsby: 'rare',
+  gamer: 'rare',
+  jbsoo: 'rare',
+  leboro: 'legendary',
+  parkster: 'mythic',
   corsair: 'rare',
   falconer: 'rare',
   prospector: 'rare',
@@ -45,11 +50,30 @@ export const CHARACTER_RARITY: Record<string, GachaRarity> = {
   vector: 'mythic',
 };
 
+// Secret heroes: never in the gacha or the shop. Every level you clear has a 1% chance to give you
+// one you don't have yet; they stay hidden from the hero list until you've got one (or a trial).
+export const SECRET_CHARACTERS = ['bunny', 'nimbus', 'glitch'];
+export const SECRET_DROP_CHANCE = 0.01;
+
+export function isSecret(characterId: string): boolean {
+  return SECRET_CHARACTERS.includes(characterId);
+}
+
 export function rarityOf(characterId: string): Rarity {
+  if (isSecret(characterId)) return 'secret';
   return CHARACTER_RARITY[characterId] ?? 'common';
 }
 
 export const GACHA_CHARACTERS = Object.keys(CHARACTER_RARITY);
+// Everything that can be owned (and so saved on a profile).
+export const UNLOCKABLE_CHARACTERS = [...GACHA_CHARACTERS, ...SECRET_CHARACTERS];
+
+// After clearing a level: 1% chance of a Secret hero you don't have yet.
+export function rollSecret(owned: string[], random: () => number = Math.random): string | null {
+  const missing = SECRET_CHARACTERS.filter((id) => !owned.includes(id));
+  if (!missing.length || random() >= SECRET_DROP_CHANCE) return null;
+  return missing[Math.floor(random() * missing.length)];
+}
 
 export const PULL_COST: Record<PullType, number> = { normal: 20, lucky: 70 };
 
@@ -60,7 +84,7 @@ export const PULL_RATES: Record<PullType, Record<GachaRarity, number>> = {
 };
 
 // Buying a specific character outright always costs more than summoning for one on average.
-export const SHOP_PRICE: Record<GachaRarity, number> = { rare: 350, epic: 650, legendary: 1500, mythic: 6000 };
+export const SHOP_PRICE: Record<GachaRarity, number> = { rare: 400, epic: 700, legendary: 1800, mythic: 7500 };
 
 // Pulling a character you already own gives some shards back.
 export const DUPLICATE_REFUND: Record<GachaRarity, number> = { rare: 5, epic: 12, legendary: 30, mythic: 80 };
