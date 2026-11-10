@@ -223,18 +223,19 @@ export const RUN_RANKS = [
 
 // Target time grows with how many enemies a level has and how much health they carry.
 // Tuned so the target is about a typical player's personal best on that level.
-export function targetTimeMs(enemies: { hp: number }[]): number {
+// Big 3D maps add a bonus for the extra ground to cover.
+export function targetTimeMs(enemies: { hp: number }[], bonusMs = 0): number {
   const extraHp = enemies.reduce((sum, e) => sum + Math.max(0, e.hp - 1), 0);
-  return (4 + enemies.length * 1.5 + extraHp * 0.15) * 1000;
+  return (4 + enemies.length * 1.5 + extraHp * 0.15) * 1000 + bonusMs;
 }
 
-export function runReward(timeMs: number, enemies: { hp: number }[], usedAbility: boolean): { rank: string; earned: number } {
-  const ratio = timeMs / targetTimeMs(enemies);
+export function runReward(timeMs: number, enemies: { hp: number }[], usedAbility: boolean, bonusMs = 0): { rank: string; earned: number } {
+  const ratio = timeMs / targetTimeMs(enemies, bonusMs);
   const tier = RUN_RANKS.find((r) => ratio <= r.maxRatio) ?? RUN_RANKS[RUN_RANKS.length - 1];
   return { rank: tier.rank, earned: usedAbility ? Math.ceil(tier.reward / 2) : tier.reward };
 }
 
 // Fastest run time the server will credit, so forged times can't be claimed in rapid succession.
-export function minimumCreditedMs(enemies: { hp: number }[]): number {
-  return Math.max(5000, targetTimeMs(enemies) * 0.5);
+export function minimumCreditedMs(enemies: { hp: number }[], bonusMs = 0): number {
+  return Math.max(5000, targetTimeMs(enemies, bonusMs) * 0.5);
 }

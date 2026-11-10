@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getLevel } from '../../../components/rpg/levels';
+import { getAnyLevel } from '../../../components/rpg/levels3d';
 import { formatTime } from '../../../components/profile/formatTime';
 import Avatar from '../../../components/profile/Avatar';
 import AvatarEditor from '../../../components/profile/AvatarEditor';
@@ -180,7 +180,7 @@ export default function ProfileViewPage() {
               <tbody>
                 {runs.map((run) => (
                   <tr key={run.levelId}>
-                    <td>{getLevel(run.levelId)?.name ?? `Level ${run.levelId}`}</td>
+                    <td>{getAnyLevel(run.levelId)?.name ?? `Level ${run.levelId}`}</td>
                     <td>{formatTime(run.timeMs)}</td>
                     <td>{run.secrets}</td>
                   </tr>

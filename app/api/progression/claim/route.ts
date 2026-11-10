@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { conflictError, requireSession } from '../../../../lib/collectionServer';
 import { loadProgression, progressionStorageError, saveProgression } from '../../../../lib/progressionServer';
-import { getLevel } from '../../../../components/rpg/levels';
+import { getAnyLevel } from '../../../../components/rpg/levels3d';
 import { minimumCreditedMs, runReward } from '../../../../components/rpg/progression';
 
 const CLOCK_TOLERANCE_MS = 1000;
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response;
 
   const body = await req.json().catch(() => null);
-  const level = getLevel(Number(body?.levelId));
+  const level = getAnyLevel(Number(body?.levelId));
   const timeMs = Number(body?.timeMs);
   const usedAbility = Boolean(body?.usedAbility);
   if (!level) return NextResponse.json({ error: 'Invalid level.' }, { status: 400 });
@@ -20,8 +20,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid run time.' }, { status: 400 });
   }
 
-  const reward = runReward(timeMs, level.enemies, usedAbility);
-  const creditedMs = Math.max(timeMs, minimumCreditedMs(level.enemies));
+  const reward = runReward(timeMs, level.enemies, usedAbility, level.parBonusMs);
+  const creditedMs = Math.max(timeMs, minimumCreditedMs(level.enemies, level.parBonusMs));
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const current = await loadProgression(auth.profileId);

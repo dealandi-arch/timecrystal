@@ -12,7 +12,7 @@ interface Entry {
   timeMs: number;
 }
 
-export default function LeaderboardPanel({ levelId }: { levelId: number }) {
+export default function LeaderboardPanel({ levelId, title = 'World’s Best' }: { levelId: number; title?: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
 
   useEffect(() => {
@@ -32,11 +32,11 @@ export default function LeaderboardPanel({ levelId }: { levelId: number }) {
   }, [levelId]);
 
   if (entries === null) return null;
-  if (entries.length === 0) return <div className="leaderboard-panel"><h4>World's Best</h4><p>No runs recorded yet. Be the first.</p></div>;
+  if (entries.length === 0) return <div className="leaderboard-panel"><h4>{title}</h4><p>No runs recorded yet. Be the first.</p></div>;
 
   return (
     <div className="leaderboard-panel">
-      <h4>World&apos;s Best</h4>
+      <h4>{title}</h4>
       {entries.map((entry, i) => (
         <div className="leaderboard-row" key={`${entry.profileId ?? entry.nickname}-${i}`}>
           <span className="leaderboard-rank">{i + 1}.</span>

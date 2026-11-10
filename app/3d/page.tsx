@@ -9,8 +9,9 @@ export default function ThreeDPage() {
       </Link>
       <h1>Time Crystal — 3D Test</h1>
       <p>
-        A first look at the game in 3D, on four maps built for climbing: take the stairs and ladders up onto rooftops and towers, duck behind fences (shots fly over them, feet don’t) and watch the dark corners, where enemies stay hidden until you’re right next to them.
-        Switch the camera between an overview of the whole level and following your hero.
+        Four big maps built for climbing: take the stairs and ladders up onto rooftops and towers, jump (Shift / K) onto ledges and over fences, and
+        watch the dark corners. You only see what’s around you, and high ground lets you see further. Activate your hero’s speciality to see the
+        whole map and unlock the overview camera. Fast clears earn Aizodon and put you on the <Link href="/3d/rank">3D World Rank</Link>.
       </p>
       <TimeCrystalRPG mode="3d" />
     </main>

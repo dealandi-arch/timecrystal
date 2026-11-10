@@ -5,7 +5,7 @@ import { ABILITIES } from './abilities';
 import { type SoundEngine, getSoundEngine } from './audio';
 import TouchControls from './TouchControls';
 import type { CameraMode, Renderer3D } from './Renderer3D';
-import { COLS, FLOOR, ROWS, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
+import { FLOOR, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
 import { getEffectiveLevel, getOverride } from './levelOverrides';
 import { LEVELS_3D } from './levels3d';
 import { canStep, heightAt, isDark, kindAt } from './terrain';
@@ -42,8 +42,6 @@ import SignInBanner from '../profile/SignInBanner';
 import LeaderboardPanel from '../profile/LeaderboardPanel';
 import { formatTime } from '../profile/formatTime';
 
-const WIDTH = COLS * TILE;
-const HEIGHT = ROWS * TILE;
 const MOVE_MS = 150;
 const ATTACK_DURATION_MS = 180;
 const ATTACK_COOLDOWN_MS = 260;
@@ -186,6 +184,8 @@ interface AbilityActive {
   iceAge: boolean;
 }
 
+const VISION_RADIUS = 4.5; // tiles you can see around you on 3D maps (more when standing high)
+
 function isWalkable(level: LevelDef, x: number, y: number, forEnemy: boolean): boolean {
   const row = level.grid[y];
   if (!row) return false;
@@ -244,8 +244,8 @@ function makeEnemies(level: LevelDef): RuntimeEnemy[] {
 // Hidden Emerald Shards: random walkable tiles (secret passages included), never the start tile.
 function pickEmeralds(level: LevelDef): Set<string> {
   const cells: string[] = [];
-  for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
+  for (let y = 0; y < level.grid.length; y++) {
+    for (let x = 0; x < level.grid[y].length; x++) {
       if (isWalkable(level, x, y, false) && !(x === level.start.x && y === level.start.y)) cells.push(`${x},${y}`);
     }
   }
@@ -328,9 +328,18 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
   const [skillWait, setSkillWait] = useState(0); // whole seconds until the skill is ready again
   const useSkillRef = useRef<() => void>(() => {});
   const skillWaitRef = useRef(0);
+  const WIDTH = level.grid[0].length * TILE;
+  const HEIGHT = level.grid.length * TILE;
+  // 3D maps: you only see what's near you unless your speciality is on, and you can jump.
+  const limitedVision = view3d && !!level.terrain;
+  const canJump = view3d && !!level.terrain;
+  const canOverview = !limitedVision || save.powerActivated;
   const view3dRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<Renderer3D | null>(null);
-  const [camera, setCamera] = useState<CameraMode>('overview');
+  const [camera, setCamera] = useState<CameraMode>(view3d && level.terrain ? 'follow' : 'overview');
+  useEffect(() => {
+    if (!canOverview && camera === 'overview') setCamera('follow');
+  }, [canOverview, camera]);
   const [view3dError, setView3dError] = useState<string | null>(null);
   useEffect(() => {
     if (rendererRef.current) rendererRef.current.mode = camera;
@@ -374,6 +383,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     crystal: makeCrystal(level),
     combat: makeCombat(),
     emeralds: pickEmeralds(level),
+    jump: { queued: false, active: false, from: 0, to: 0, cooldown: 0 },
     weaponSlot: (autoWeapon ? 1 : 0) as 0 | 1,
     particles: [] as Particle[],
     discoveredSecrets: new Set<string>(),
@@ -480,6 +490,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
       if (e.key.toLowerCase() === 'q' && !e.repeat) toggleWeaponRef.current();
       if (e.key.toLowerCase() === 'e' && !e.repeat) useSkillRef.current();
+      if ((e.key === 'Shift' || e.key.toLowerCase() === 'k') && !e.repeat) s.jump.queued = true;
     }
     function onKeyUp(e: KeyboardEvent) {
       s.keys.delete(e.key.toLowerCase());
@@ -742,6 +753,37 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     }
     useSkillRef.current = useSkill;
 
+    // Jump (3D maps): up one level onto a ledge, down off any edge, or over a fence to the tile behind it.
+    // With nowhere to land it's a hop on the spot.
+    function tryJump(facing: Dir) {
+      const p = s.player;
+      const { dx, dy } = DIR_VECTORS[facing];
+      const here = heightAt(level, p.gx, p.gy);
+      const landable = (x: number, y: number) => isWalkable(level, x, y, false) && heightAt(level, x, y) <= here + 1 + 1e-6;
+      let tx = p.gx + dx;
+      let ty = p.gy + dy;
+      if (kindAt(level, tx, ty) === 'fence' && level.grid[ty]?.[tx] === FLOOR) {
+        tx += dx;
+        ty += dy;
+      }
+      const occupied = s.enemies.some((e) => e.alive && e.gx === tx && e.gy === ty);
+      if (!landable(tx, ty) || occupied) {
+        tx = p.gx;
+        ty = p.gy;
+      }
+      s.jump.active = true;
+      s.jump.from = here;
+      s.jump.to = heightAt(level, tx, ty);
+      s.jump.cooldown = 0.35;
+      p.fromX = p.gx;
+      p.fromY = p.gy;
+      p.gx = tx;
+      p.gy = ty;
+      p.moving = true;
+      p.moveT = 0;
+      sound.playMenuClick();
+    }
+
     function heldDirection(): Dir | null {
       if (s.keys.has('arrowup') || s.keys.has('w')) return 'up';
       if (s.keys.has('arrowdown') || s.keys.has('s')) return 'down';
@@ -770,7 +812,14 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const dir = heldDirection();
       if (dir) p.facing = dir;
 
+      if (s.jump.cooldown > 0) s.jump.cooldown -= dt;
+      if (!p.moving && s.jump.queued) {
+        s.jump.queued = false;
+        if (canJump && s.jump.cooldown <= 0) tryJump(dir ?? p.facing);
+      }
+      s.jump.queued = false;
       if (!p.moving) {
+        if (s.jump.active) s.jump.active = false;
         if (dir) {
           const { dx, dy } = DIR_VECTORS[dir];
           const nx = p.gx + dx;
@@ -785,7 +834,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           }
         }
       } else {
-        stepEntityMove(p, dt, s.perk.hasteT > 0 ? effectiveStats.moveMs / 1.5 : effectiveStats.moveMs);
+        const walkMs = s.perk.hasteT > 0 ? effectiveStats.moveMs / 1.5 : effectiveStats.moveMs;
+        stepEntityMove(p, dt, s.jump.active ? Math.max(260, walkMs * 1.6) : walkMs);
       }
 
       const perk = activePerks();
@@ -1055,8 +1105,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const floorB = getSpriteCanvas(`floorB:${level.id}`, FLOOR_B, theme.floorBPalette, PIXEL_SIZE);
       const wall = getSpriteCanvas(`wall:${level.id}`, WALL, theme.wallPalette, PIXEL_SIZE);
 
-      for (let y = 0; y < ROWS; y++) {
-        for (let x = 0; x < COLS; x++) {
+      for (let y = 0; y < level.grid.length; y++) {
+        for (let x = 0; x < level.grid[y].length; x++) {
           const tile = level.grid[y][x];
           if (tile === FLOOR) {
             ctx.drawImage((x + y) % 2 === 0 ? floorA : floorB, x * TILE, y * TILE);
@@ -1071,6 +1121,13 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
 
       if (level.terrain) drawTerrain(ctx);
+      sight = computeSight();
+      if (sight) {
+        ctx.fillStyle = 'rgba(3, 5, 14, 0.82)';
+        for (let y = 0; y < level.grid.length; y++) {
+          for (let x = 0; x < level.grid[y].length; x++) if (!sight[y][x]) ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+        }
+      }
 
       const time = performance.now() / 1000;
       const drawPerks = activePerks();
@@ -1078,6 +1135,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         for (const key of s.emeralds) {
           const [ex, ey] = key.split(',').map(Number);
           if (s.skill.radarT <= 0 && Math.max(Math.abs(ex - s.player.gx), Math.abs(ey - s.player.gy)) > (drawPerks.shardSense ?? 0)) continue;
+          if (!canSee(ex, ey)) continue;
           ctx.globalAlpha = 0.45 + Math.sin(time * 6 + ex) * 0.25;
           drawDiamond(ctx, (ex + 0.5) * TILE, (ey + 0.5) * TILE, 6, '#10b981');
           ctx.globalAlpha = 1;
@@ -1200,7 +1258,15 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       const r3d = rendererRef.current;
       if (r3d) {
         r3d.render({
-          player: { key: `player:${characterId}:${appearanceRef.current}`, canvas: playerSprite, x: px / TILE, y: py / TILE, lift: Math.abs(walkBob) / TILE, tint: flashing ? '#f87171' : null },
+          player: {
+            key: `player:${characterId}:${appearanceRef.current}`,
+            canvas: playerSprite,
+            x: px / TILE,
+            y: py / TILE,
+            lift: s.jump.active ? Math.sin(Math.PI * p.moveT) * 0.7 : Math.abs(walkBob) / TILE,
+            groundLevel: s.jump.active ? lerp(s.jump.from, s.jump.to, p.moveT) : undefined,
+            tint: flashing ? '#f87171' : null,
+          },
           enemies: s.enemies.filter((e) => e.alive && !hiddenInDark(e)).map((enemy) => {
             const pos = entityPixelPos(enemy);
             const kind = enemy.isBoss ? 'boss' : enemy.frozen || enemy.stunMs > 0 ? 'frozen' : 'enemy';
@@ -1215,21 +1281,58 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
               hp: enemy.maxHp > 1 ? enemy.hp / enemy.maxHp : undefined,
             };
           }),
-          crystal: { x: crystalPos.x / TILE, y: crystalPos.y / TILE, lift: bob / TILE },
+          crystal: { x: crystalPos.x / TILE, y: crystalPos.y / TILE, lift: bob / TILE, hidden: !canSee(s.crystal.gx, s.crystal.gy) },
+          fog: !!sight,
           openSecrets: s.discoveredSecrets,
         });
       }
     }
 
-    // Enemies in a dark spot can't be seen until you're right next to them (or a radar is on).
+    // Enemies in a dark spot can't be seen until you're right next to them (or a radar is on),
+    // and on 3D maps nothing outside your line of sight shows at all.
     function hiddenInDark(enemy: RuntimeEnemy): boolean {
+      if (!canSee(enemy.gx, enemy.gy)) return true;
       if (!isDark(level, enemy.gx, enemy.gy) || s.skill.radarT > 0) return false;
       return Math.max(Math.abs(enemy.gx - s.player.gx), Math.abs(enemy.gy - s.player.gy)) > 1;
     }
 
+    // ----- limited vision on 3D maps -----
+    // You see a circle around you (bigger the higher you stand), and walls and ledges above you block the view.
+    // The hero's speciality (or a radar) shows the whole map.
+    let sight: boolean[][] | null = null;
+    function canSee(x: number, y: number): boolean {
+      return !sight || !!sight[y]?.[x];
+    }
+    function lineOfSight(x0: number, y0: number, x1: number, y1: number, eye: number): boolean {
+      const steps = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 3);
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const cx = Math.round(x0 + (x1 - x0) * t);
+        const cy = Math.round(y0 + (y1 - y0) * t);
+        if ((cx === x1 && cy === y1) || (cx === x0 && cy === y0)) continue;
+        const tile = level.grid[cy]?.[cx];
+        if (tile !== FLOOR && !(tile === SECRET && s.discoveredSecrets.has(`${cx},${cy}`))) return false;
+        if (heightAt(level, cx, cy) > eye + 0.75) return false;
+      }
+      return true;
+    }
+    function computeSight(): boolean[][] | null {
+      if (!limitedVision || powerActiveRef.current || s.skill.radarT > 0) return null;
+      const p = s.player;
+      const eye = heightAt(level, p.gx, p.gy);
+      const r = VISION_RADIUS + eye * 1.5;
+      return level.grid.map((row, y) =>
+        row.map((_, x) => {
+          const dx = x - p.gx;
+          const dy = y - p.gy;
+          return dx * dx + dy * dy <= r * r && lineOfSight(p.gx, p.gy, x, y, eye);
+        })
+      );
+    }
+
     function drawTerrain(c: CanvasRenderingContext2D) {
-      for (let y = 0; y < ROWS; y++) {
-        for (let x = 0; x < COLS; x++) {
+      for (let y = 0; y < level.grid.length; y++) {
+        for (let x = 0; x < level.grid[y].length; x++) {
           if (level.grid[y][x] !== FLOOR) continue;
           const h = heightAt(level, x, y);
           const kind = kindAt(level, x, y);
@@ -1358,9 +1461,17 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       {view3d && (
         <div className="view3d-bar">
           <span className="view3d-tag">3D test</span>
-          <button className="ability-btn story-skip" onClick={() => setCamera(camera === 'overview' ? 'follow' : 'overview')}>
-            🎥 Camera: {camera === 'overview' ? 'Overview' : 'Follow'}
+          <button
+            className="ability-btn story-skip"
+            disabled={!canOverview}
+            title={canOverview ? undefined : `Activate ${charStats.passiveName} to see the whole map`}
+            onClick={() => setCamera(camera === 'overview' ? 'follow' : 'overview')}
+          >
+            {canOverview ? <>🎥 Camera: {camera === 'overview' ? 'Overview' : 'Follow'}</> : <>🔒 Overview</>}
           </button>
+          {limitedVision && !save.powerActivated && (
+            <span className="view3d-hint">You only see what’s near you. Activate {charStats.passiveName} to see the whole map.</span>
+          )}
         </div>
       )}
       <div className={`rpg-canvas-wrap${view3d ? ' is-3d' : ''}`}>
@@ -1384,7 +1495,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
                     : reward.reason}
               </p>
             )}
-            {!signedIn && !view3d && <p className="run-reward">Sign in to earn Aizodon and level up your heroes.</p>}
+            {!signedIn && <p className="run-reward">Sign in to earn Aizodon and level up your heroes.</p>}
             <p>
               Time: {formatTime(runStats.timeMs)} &nbsp;·&nbsp; Secrets found: {runStats.secrets}
               {(() => {
@@ -1393,8 +1504,12 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
               })()}
             </p>
             {runStats.usedAbility && <p className="ability-disqualified-note">A help ability was used on this level, so this run will not count toward the world record.</p>}
-            {!view3d && <LeaderboardPanel levelId={level.id} />}
-            {view3d && <p className="gacha-fine">3D test maps don’t earn Aizodon or go on the World’s Best list yet.</p>}
+            <LeaderboardPanel levelId={level.id} title={view3d ? '3D World Rank' : undefined} />
+            {view3d && (
+              <p className="gacha-fine">
+                <a href="/3d/rank" target="_blank" rel="noreferrer">See the full 3D World Rank ↗</a>
+              </p>
+            )}
             <button
               onClick={() => {
                 sound.playMenuClick();
@@ -1417,10 +1532,11 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           skillReady={skillWait <= 0}
           skillWait={skillWait}
           onSkill={() => useSkillRef.current()}
+          onJump={canJump ? () => (stateRef.current.jump.queued = true) : undefined}
         />
       )}
       <p className="game-controls">
-        <span className="keyboard-hint">Move: Arrow keys / WASD &nbsp;·&nbsp; Attack: Space / J &nbsp;·&nbsp; Switch weapon: Q &nbsp;·&nbsp; Skill: E &nbsp;·&nbsp; </span>
+        <span className="keyboard-hint">Move: Arrow keys / WASD &nbsp;·&nbsp; Attack: Space / J &nbsp;·&nbsp; {canJump && <>Jump: Shift / K &nbsp;·&nbsp; </>}Switch weapon: Q &nbsp;·&nbsp; Skill: E &nbsp;·&nbsp; </span>
         Clear every enemy, then catch the crystal. Five Emerald Shards are hidden on random tiles — step on them to collect.
       </p>
     </div>
@@ -1589,8 +1705,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
-    // 3D test runs are kept off the World's Best list.
-    if (profile && !is3d) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
+    if (profile) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
     updateSave({
       ...currentSave,
       crystalsCollected: currentSave.crystalsCollected + 1,
@@ -1743,7 +1858,7 @@ export default function TimeCrystalRPG({ mode = 'classic' }: { mode?: 'classic' 
             skill={signedIn ? equippedSkill(save.characterId ?? 'wanderer') : null}
             view3d={is3d}
             signedIn={signedIn}
-            onRunFinished={(stats) => (is3d ? Promise.resolve(null) : claimRun(level.id, stats.timeMs, stats.usedAbility))}
+            onRunFinished={(stats) => claimRun(level.id, stats.timeMs, stats.usedAbility)}
             autoWeapon={settings.autoWeapon}
             paused={settingsOpen}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}

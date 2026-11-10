@@ -39,7 +39,8 @@ export interface LevelDef {
   enemies: EnemyDef[];
   crystalPath: Point[];
   themeIndex?: number; // which look to use, if not the one for its level number
-  terrain?: Terrain; // heights, stairs, ladders, fences and dark spots (3D maps)
+  terrain?: Terrain;
+  parBonusMs?: number; // extra target time for big maps, used for Aizodon ranks // heights, stairs, ladders, fences and dark spots (3D maps)
 }
 
 // Each stage's data lives in ./data/levelN.json. Edit those files directly (or paste in

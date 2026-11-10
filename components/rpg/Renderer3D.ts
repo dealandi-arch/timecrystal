@@ -3,7 +3,7 @@
 // Walls are raised into blocks, and the hero, enemies and crystal stand upright as sprites.
 
 import * as THREE from 'three';
-import { COLS, FLOOR, ROWS, SECRET, type LevelDef } from './levels';
+import { FLOOR, SECRET, type LevelDef } from './levels';
 import { heightAt, isDark, kindAt } from './terrain';
 
 const UNIT = 0.5; // world height of one terrain level
@@ -15,7 +15,8 @@ export interface Actor3D {
   canvas: HTMLCanvasElement;
   x: number; // tile units, top-left of the tile
   y: number;
-  lift?: number; // extra height (bobbing)
+  lift?: number; // extra height (bobbing, jumping)
+  groundLevel?: number; // terrain level to stand on, when it isn't the tile underneath (mid-jump)
   tint?: string | null; // flash colour while hurt
   hp?: number; // 0..1 health bar, if shown
 }
@@ -23,7 +24,8 @@ export interface Actor3D {
 export interface Frame3D {
   player: Actor3D;
   enemies: Actor3D[];
-  crystal: { x: number; y: number; lift: number };
+  crystal: { x: number; y: number; lift: number; hidden?: boolean };
+  fog?: boolean; // limited vision: fade out the distance
   openSecrets: Set<string>; // secret walls the hero has found ("x,y")
 }
 
@@ -65,7 +67,10 @@ function pixelTexture(source: HTMLCanvasElement): THREE.CanvasTexture {
 export class Renderer3D {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(42, COLS / ROWS, 0.1, 100);
+  private camera = new THREE.PerspectiveCamera(42, 1.5, 0.1, 200);
+  private cols: number;
+  private rows: number;
+  private fog = new THREE.Fog(0x05060f, 6.5, 13);
   private floorTexture: THREE.CanvasTexture;
   private secretBlocks = new Map<string, THREE.Mesh>();
   private materials = new Map<string, THREE.SpriteMaterial>();
@@ -91,6 +96,8 @@ export class Renderer3D {
   }
 
   constructor(private container: HTMLElement, private level: LevelDef, wallSource: HTMLCanvasElement, floorSource: HTMLCanvasElement) {
+    this.cols = level.grid[0].length;
+    this.rows = level.grid.length;
     this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x05060f);
@@ -112,12 +119,12 @@ export class Renderer3D {
     this.textures.push(wallTexture);
     const wallMaterial = new THREE.MeshLambertMaterial({ map: wallTexture });
     let top = 0;
-    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) top = Math.max(top, heightAt(level, x, y) * UNIT);
+    for (let y = 0; y < this.rows; y++) for (let x = 0; x < this.cols; x++) top = Math.max(top, heightAt(level, x, y) * UNIT);
     const WALL_HEIGHT = Math.max(0.75, top + 0.6);
     const box = new THREE.BoxGeometry(1, WALL_HEIGHT, 1);
     const solid: [number, number][] = [];
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
         const tile = level.grid[y]?.[x];
         if (tile === FLOOR) continue;
         if (tile === SECRET) {
@@ -133,7 +140,7 @@ export class Renderer3D {
     // The front row stays low so it never hides the hero from the camera.
     const FRONT = 0.75;
     solid.forEach(([x, y], i) => {
-      const h = y === ROWS - 1 ? FRONT : WALL_HEIGHT;
+      const h = y === this.rows - 1 ? FRONT : WALL_HEIGHT;
       walls.setMatrixAt(i, m.makeTranslation(x + 0.5, h / 2, y + 0.5).multiply(new THREE.Matrix4().makeScale(1, h / WALL_HEIGHT, 1)));
     });
     this.scene.add(walls);
@@ -159,6 +166,8 @@ export class Renderer3D {
     const pos: number[] = [];
     const uv: number[] = [];
     const index: number[] = [];
+    const COLS = this.cols;
+    const ROWS = this.rows;
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         if (this.level.grid[y]?.[x] !== FLOOR) continue;
@@ -192,8 +201,8 @@ export class Renderer3D {
       return mesh;
     };
     const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
         if (level.grid[y]?.[x] !== FLOOR) continue;
         const h = heightAt(level, x, y);
         const kind = kindAt(level, x, y);
@@ -276,7 +285,8 @@ export class Renderer3D {
   private place(sprite: THREE.Sprite, actor: Actor3D) {
     sprite.material = this.material(actor.key, actor.canvas);
     sprite.material.color.set(actor.tint ?? '#ffffff');
-    sprite.position.set(actor.x + 0.5, this.groundAt(actor.x, actor.y) + (actor.lift ?? 0), actor.y + 0.5);
+    const ground = actor.groundLevel !== undefined ? actor.groundLevel * UNIT : this.groundAt(actor.x, actor.y);
+    sprite.position.set(actor.x + 0.5, ground + (actor.lift ?? 0), actor.y + 0.5);
     sprite.visible = true;
   }
 
@@ -309,16 +319,20 @@ export class Renderer3D {
         bar.quaternion.copy(this.camera.quaternion);
       }
     });
+    this.crystalSprite.visible = !frame.crystal.hidden;
     this.crystalSprite.position.set(frame.crystal.x + 0.5, this.groundAt(frame.crystal.x, frame.crystal.y) + 0.45 + frame.crystal.lift, frame.crystal.y + 0.5);
 
     // Overview tilts over the whole board; follow sits close behind the hero.
     const px = frame.player.x + 0.5;
     const pz = frame.player.y + 0.5;
+    this.scene.fog = frame.fog && this.mode === 'follow' ? this.fog : null;
     if (this.mode === 'overview') {
-      this.camPos.set(COLS / 2, 12.5, ROWS + 7);
-      this.camTarget.set(COLS / 2, 0, ROWS / 2 - 0.3);
+      // Pull back further on bigger maps so the whole board fits.
+      const k = Math.max(this.cols / 15, this.rows / 10);
+      this.camPos.set(this.cols / 2, 12.5 * k, this.rows / 2 + 12 * k);
+      this.camTarget.set(this.cols / 2, 0, this.rows / 2 - 0.3);
     } else {
-      const ground = this.groundAt(frame.player.x, frame.player.y);
+      const ground = frame.player.groundLevel !== undefined ? frame.player.groundLevel * UNIT : this.groundAt(frame.player.x, frame.player.y);
       this.camPos.set(px, ground + 6, pz + 3.6);
       this.camTarget.set(px, ground + 0.3, pz - 0.6);
     }

@@ -15,6 +15,7 @@ export default function Home() {
           <Link href="/gacha">Gacha</Link>
           <Link href="/level-up">Level up</Link>
           <Link href="/3d">3D test</Link>
+          <Link href="/3d/rank">3D World Rank</Link>
           <Link href="/editor">Stage editor</Link>
           <Link href="#features">Explore features</Link>
         </div>

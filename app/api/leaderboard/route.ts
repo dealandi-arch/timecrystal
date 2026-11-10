@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from '../../../lib/supabase';
+import { isRankedLevelId } from '../../../components/rpg/levels3d';
 import { BASE_PUBLIC, WITH_AVATAR, selectWithFallback } from '../../../lib/profileFields';
 
 export async function GET(req: NextRequest) {
   if (!isBackendConfigured()) return NextResponse.json({ entries: [] });
 
   const levelId = Number(req.nextUrl.searchParams.get('levelId'));
-  if (!Number.isInteger(levelId) || levelId < 1 || levelId > 11) {
+  if (!isRankedLevelId(levelId)) {
     return NextResponse.json({ error: 'Invalid levelId.' }, { status: 400 });
   }
 
