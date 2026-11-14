@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from '../../../../lib/supabase';
-import { PROFILE_PAGE_EXTRAS, selectWithFallback } from '../../../../lib/profileFields';
+import { PROFILE_PAGE_EXTRAS, selectWithFallback, shownNameOf } from '../../../../lib/profileFields';
 
 const BASE = 'id, nickname, avatar_color, created_at';
 
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const supabase = getSupabase();
   const { data } = await selectWithFallback(
     (columns) => supabase.from('profiles').select(columns).eq('id', params.id).maybeSingle(),
+    `${BASE}, display_name, display_name_changed_at, ${PROFILE_PAGE_EXTRAS}`,
     `${BASE}, ${PROFILE_PAGE_EXTRAS}`,
     BASE
   );
@@ -17,6 +18,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const profile = data as unknown as {
     id: string;
     nickname: string;
+    display_name?: string | null;
+    display_name_changed_at?: string | null;
     avatar_color: string;
     created_at: string;
     avatar_pixels?: string | null;
@@ -36,6 +39,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     profile: {
       id: profile.id,
       nickname: profile.nickname,
+      displayName: shownNameOf(profile),
+      nameChangedAt: profile.display_name_changed_at ?? null,
       avatarColor: profile.avatar_color,
       createdAt: profile.created_at,
       avatarPixels: profile.avatar_pixels ?? null,

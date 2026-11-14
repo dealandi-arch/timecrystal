@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from '../../../lib/supabase';
 import { isRankedLevelId } from '../../../components/rpg/levels3d';
-import { BASE_PUBLIC, WITH_AVATAR, selectWithFallback } from '../../../lib/profileFields';
+import { customLevelForRuns } from '../../../lib/customLevelsServer';
+import { BASE_PUBLIC, WITH_AVATAR, WITH_NAME, selectWithFallback, shownNameOf } from '../../../lib/profileFields';
 
 export async function GET(req: NextRequest) {
   if (!isBackendConfigured()) return NextResponse.json({ entries: [] });
 
   const levelId = Number(req.nextUrl.searchParams.get('levelId'));
-  if (!isRankedLevelId(levelId)) {
+  if (!isRankedLevelId(levelId) && !(await customLevelForRuns(levelId, null))) {
     return NextResponse.json({ error: 'Invalid levelId.' }, { status: 400 });
   }
 
@@ -20,13 +21,14 @@ export async function GET(req: NextRequest) {
         .eq('level_id', levelId)
         .order('time_ms', { ascending: true })
         .limit(50),
+    WITH_NAME,
     WITH_AVATAR,
     BASE_PUBLIC
   );
 
   if (error) return NextResponse.json({ error: 'Could not load leaderboard.' }, { status: 500 });
 
-  type LeaderProfile = { id: string; nickname: string; avatar_color: string; avatar_pixels?: string | null };
+  type LeaderProfile = { id: string; nickname: string; display_name?: string | null; avatar_color: string; avatar_pixels?: string | null };
   type Row = {
     time_ms: number;
     kills: number;
@@ -40,6 +42,7 @@ export async function GET(req: NextRequest) {
     return {
       profileId: profile?.id ?? null,
       nickname: profile?.nickname ?? 'Unknown',
+      displayName: shownNameOf(profile),
       avatarColor: profile?.avatar_color ?? '#888888',
       avatarPixels: profile?.avatar_pixels ?? null,
       timeMs: row.time_ms,

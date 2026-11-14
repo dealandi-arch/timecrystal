@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { getAnyLevel } from '../../../components/rpg/levels3d';
+import { CUSTOM_ID_OFFSET } from '../../../components/rpg/customLevels';
 import { formatTime } from '../../../components/profile/formatTime';
 import Avatar from '../../../components/profile/Avatar';
 import AvatarEditor from '../../../components/profile/AvatarEditor';
+import DisplayNameEditor from '../../../components/profile/DisplayNameEditor';
 import { useProfile } from '../../../components/profile/ProfileContext';
 import { CHARACTERS } from '../../../components/rpg/pixelArt';
 import { RARITY_INFO, rarityOf } from '../../../components/rpg/gacha';
@@ -23,7 +25,9 @@ interface RunRow {
 
 interface ProfileData {
   id: string;
-  nickname: string;
+  nickname: string; // username, never changes
+  displayName?: string;
+  nameChangedAt?: string | null;
   avatarColor: string;
   createdAt: string;
   avatarPixels: string | null;
@@ -50,7 +54,7 @@ function lastOnline(iso: string | null): string {
 
 export default function ProfileViewPage() {
   const params = useParams<{ id: string }>();
-  const { profile: me, setAvatar } = useProfile();
+  const { profile: me, setAvatar, setDisplayName } = useProfile();
   const [profile, setProfile] = useState<ProfileData | null | undefined>(undefined);
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [editing, setEditing] = useState(false);
@@ -105,10 +109,22 @@ export default function ProfileViewPage() {
       {profile && (
         <>
           <div className="profile-header">
-            <Avatar nickname={profile.nickname} color={profile.avatarColor} pixels={profile.avatarPixels} size={96} />
+            <Avatar nickname={profile.displayName ?? profile.nickname} color={profile.avatarColor} pixels={profile.avatarPixels} size={96} />
             <div>
-              <h1 style={{ margin: 0 }}>{profile.nickname}</h1>
-              <span style={{ opacity: 0.6 }}>#{profile.id}</span>
+              <h1 style={{ margin: 0 }}>{profile.displayName ?? profile.nickname}</h1>
+              <span className="profile-username">
+                @{profile.nickname} · #{profile.id}
+              </span>
+              {isMe && (
+                <DisplayNameEditor
+                  current={profile.displayName ?? profile.nickname}
+                  changedAt={profile.nameChangedAt ?? null}
+                  onSaved={(displayName, changedAt) => {
+                    setProfile((p) => (p ? { ...p, displayName, nameChangedAt: changedAt } : p));
+                    setDisplayName(displayName, changedAt);
+                  }}
+                />
+              )}
               {isMe && (
                 <div>
                   <button className="ability-btn profile-edit-avatar" onClick={() => setEditing(true)}>
@@ -180,7 +196,7 @@ export default function ProfileViewPage() {
               <tbody>
                 {runs.map((run) => (
                   <tr key={run.levelId}>
-                    <td>{getAnyLevel(run.levelId)?.name ?? `Level ${run.levelId}`}</td>
+                    <td>{run.levelId > CUSTOM_ID_OFFSET ? <a href={`/levels/${run.levelId - CUSTOM_ID_OFFSET}`}>Public level #{run.levelId - CUSTOM_ID_OFFSET}</a> : getAnyLevel(run.levelId)?.name ?? `Level ${run.levelId}`}</td>
                     <td>{formatTime(run.timeMs)}</td>
                     <td>{run.secrets}</td>
                   </tr>
@@ -190,7 +206,7 @@ export default function ProfileViewPage() {
           )}
           {editing && (
             <AvatarEditor
-              nickname={profile.nickname}
+              nickname={profile.displayName ?? profile.nickname}
               color={profile.avatarColor}
               pixels={profile.avatarPixels}
               onSave={saveAvatar}

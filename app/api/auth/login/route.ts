@@ -20,21 +20,22 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabase();
   const { data, upToDate } = await selectWithFallback(
     (columns) => supabase.from('profiles').select(columns).ilike('nickname', nickname).maybeSingle(),
-    'id, nickname, password_hash, avatar_color, avatar_pixels',
+    'id, nickname, password_hash, avatar_color, avatar_pixels, last_seen_at, display_name, display_name_changed_at',
+    'id, nickname, password_hash, avatar_color, avatar_pixels, last_seen_at',
     'id, nickname, password_hash, avatar_color'
   );
-  const profile = data as unknown as { id: string; nickname: string; password_hash: string; avatar_color: string; avatar_pixels?: string | null } | null;
+  const profile = data as unknown as { id: string; nickname: string; display_name?: string | null; display_name_changed_at?: string | null; password_hash: string; avatar_color: string; avatar_pixels?: string | null } | null;
 
   if (!profile) return NextResponse.json({ error: 'Nickname or password is incorrect.' }, { status: 401 });
 
   const ok = await bcrypt.compare(password, profile.password_hash);
   if (!ok) return NextResponse.json({ error: 'Nickname or password is incorrect.' }, { status: 401 });
 
-  if (upToDate) await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', profile.id);
+  if (upToDate || (profile && 'last_seen_at' in profile)) await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', profile.id);
 
   const token = createSessionToken({ id: profile.id, nickname: profile.nickname });
   const res = NextResponse.json({
-    profile: { id: profile.id, nickname: profile.nickname, avatarColor: profile.avatar_color, avatarPixels: profile.avatar_pixels ?? null }
+    profile: { id: profile.id, nickname: profile.nickname, displayName: profile.display_name?.trim() || profile.nickname, nameChangedAt: profile.display_name_changed_at ?? null, avatarColor: profile.avatar_color, avatarPixels: profile.avatar_pixels ?? null }
   });
   res.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,

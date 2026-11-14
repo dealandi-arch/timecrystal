@@ -88,6 +88,7 @@ const HERO_PERKS: Record<string, PerkKind[]> = {
   briar: ['magnet', 'regen'],
   wraith: ['dodge', 'frenzy'],
   gamer: ['echoShot', 'overcharge'],
+  ovenhead: ['regen', 'thorns'],
   jbsoo: ['knockback', 'stunTouch'],
   leboro: ['deathBurst', 'frenzy', 'lastStand'],
   parkster: ['killHaste', 'magnet', 'dodge'],

@@ -56,3 +56,16 @@ create table if not exists custom_levels (
 );
 create index if not exists custom_levels_created_idx on custom_levels (created_at desc);
 create index if not exists custom_levels_author_idx on custom_levels (author_id);
+
+-- Update 10: public level verification (safe to re-run).
+-- A new public level stays hidden until its creator beats it once; verified_at is when they did,
+-- verify_time_ms their clear time. Each verified level also gets its own World's Best list in best_runs
+-- (level_id = 100000 + the level's id).
+alter table custom_levels add column if not exists verified_at timestamptz;
+alter table custom_levels add column if not exists verify_time_ms int;
+create index if not exists custom_levels_verified_idx on custom_levels (verified_at);
+
+-- Update 10: display names (safe to re-run). nickname stays the permanent username used to log in;
+-- display_name is what everyone sees (null = show the username). It can change once every 5 days.
+alter table profiles add column if not exists display_name text;
+alter table profiles add column if not exists display_name_changed_at timestamptz;

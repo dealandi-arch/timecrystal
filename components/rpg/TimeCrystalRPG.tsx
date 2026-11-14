@@ -5,8 +5,9 @@ import { ABILITIES } from './abilities';
 import { type SoundEngine, getSoundEngine } from './audio';
 import TouchControls from './TouchControls';
 import type { CameraMode, Renderer3D } from './Renderer3D';
-import { FLOOR, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS } from './levels';
-import { getEffectiveLevel, getOverride } from './levelOverrides';
+import { FLOOR, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS, getLevel } from './levels';
+import { getTestLevel } from './testLevels';
+import { customRewardWeight } from './customLevels';
 import { LEVELS_3D, isRankedLevelId } from './levels3d';
 import { canStep, heightAt, isDark, kindAt } from './terrain';
 import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
@@ -242,7 +243,7 @@ function makeEnemies(level: LevelDef): RuntimeEnemy[] {
 }
 
 // Hidden Emerald Shards: random walkable tiles (secret passages included), never the start tile.
-function pickEmeralds(level: LevelDef): Set<string> {
+function pickEmeralds(level: LevelDef, count = SHARDS_PER_LEVEL): Set<string> {
   const cells: string[] = [];
   for (let y = 0; y < level.grid.length; y++) {
     for (let x = 0; x < level.grid[y].length; x++) {
@@ -253,7 +254,7 @@ function pickEmeralds(level: LevelDef): Set<string> {
     const j = Math.floor(Math.random() * (i + 1));
     [cells[i], cells[j]] = [cells[j], cells[i]];
   }
-  return new Set(cells.slice(0, SHARDS_PER_LEVEL));
+  return new Set(cells.slice(0, count));
 }
 
 // Speciality perk timers and counters; reset when the level restarts.
@@ -310,11 +311,14 @@ interface LevelRunnerProps {
   skill: SkillDef | null;
   view3d?: boolean;
   onRunFinished: (stats: LevelRunStats) => Promise<ClaimResult | null>;
-  ranked?: boolean; // on a World's Best list (public levels aren't)
+  ranked?: boolean; // on a World's Best list
+  shardCount?: number; // hidden Emerald Shards in this level
+  rankTitle?: string;
+  rankLink?: { href: string; label: string }; // the full ranking this level belongs to
   signedIn: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn, ranked = true }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn, ranked = true, rankTitle, rankLink, shardCount = SHARDS_PER_LEVEL }: LevelRunnerProps) {
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
   const baseSignature = getSignatureWeapon(charDef.id);
@@ -383,7 +387,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     enemies: makeEnemies(level),
     crystal: makeCrystal(level),
     combat: makeCombat(),
-    emeralds: pickEmeralds(level),
+    emeralds: pickEmeralds(level, shardCount),
     jump: { queued: false, active: false, from: 0, to: 0, cooldown: 0 },
     weaponSlot: (autoWeapon ? 1 : 0) as 0 | 1,
     particles: [] as Particle[],
@@ -1449,7 +1453,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, effectiveMaxHp - hp))}</span>
         <span>Enemies left: {enemiesLeft}</span>
         <span className="emerald-count" title="Hidden Emerald Shards found in this level">
-          💎 {emeraldsFound}/{SHARDS_PER_LEVEL}
+          💎 {emeraldsFound}/{shardCount}
         </span>
         <button className="ability-btn weapon-btn" onClick={toggleWeapon} title={currentWeapon.desc} style={{ borderColor: currentWeapon.color }}>
           ⚔ {currentWeapon.name} <kbd>Q</kbd>
@@ -1499,7 +1503,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
             <h2>{level.isBoss ? 'The Time Crystal Is Whole Again' : 'Crystal Secured'}</h2>
             <p>{level.isBoss ? 'You defeated the guardian and restored the final shard.' : 'On to the next level.'}</p>
             <p>
-              Emerald Shards found: {emeraldsFound}/{SHARDS_PER_LEVEL}
+              Emerald Shards found: {emeraldsFound}/{shardCount}
             </p>
             {reward?.secret && <SecretObtained heroId={reward.secret} appearance={appearance} />}
             {signedIn && reward && (reward.earned > 0 || reward.pending || reward.reason) && (
@@ -1520,10 +1524,17 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
               })()}
             </p>
             {runStats.usedAbility && <p className="ability-disqualified-note">A help ability was used on this level, so this run will not count toward the world record.</p>}
-            {ranked && <LeaderboardPanel levelId={level.id} title={view3d ? '3D World Rank' : undefined} />}
-            {ranked && view3d && (
+            {ranked && <LeaderboardPanel levelId={level.id} title={rankTitle ?? (view3d ? '3D World Rank' : undefined)} />}
+            {ranked && (rankLink ?? (view3d ? { href: '/3d/rank', label: 'See the full 3D World Rank' } : null)) && (
               <p className="gacha-fine">
-                <a href="/3d/rank" target="_blank" rel="noreferrer">See the full 3D World Rank ↗</a>
+                {(() => {
+                  const link = rankLink ?? { href: '/3d/rank', label: 'See the full 3D World Rank' };
+                  return (
+                    <a href={link.href} target="_blank" rel="noreferrer">
+                      {link.label} ↗
+                    </a>
+                  );
+                })()}
               </p>
             )}
             <button
@@ -1715,11 +1726,21 @@ export interface CustomPlay {
   levels: LevelDef[]; // played in order
   heroes?: string[]; // only these heroes can be picked (events)
   customLevelId?: number; // a published public level: rewards are claimed against it
+  ownLevel?: boolean; // the player made it: no Emerald Shards (they could replay it for free shards)
+  rank?: { title: string; link: { href: string; label: string } }; // which ranking the runs go on
   rewards?: boolean; // false for test plays in the level builder
   finale: { title: string; text: string };
 }
 
-export default function TimeCrystalRPG({ mode = 'classic', custom }: { mode?: 'classic' | 'story' | '3d' | 'custom'; custom?: CustomPlay }) {
+export default function TimeCrystalRPG({
+  mode = 'classic',
+  custom,
+  testLevels = false,
+}: {
+  mode?: 'classic' | 'story' | '3d' | 'custom';
+  custom?: CustomPlay;
+  testLevels?: boolean; // automated tests only (server started with TC_TEST_LEVELS=1)
+}) {
   const is3d = mode === '3d';
   const customLevels = mode === 'custom' ? custom?.levels ?? [] : null;
   const levelCount = customLevels ? customLevels.length : is3d ? LEVELS_3D.length : TOTAL_LEVELS; // the 3D test has its own climbable maps
@@ -1736,7 +1757,7 @@ export default function TimeCrystalRPG({ mode = 'classic', custom }: { mode?: 'c
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
-    if (profile && isRankedLevelId(level.id) && !custom?.customLevelId) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
+    if (profile && (isRankedLevelId(level.id) || custom?.customLevelId)) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
     updateSave({
       ...currentSave,
       crystalsCollected: currentSave.crystalsCollected + 1,
@@ -1788,6 +1809,7 @@ export default function TimeCrystalRPG({ mode = 'classic', custom }: { mode?: 'c
   }
 
   // Aizodon for the run, and the 1% Secret hero roll (on the server when signed in, here for guests).
+  // Builder test plays never count.
   async function finishRun(level: LevelDef, stats: LevelRunStats): Promise<ClaimResult | null> {
     if (custom && custom.rewards === false) return null;
     if (signedIn) {
@@ -1872,7 +1894,16 @@ export default function TimeCrystalRPG({ mode = 'classic', custom }: { mode?: 'c
     );
   } else if (save) {
     const map3d = is3d ? LEVELS_3D[save.currentLevel - 1] : undefined;
-    const level = customLevels ? customLevels[save.currentLevel - 1] : map3d ? (getOverride(map3d.id) ?? map3d) : getEffectiveLevel(save.currentLevel);
+    // Always the original levels (test levels only on a test server, see testLevels.ts).
+    const builtIn = map3d ?? getLevel(save.currentLevel);
+    const level = customLevels ? customLevels[save.currentLevel - 1] : (testLevels && builtIn ? getTestLevel(builtIn.id) : undefined) ?? builtIn;
+    // No shards on builder test plays or your own public level; fewer on small public levels.
+    const shardCount =
+      custom?.rewards === false || custom?.ownLevel
+        ? 0
+        : custom?.customLevelId && level
+          ? Math.round(SHARDS_PER_LEVEL * customRewardWeight(level.enemies))
+          : SHARDS_PER_LEVEL;
     if (level) {
       const theme = LEVEL_THEMES[Math.min(level.themeIndex ?? level.id - 1, LEVEL_THEMES.length - 1)];
       const chapterTitle = isStory ? getChapterTitle(level.id - 1) : undefined;
@@ -1903,7 +1934,10 @@ export default function TimeCrystalRPG({ mode = 'classic', custom }: { mode?: 'c
             skill={signedIn ? equippedSkill(save.characterId ?? 'wanderer') : null}
             view3d={is3d || !!level.terrain}
             signedIn={signedIn}
-            ranked={isRankedLevelId(level.id) && !custom?.customLevelId}
+            ranked={isRankedLevelId(level.id) || !!custom?.customLevelId}
+            shardCount={shardCount}
+            rankTitle={custom?.rank?.title ?? (custom?.customLevelId ? 'Level Rank' : undefined)}
+            rankLink={custom?.rank?.link ?? (custom?.customLevelId ? { href: '/levels/rank', label: 'See the Public Levels Rank' } : undefined)}
             onRunFinished={(stats) => finishRun(level, stats)}
             autoWeapon={settings.autoWeapon}
             paused={settingsOpen}
@@ -1958,7 +1992,7 @@ export function SecretObtained({ heroId, appearance }: { heroId: string; appeara
   return (
     <div className="secret-obtained" role="status">
       <h3>✨ Obtained {hero.name}! ✨</h3>
-      <p className="gacha-fine">A Secret hero — they’re yours to keep and now appear in your hero list.</p>
+      <p className="gacha-fine">A Secret hero. This hero is yours to keep and now appears in your hero list.</p>
       <div className="secret-card rarity-secret">
         <span className="rarity-badge" style={{ background: RARITY_INFO.secret.color }}>{RARITY_INFO.secret.name}</span>
         <div className="char-portrait">

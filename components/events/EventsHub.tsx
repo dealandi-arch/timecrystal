@@ -33,7 +33,7 @@ export default function EventsHub() {
     const result = startTrial(reward.heroId, reward.days);
     setCodeMessage(
       result.ok
-        ? { ok: true, text: `${heroName(reward.heroId)} unlocked for ${formatTrialLeft(result.value)}! Pick them from the hero list.` }
+        ? { ok: true, text: `${heroName(reward.heroId)} unlocked for ${formatTrialLeft(result.value)}! Pick that hero from the hero list.` }
         : { ok: false, text: result.error }
     );
   }
@@ -45,6 +45,11 @@ export default function EventsHub() {
 
   return (
     <div className="events">
+      <p>
+        <Link className="event-play" href="/events/rank">
+          🏆 Event Rank
+        </Link>
+      </p>
       <section className="event-card event-parkster">
         <span className="rarity-badge" style={{ background: RARITY_INFO[rarityOf('parkster')].color }}>{RARITY_INFO[rarityOf('parkster')].name} hero</span>
         <h2>🏃 {PARKSTER_TRYOUT.title}</h2>

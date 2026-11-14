@@ -4,7 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 export interface Profile {
   id: string;
-  nickname: string;
+  nickname: string; // username: permanent, used to log in
+  displayName?: string; // what everyone sees
+  nameChangedAt?: string | null;
   avatarColor: string;
   avatarPixels?: string | null;
 }
@@ -21,6 +23,7 @@ interface ProfileContextValue {
   logIn: (nickname: string, password: string) => Promise<AuthResult>;
   logOut: () => Promise<void>;
   setAvatar: (pixels: string | null, color: string) => void;
+  setDisplayName: (displayName: string, changedAt: string) => void;
   submitRun: (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean) => Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean } | null>;
 }
 
@@ -47,6 +50,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const setAvatar = useCallback((pixels: string | null, color: string) => {
     setProfile((p) => (p ? { ...p, avatarPixels: pixels, avatarColor: color } : p));
+  }, []);
+
+  const setDisplayName = useCallback((displayName: string, changedAt: string) => {
+    setProfile((p) => (p ? { ...p, displayName, nameChangedAt: changedAt } : p));
   }, []);
 
   useEffect(() => {
@@ -108,8 +115,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ profile, loading, signUp, logIn, logOut, submitRun, setAvatar }),
-    [profile, loading, signUp, logIn, logOut, submitRun, setAvatar]
+    () => ({ profile, loading, signUp, logIn, logOut, submitRun, setAvatar, setDisplayName }),
+    [profile, loading, signUp, logIn, logOut, submitRun, setAvatar, setDisplayName]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

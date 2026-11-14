@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import WalletBar from '../components/profile/WalletBar';
+import { WhatsNewButton } from '../components/UpdateLog';
 
 export default function Home() {
   return (
@@ -8,6 +9,7 @@ export default function Home() {
         <h1>Time Crystal</h1>
         <p>Welcome to your new Next.js website. Start building your game hub here.</p>
         <WalletBar />
+        <WhatsNewButton />
         <div className="actions">
           <Link href="/play">Play the game</Link>
           <Link href="/story">Story mode</Link>
@@ -18,7 +20,6 @@ export default function Home() {
           <Link href="/level-up">Level up</Link>
           <Link href="/3d">3D test</Link>
           <Link href="/3d/rank">3D World Rank</Link>
-          <Link href="/editor">Stage editor</Link>
           <Link href="#features">Explore features</Link>
         </div>
       </section>

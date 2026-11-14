@@ -7,6 +7,7 @@ import Avatar from '../../components/profile/Avatar';
 interface SearchResult {
   id: string;
   nickname: string;
+  displayName?: string;
   avatarColor: string;
   avatarPixels?: string | null;
 }
@@ -39,7 +40,7 @@ export default function ProfilesBrowsePage() {
       <div className="profile-search">
         <input
           type="text"
-          placeholder="Search by nickname..."
+          placeholder="Search by name..."
           value={query}
           onChange={(e) => search(e.target.value)}
         />
@@ -49,8 +50,9 @@ export default function ProfilesBrowsePage() {
       {results &&
         results.map((p) => (
           <Link key={p.id} href={`/profiles/${p.id}`} className="profile-result-row">
-            <Avatar nickname={p.nickname} color={p.avatarColor} pixels={p.avatarPixels} size={32} />
-            <span>{p.nickname}</span>
+            <Avatar nickname={p.displayName ?? p.nickname} color={p.avatarColor} pixels={p.avatarPixels} size={32} />
+            <span>{p.displayName ?? p.nickname}</span>
+            {p.displayName && p.displayName !== p.nickname && <span className="profile-username">@{p.nickname}</span>}
             <span style={{ opacity: 0.6, marginLeft: 'auto' }}>#{p.id}</span>
           </Link>
         ))}

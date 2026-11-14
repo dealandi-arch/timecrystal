@@ -7,6 +7,7 @@ import Avatar from './Avatar';
 interface Entry {
   profileId: string | null;
   nickname: string;
+  displayName?: string;
   avatarColor: string;
   avatarPixels?: string | null;
   timeMs: number;
@@ -40,8 +41,8 @@ export default function LeaderboardPanel({ levelId, title = 'World’s Best' }: 
       {entries.map((entry, i) => (
         <div className="leaderboard-row" key={`${entry.profileId ?? entry.nickname}-${i}`}>
           <span className="leaderboard-rank">{i + 1}.</span>
-          <Avatar nickname={entry.nickname} color={entry.avatarColor} pixels={entry.avatarPixels} size={20} />
-          <span>{entry.nickname}</span>
+          <Avatar nickname={entry.displayName ?? entry.nickname} color={entry.avatarColor} pixels={entry.avatarPixels} size={20} />
+          <span>{entry.displayName ?? entry.nickname}</span>
           <span className="leaderboard-time">{formatTime(entry.timeMs)}</span>
         </div>
       ))}

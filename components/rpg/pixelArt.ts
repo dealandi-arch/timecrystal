@@ -690,10 +690,19 @@ const RAW_CHARACTERS: CharacterDef[] = [
     stats: { maxHp: 6, moveMs: 115, attackCooldownMs: 190, attackDurationMs: 140, invulnS: 2.1, bulletSpeed: 18, passiveName: 'Free Runner', passiveDesc: '30% faster than anyone, a 2.1-second recovery window after every hit, and fast shots.' },
   },
   {
+    id: 'ovenhead',
+    name: 'Ovenhead',
+    description:
+      "He was the baker of a little town at the edge of time, and one morning he leaned too close to his own oven and simply became it. Nobody minded: the bread has never been better. When the crystal broke, every oven in the world went cold except his. Ovenhead is slow to get going but very hard to put out, and anyone who touches him gets burned.",
+    sprite: PLAYER_SPRITE,
+    palette: { o: '#1c1917', y: '#d6d3d1', d: '#78716c', e: '#f59e0b' },
+    stats: { maxHp: 7, moveMs: 165, attackCooldownMs: 260, attackDurationMs: 180, invulnS: 1, bulletSpeed: 9, passiveName: 'Slow Roast', passiveDesc: 'Tough and toasty; takes a while to get going.' },
+  },
+  {
     id: 'gamer',
     name: 'Gamer',
     description:
-      "They have finished every game in every timeline on the hardest setting, and they were halfway through a world-record run when the crystal shattered and the screen went dark. Gamer treats the broken timeline like one more level to beat: learn the patterns, find the shortcuts, and never, ever stop to read the tutorial.",
+      "He has finished every game in every timeline on the hardest setting, and he was halfway through a world-record run when the crystal shattered and the screen went dark. Gamer treats the broken timeline like one more level to beat: learn the patterns, find the shortcuts, and never, ever stop to read the tutorial.",
     sprite: PLAYER_SPRITE,
     palette: { o: '#052e16', y: '#22c55e', d: '#15803d', e: '#f0fdf4' },
     stats: { maxHp: 4, moveMs: 140, attackCooldownMs: 200, attackDurationMs: 150, invulnS: 0.8, bulletSpeed: 13, passiveName: 'Speedrun', passiveDesc: 'Quick hands and a sharp eye for shortcuts.' },
@@ -711,7 +720,7 @@ const RAW_CHARACTERS: CharacterDef[] = [
     id: 'leboro',
     name: 'Leboro',
     description:
-      "She was born in the heart of a volcano that has been erupting since the first second of time, and she has never once felt cold. When the crystal broke, the volcano went silent, and Leboro climbed out to find out who had dared to put out her home. She hits hard, burns long, and never backs down from a fight.",
+      "He was born in the heart of a volcano that has been erupting since the first second of time, and he has never once felt cold. When the crystal broke, the volcano went silent, and Leboro climbed out to find out who had dared to put out his home. He hits hard, burns long, and never backs down from a fight.",
     sprite: PLAYER_SPRITE,
     palette: { o: '#450a0a', y: '#dc2626', d: '#7f1d1d', e: '#fde047' },
     stats: { maxHp: 6, moveMs: 140, attackCooldownMs: 210, attackDurationMs: 150, invulnS: 1, bulletSpeed: 12, passiveName: 'Molten Heart', passiveDesc: 'Hits hard and keeps the heat on.' },
@@ -720,7 +729,7 @@ const RAW_CHARACTERS: CharacterDef[] = [
     id: 'bunny',
     name: 'Bunny',
     description:
-      "She lives in a meadow at the edge of every timeline, where the clover never stops growing and the carrots are always in season. Nobody knows where she came from, and she is not telling. Bunny is the fastest thing on four paws or two, and she only shows herself to travellers who are very, very lucky.",
+      "He lives in a meadow at the edge of every timeline, where the clover never stops growing and the carrots are always in season. Nobody knows where he came from, and he is not telling. Bunny is the fastest thing on four paws or two, and he only shows himself to travellers who are very, very lucky.",
     sprite: PLAYER_SPRITE,
     palette: { o: '#4a044e', y: '#fbcfe8', d: '#f472b6', e: '#4a044e' },
     stats: { maxHp: 6, moveMs: 75, attackCooldownMs: 170, attackDurationMs: 125, invulnS: 2, bulletSpeed: 14, passiveName: 'Hop Skip', passiveDesc: 'The fastest feet in any timeline.' },
@@ -729,7 +738,7 @@ const RAW_CHARACTERS: CharacterDef[] = [
     id: 'nimbus',
     name: 'Nimbus',
     description:
-      "They drift above the timelines as a small grey cloud with a very large opinion about the weather. When the crystal broke, the skies cracked open with it, and Nimbus came down to stitch them shut. They are hard to hurt and slow to anger, but nothing ruins an enemy's day quite like a personal rain cloud.",
+      "She drifts above the timelines as a small grey cloud with a very large opinion about the weather. When the crystal broke, the skies cracked open with it, and Nimbus came down to stitch them shut. She is hard to hurt and slow to anger, but nothing ruins an enemy's day quite like a personal rain cloud.",
     sprite: PLAYER_SPRITE,
     palette: { o: '#1e293b', y: '#e2e8f0', d: '#93c5fd', e: '#1e3a8a' },
     stats: { maxHp: 6, moveMs: 140, attackCooldownMs: 210, attackDurationMs: 150, invulnS: 1.4, bulletSpeed: 11, passiveName: 'Silver Lining', passiveDesc: 'Floats through trouble with a long recovery window.' },
@@ -954,6 +963,16 @@ const SMALL_HORNS: Layer = { 0: '...a........a...', 1: '....a......a....' };
 const BLINDFOLD: Layer = { 4: '....aaaaaaaa....', 5: '...a............', 6: '..a.............' };
 const EYE_GOGGLES: Layer = { 4: '....oaaooaao....' };
 const MONOCLE: Layer = { 4: '........oao.....' };
+// A whole oven where the head should be: metal box, glowing window.
+const OVEN_HEAD: Layer = {
+  1: '....mmmmmmmm....',
+  2: '...mmooooooomm..',
+  3: '...moaaaaaaaom..',
+  4: '...moaarraaaom..',
+  5: '...moaaaaaaaom..',
+  6: '...mmooooooomm..',
+  7: '....mm....mm....',
+};
 const BUNNY_EARS: Layer = { 0: '....owo..owo....', 1: '....oao..oao....' };
 const HEADSET: Layer = { 1: '....oaaaaaao....', 3: '...aa......aa...', 4: '...aa......aa...', 5: '....a...........' };
 const CLOUD: Layer = { 0: '...wwww.wwww....', 1: '..wwwwwwwwwwww..' };
@@ -1073,11 +1092,12 @@ const HUMAN_LOOKS: Record<string, HumanLook> = {
   weaver: { layers: [ROBE, HEAD, MESSY, THIRD_EYE, STRINGS], s: '#e0ac69', h: '#a21caf', a: '#f0abfc' },
   vector: { layers: [BROAD, APRON, HEAD, SPIKY, EYE_GOGGLES], s: '#c68642', h: '#0f172a', a: '#38bdf8' },
   parkster: { layers: [BROAD, HEAD, SPIKY, BANDANA], s: '#8d5524', h: '#1c1917', a: '#f97316' },
-  gamer: { layers: [NEUTRAL, HEAD, MESSY, HEADSET], s: '#f1c27d', h: '#1e3a8a', a: '#22c55e' },
+  ovenhead: { layers: [BULKY, APRON, HEAD, OVEN_HEAD], s: '#e0ac69', h: '#78716c', a: '#f59e0b' },
+  gamer: { layers: [BROAD, HEAD, MESSY, HEADSET], s: '#f1c27d', h: '#1e3a8a', a: '#22c55e' },
   jbsoo: { layers: [BROAD, BARE_ARMS, HEAD, SHORT, BANDANA], s: '#f1c27d', h: '#0c0a09', a: '#38bdf8' },
-  leboro: { layers: [SLIM, BARE_ARMS, HEAD, LIPS, PONYTAIL, CROWN], s: '#c68642', h: '#7f1d1d', a: '#fde047' },
-  bunny: { layers: [DRESS, HEAD, LIPS, BOB, BUNNY_EARS], s: '#ffdbac', h: '#f8fafc', a: '#f9a8d4' },
-  nimbus: { layers: [FLOAT, HEAD, MEDIUM, CLOUD], s: '#e2e8f0', h: '#94a3b8', a: '#f8fafc' },
+  leboro: { layers: [BROAD, BARE_ARMS, HEAD, BEARD, SPIKY, FLAME_TIPS], s: '#c68642', h: '#7f1d1d', a: '#fde047' },
+  bunny: { layers: [BROAD, HEAD, MESSY, BUNNY_EARS], s: '#ffdbac', h: '#f8fafc', a: '#f9a8d4' },
+  nimbus: { layers: [FLOAT, HEAD, LIPS, LONG, CLOUD], s: '#e2e8f0', h: '#94a3b8', a: '#f8fafc' },
   glitch: { layers: [BROAD, HEAD, SPIKY, VISOR], s: '#d6d3d1', h: '#a21caf', a: '#22d3ee' },
 };
 
@@ -1153,14 +1173,14 @@ export function getEnemyLook(kind: EnemyKind, appearance: Appearance): Look {
 }
 
 // Story actors: the guide, the Guardian (boss) and each hero's nemesis.
-// One nemesis per hero. Bad characters (nemeses + the Guardian) are 27 women, 27 men and 8 they.
+// One nemesis per hero. Bad characters (nemeses + the Guardian) are 27 women, 27 men and 9 they.
 export type VillainId =
   // women
   | 'lag' | 'rime' | 'zero' | 'vex' | 'sorrow' | 'ashen' | 'morrigan' | 'quill' | 'cassia' | 'ledger' | 'maren' | 'selene' | 'sable' | 'breach' | 'moth' | 'grave' | 'eclipse' | 'vein' | 'kuro' | 'strings' | 'maris' | 'seraph' | 'aurelia' | 'thaw' | 'blight' | 'lumen' | 'knot'
   // men
   | 'bollard' | 'grudge' | 'snare' | 'kestrel' | 'tick' | 'brand' | 'halden' | 'voss' | 'rustbelly' | 'vance' | 'thorne' | 'mallus' | 'ringmaster' | 'rocco' | 'gale' | 'frostjaw' | 'harrow' | 'ichor' | 'crassus' | 'kael' | 'krell' | 'omega' | 'smog' | 'bram' | 'dusk' | 'rook'
   // they
-  | 'drought' | 'hollow' | 'mirror' | 'lantern' | 'unmaker' | 'silence' | 'voidmaw' | 'static';
+  | 'crumb' | 'drought' | 'hollow' | 'mirror' | 'lantern' | 'unmaker' | 'silence' | 'voidmaw' | 'static';
 export type ActorId = 'oren' | 'guardian' | VillainId;
 
 interface ActorDef {
@@ -1245,6 +1265,7 @@ const ACTORS: Record<Exclude<ActorId, 'guardian' | 'mirror'>, ActorDef> = {
   hollow: villain(['#020617', '#1f2937', '#111827'], [FLOAT, HEAD, HOOD, SHADOW_FACE], '#64748b', '#020617', '#ef4444', ['#020617', '#334155', '#94a3b8'], '#ef4444'),
   silence: villain(['#000000', '#e5e7eb', '#9ca3af'], [FLOAT, HEAD, HOOD, BLANK_FACE], '#f3f4f6', '#000000', '#f3f4f6', ['#374151', '#e5e7eb', '#ffffff'], '#e5e7eb'),
   voidmaw: villain(['#000000', '#1e1b4b', '#020617'], [FLOAT, HEAD, SHADOW_FACE, SMALL_HORNS], '#1e1b4b', '#000000', '#a855f7', ['#020617', '#312e81', '#a855f7'], '#a855f7'),
+  crumb: villain(['#0f172a', '#e2e8f0', '#64748b'], [NEUTRAL, HEAD, SPECTACLES, BRIM_HAT], '#f1c27d', '#475569', '#ef4444', ['#1e293b', '#cbd5e1', '#ef4444']),
   drought: villain(['#431407', '#fdba74', '#c2410c'], [FLOAT, HEAD, MESSY, BLANK_FACE], '#fed7aa', '#9a3412', '#f97316', ['#431407', '#fb923c', '#ffedd5'], '#f97316'),
   static: villain(['#18181b', '#a1a1aa', '#3f3f46'], [FLOAT, HEAD, BLANK_FACE, ANTENNAE], '#e4e4e7', '#18181b', '#facc15', ['#27272a', '#a1a1aa', '#facc15'], '#facc15'),
   unmaker: villain(['#000000', '#18181b', '#450a0a'], [FLOAT, HEAD, MESSY, VISOR], '#71717a', '#09090b', '#ef4444', ['#000000', '#27272a', '#ef4444'], '#ef4444'),

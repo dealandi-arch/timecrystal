@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from '../../../lib/supabase';
 import { isRankedLevelId } from '../../../components/rpg/levels3d';
+import { customLevelForRuns } from '../../../lib/customLevelsServer';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '../../../lib/session';
 
 export async function POST(req: NextRequest) {
@@ -18,7 +19,8 @@ export async function POST(req: NextRequest) {
   const secrets = Number.isFinite(Number(body?.secrets)) ? Number(body?.secrets) : 0;
   const usedAbility = Boolean(body?.usedAbility);
 
-  if (!isRankedLevelId(levelId)) {
+  // Built-in levels, or a public level (verified, or your own while you verify it).
+  if (!isRankedLevelId(levelId) && !(await customLevelForRuns(levelId, session.id))) {
     return NextResponse.json({ error: 'Invalid levelId.' }, { status: 400 });
   }
   if (!Number.isFinite(timeMs) || timeMs <= 0 || timeMs > 1000 * 60 * 60) {

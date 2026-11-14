@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import TimeCrystalRPG from '../../components/rpg/TimeCrystalRPG';
 
+// Read at request time, so the test-only switch can't be baked into the live build.
+export const dynamic = 'force-dynamic';
+
 export default function PlayPage() {
   return (
     <main className="container">
@@ -12,7 +15,7 @@ export default function PlayPage() {
       <p>
         Want the full tale? <Link href="/story">Play story mode</Link>
       </p>
-      <TimeCrystalRPG />
+      <TimeCrystalRPG testLevels={process.env.TC_TEST_LEVELS === '1'} />
     </main>
   );
 }

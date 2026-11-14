@@ -34,6 +34,8 @@ export interface CustomLevelInfo {
   authorId?: string;
   plays?: number;
   createdAt?: string;
+  verifiedAt?: string | null; // null until the creator beats it; only verified levels are public
+  verifyTimeMs?: number | null;
 }
 
 export function emptyMap(mode: CustomMode): CustomMap {
@@ -124,6 +126,14 @@ export function validateCustomLevel(name: unknown, mode: unknown, map: unknown):
   if (m.enemies.some((e) => !seen.has(`${e.x},${e.y}`))) return 'An enemy can’t be reached from the start.';
   if (m.crystalPath.some((p) => !seen.has(`${p.x},${p.y}`))) return 'A crystal stop can’t be reached from the start.';
   return null;
+}
+
+// Public levels pay Aizodon and hide Emerald Shards in proportion to how much there is to beat
+// (total enemy health, full value from 8 up), so a tiny level made just to farm rewards pays very little.
+export const FULL_VALUE_ENEMY_HP = 8;
+export function customRewardWeight(enemies: { hp: number }[]): number {
+  const total = enemies.reduce((sum, e) => sum + Math.max(0, e.hp), 0);
+  return Math.min(1, total / FULL_VALUE_ENEMY_HP);
 }
 
 // Height tools in the builder: what each one paints.

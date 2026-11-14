@@ -72,6 +72,7 @@ export const VILLAINS: Record<VillainId, { name: string; blurb: string }> = {
   dusk: { name: 'Duke Dusk', blurb: 'A night-court noble dragging every evening into endless dark.' },
   rook: { name: 'Overseer Rook', blurb: 'A machine overseer who seized the maintenance network of every timeline.' },
   // they
+  crumb: { name: 'Inspector Crumb', blurb: 'A health inspector who has closed every kitchen in every timeline, and wants to switch off the last hot oven.' },
   drought: { name: 'The Drought', blurb: 'A thirst that walks, drinking the skies of every timeline dry.' },
   hollow: { name: 'The Hollow', blurb: 'An echo of every path not taken, hungry for what is real.' },
   mirror: { name: 'The Mirror', blurb: 'A dark copy built from every piece of yourself you left behind.' },
@@ -573,6 +574,13 @@ const ARCS: Record<string, PersonalArc> = {
     rival: [v("You there! No running on the rooftops. No jumping. No climbing. No fun."), h("Sergeant Bollard. You fenced off half the city."), v("And I will fence off the other half, now that time stands still.")],
     clash: [v("Every route sealed! Every gap fenced! There is nowhere left to run!"), h("There is always somewhere to run."), n("Parkster vaults the last fence, whistles, and a rockslide flattens every barrier Bollard ever built.")],
     ending: [h("The city is moving again. Rush hour is back."), o("Is that a good thing?"), h("For everyone else? Probably not. For me? I have the rooftops.")],
+  },
+  ovenhead: {
+    nemesis: 'crumb',
+    intro: [n("Every oven in the world went cold when the crystal broke. Every oven but one."), h("Oren! You look hungry. Have a roll. Careful, it is hot."), o("You are… an oven."), h("I am a baker who got very good at his job.")],
+    rival: [v("Ovenhead. One open flame, unlicensed and walking around. That is a violation."), h("Inspector Crumb. You closed every bakery in the land."), v("And you are the last kitchen left open.")],
+    clash: [v("By order of the inspectorate, switch yourself OFF!"), h("Sorry, Inspector. I only have one setting, and it is HOT."), n("Ovenhead flings his door wide open and a wave of heat sends Inspector Crumb’s clipboard, citations and hat up in smoke.")],
+    ending: [h("The ovens are warm again. Every bakery is open."), o("What will you bake first?"), h("A cake. For you. You have earned it.")],
   },
   gamer: {
     nemesis: 'lag',
