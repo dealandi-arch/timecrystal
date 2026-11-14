@@ -18,3 +18,13 @@ export function getTestLevel(id: number): LevelDef | undefined {
     return undefined;
   }
 }
+
+// Players who used the old Stage editor still have their edited levels saved in their browser.
+// The game ignores them, and this removes them for good (never on a test server).
+export function clearOldLevelEdits() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* storage unavailable: nothing saved anyway */
+  }
+}

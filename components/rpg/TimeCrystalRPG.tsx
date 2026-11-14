@@ -6,7 +6,7 @@ import { type SoundEngine, getSoundEngine } from './audio';
 import TouchControls from './TouchControls';
 import type { CameraMode, Renderer3D } from './Renderer3D';
 import { FLOOR, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS, getLevel } from './levels';
-import { getTestLevel } from './testLevels';
+import { clearOldLevelEdits, getTestLevel } from './testLevels';
 import { customRewardWeight } from './customLevels';
 import { LEVELS_3D, isRankedLevelId } from './levels3d';
 import { canStep, heightAt, isDark, kindAt } from './terrain';
@@ -1764,6 +1764,11 @@ export default function TimeCrystalRPG({
       currentLevel: currentSave.currentLevel + 1
     });
   }
+
+  // Everyone plays the original levels: remove any old Stage editor edits from this browser.
+  useEffect(() => {
+    if (!testLevels) clearOldLevelEdits();
+  }, [testLevels]);
 
   useEffect(() => {
     setSave(loadSave());
