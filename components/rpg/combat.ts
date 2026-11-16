@@ -49,7 +49,8 @@ interface Orbit { weapon: WeaponDef; t: number; angle: number; cooldowns: Map<Co
 interface Eruption { x: number; y: number; dx: number; dy: number; step: number; next: number; weapon: WeaponDef }
 interface Meteor { gx: number; gy: number; t: number; maxT: number; weapon: WeaponDef }
 interface Vortex { gx: number; gy: number; life: number; maxLife: number; tick: number; weapon: WeaponDef }
-interface Rockfall { cells: { x: number; y: number }[]; t: number; maxT: number; weapon: WeaponDef }
+// A boulder rolling along a straight line from the hero until it hits a wall.
+interface Rockfall { cells: { x: number; y: number }[]; ox: number; oy: number; dx: number; dy: number; travelled: number; done: number; weapon: WeaponDef }
 
 export interface Combat {
   projectiles: Projectile[];
@@ -106,7 +107,7 @@ const ZAP_EVERY_S = 0.3;
 const ERUPT_EVERY_S = 0.07;
 const METEOR_DELAY_S = 0.6;
 const VORTEX_TICK_S = 0.4;
-const ROCKFALL_DELAY_S = 0.55;
+const BOULDER_SPEED = 22; // tiles per second
 const ORB_HIT_COOLDOWN_S = 0.5;
 
 function damage(h: CombatHooks, enemy: CombatEnemy, amount: number, weapon: WeaponDef) {
@@ -285,17 +286,10 @@ function fireInner(c: Combat, h: CombatHooks, weapon: WeaponDef, origin: { x: nu
   }
 
   if (weapon.kind === 'rockfall') {
-    // A random row or column that has open ground on it.
-    const cols = h.cols ?? 15;
-    const rows = h.rows ?? 10;
-    const random = h.random ?? Math.random;
-    const lines: { x: number; y: number }[][] = [];
-    for (let y = 0; y < rows; y++) lines.push(Array.from({ length: cols }, (_, x) => ({ x, y })).filter((p) => h.walkable(p.x, p.y)));
-    for (let x = 0; x < cols; x++) lines.push(Array.from({ length: rows }, (_, y) => ({ x, y })).filter((p) => h.walkable(p.x, p.y)));
-    const open = lines.filter((l) => l.length > 0);
-    if (!open.length) return {};
-    const cells = open[Math.floor(random() * open.length)];
-    c.rockfalls.push({ cells, t: ROCKFALL_DELAY_S, maxT: ROCKFALL_DELAY_S, weapon });
+    // One boulder, rolled the way the hero faces, all the way to the next wall.
+    const cells = ray(h, origin.x, origin.y, fx, fy, 40);
+    if (!cells.length) return {};
+    c.rockfalls.push({ cells, ox: ocx, oy: ocy, dx: fx, dy: fy, travelled: 0, done: 0, weapon });
     return {};
   }
 
@@ -664,19 +658,18 @@ function updateInner(c: Combat, h: CombatHooks, dt: number, player: { x: number;
   }
   if (c.meteors.length) c.meteors = c.meteors.filter((m) => m.t > 0);
 
-  // Rockslides: after the warning, crush everything on the line and scoop up what's hidden there.
+  // Boulders: roll fast, crushing every enemy and scooping up every hidden shard on the tiles they pass.
   for (const r of c.rockfalls) {
-    r.t -= dt;
-    if (r.t > 0) continue;
-    for (const cell of r.cells) {
+    r.travelled += BOULDER_SPEED * dt;
+    while (r.done < r.cells.length && r.done + 1 <= r.travelled + 0.5) {
+      const cell = r.cells[r.done++];
       for (const e of enemiesAt(h, cell.x, cell.y)) damage(h, e, r.weapon.damage, r.weapon);
       h.collect?.(cell.x, cell.y);
-      spawnBurst(h.particles, (cell.x + 0.5) * h.tile, (cell.y + 0.5) * h.tile, [r.weapon.color, '#78716c', '#e7e5e4'], 6, 140, 120);
+      spawnBurst(h.particles, (cell.x + 0.5) * h.tile, (cell.y + 0.8) * h.tile, [r.weapon.color, '#78716c'], 3, 70, 60);
     }
-    c.slashes.push({ cells: r.cells, life: 0.4, maxLife: 0.4, color: r.weapon.color });
-    h.shake(0.6);
+    if (r.done >= r.cells.length) h.shake(0.25);
   }
-  if (c.rockfalls.length) c.rockfalls = c.rockfalls.filter((r) => r.t > 0);
+  if (c.rockfalls.length) c.rockfalls = c.rockfalls.filter((r) => r.done < r.cells.length);
 
   // Vortexes: drag nearby enemies toward the middle and grind them.
   for (const v of c.vortexes) {
@@ -768,16 +761,23 @@ export function drawCombat(ctx: CanvasRenderingContext2D, c: Combat, tile: numbe
   }
 
   for (const r of c.rockfalls) {
-    const t = r.t / r.maxT; // 1 → 0 as the rocks come down
-    for (const cell of r.cells) {
-      const x = cell.x * tile;
-      const y = cell.y * tile;
-      ctx.fillStyle = `rgba(239, 68, 68, ${0.15 + 0.25 * (1 - t)})`;
-      ctx.fillRect(x, y, tile, tile);
-      ctx.fillStyle = r.weapon.color;
+    const x = (r.ox + r.dx * r.travelled) * tile;
+    const y = (r.oy + r.dy * r.travelled) * tile;
+    const radius = tile * 0.36;
+    ctx.fillStyle = r.weapon.color;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    // cracks that turn as it rolls
+    ctx.strokeStyle = '#57534e';
+    ctx.lineWidth = 3;
+    const spin = r.travelled * 4;
+    for (let k = 0; k < 3; k++) {
+      const a = spin + (k * Math.PI * 2) / 3;
       ctx.beginPath();
-      ctx.arc(x + tile / 2, y + tile / 2 - t * tile * 3, tile * 0.28, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * radius * 0.85, y + Math.sin(a) * radius * 0.85);
+      ctx.stroke();
     }
   }
 

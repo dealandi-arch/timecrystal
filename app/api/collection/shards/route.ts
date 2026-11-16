@@ -14,8 +14,9 @@ export async function POST(req: NextRequest) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const current = await loadCollection(auth.profileId);
     if (!current) return storageError();
-    const next = { ...current, shards: current.shards + count };
-    if (await saveCollection(auth.profileId, current.shards, next)) return NextResponse.json(next);
+    // Only shards change here; cards are left alone (and work before the hero_cards column exists).
+    const next = { shards: current.shards + count, owned: current.owned };
+    if (await saveCollection(auth.profileId, current.shards, next)) return NextResponse.json({ ...next, cards: current.cards });
   }
   return conflictError();
 }

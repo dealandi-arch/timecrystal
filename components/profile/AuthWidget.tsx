@@ -31,6 +31,14 @@ export default function AuthWidget() {
         <Link href="/profiles" className="auth-link">
           Browse
         </Link>
+        <Link href="/chat" className="auth-link">
+          💬 Chat
+        </Link>
+        {profile.isAdmin && (
+          <Link href="/admin" className="auth-link auth-admin">
+            🛡 Admin
+          </Link>
+        )}
         <button className="auth-link" onClick={() => logOut()}>
           Log out
         </button>

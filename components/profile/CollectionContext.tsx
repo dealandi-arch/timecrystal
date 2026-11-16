@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useProfile } from './ProfileContext';
-import { CHARACTER_RARITY, PULL_COST, type PullResult, type PullType, SHARDS_PER_LEVEL, SHOP_PRICE, UNLOCKABLE_CHARACTERS, rarityOf, rollPull, rollSecret } from '../rpg/gacha';
+import { CHARACTER_RARITY, type CardDraw, type Cards, DRAW_COST, type DrawType, SHARDS_PER_LEVEL, SHOP_PRICE, UNLOCKABLE_CHARACTERS, cleanCards, drawCards, rarityOf, rollSecret } from '../rpg/gacha';
 
 // Emerald Shards + gacha heroes. Signed-in players keep them on their profile (the server rolls
 // the gacha); guests keep them in this browser.
@@ -10,6 +10,7 @@ import { CHARACTER_RARITY, PULL_COST, type PullResult, type PullType, SHARDS_PER
 interface Collection {
   shards: number;
   owned: string[];
+  cards: Cards; // hero cards collected towards unlocking gacha heroes
 }
 
 type ActionResult<T = undefined> = { ok: true; value: T } | { ok: false; error: string };
@@ -20,7 +21,7 @@ interface CollectionContextValue extends Collection {
   warning: string | null;
   isUnlocked: (characterId: string) => boolean;
   addShards: (count: number) => void;
-  pull: (type: PullType) => Promise<ActionResult<PullResult>>;
+  draw: (type: DrawType) => Promise<ActionResult<{ draws: CardDraw[]; refund: number }>>;
   buy: (characterId: string) => Promise<ActionResult>;
   // Free trials (event tryouts and codes), kept in this browser: heroId → when it ends (ms).
   trials: Record<string, number>;
@@ -43,7 +44,7 @@ function readTrials(): Record<string, number> {
     return {};
   }
 }
-const EMPTY: Collection = { shards: 0, owned: [] };
+const EMPTY: Collection = { shards: 0, owned: [], cards: {} };
 
 function readLocal(): Collection {
   try {
@@ -53,6 +54,7 @@ function readLocal(): Collection {
     return {
       shards: Number.isFinite(parsed?.shards) ? Math.max(0, Math.floor(parsed.shards)) : 0,
       owned: Array.isArray(parsed?.owned) ? parsed.owned.filter((id: unknown) => typeof id === 'string' && UNLOCKABLE_CHARACTERS.includes(id)) : [],
+      cards: cleanCards(parsed?.cards),
     };
   } catch {
     return EMPTY;
@@ -128,7 +130,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         if (!res.ok) break;
         left -= count;
         writePending(profileId, left);
-        setCollection({ shards: data.shards + left, owned: data.owned });
+        setCollection((c) => ({ shards: data.shards + left, owned: data.owned, cards: data.cards ?? c.cards }));
       }
     } catch {
       /* still offline: try again next time */
@@ -159,7 +161,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           setStorage('profile');
           setWarning(null);
-          setCollection({ shards: (data.shards ?? 0) + readPending(profile.id), owned: data.owned ?? [] });
+          setCollection({ shards: (data.shards ?? 0) + readPending(profile.id), owned: data.owned ?? [], cards: cleanCards(data.cards) });
           setReady(true);
           flushPending();
         } else {
@@ -194,7 +196,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       postJson('/api/collection/shards', { count })
         .then(({ res, data }) => {
           if (!res.ok) return keepForLater();
-          setCollection({ shards: data.shards + readPending(profileId), owned: data.owned });
+          setCollection((c) => ({ shards: data.shards + readPending(profileId), owned: data.owned, cards: data.cards ?? c.cards }));
           flushPending();
         })
         .catch(keepForLater);
@@ -202,22 +204,19 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     [updateLocal, flushPending]
   );
 
-  const pull = useCallback(
-    async (type: PullType): Promise<ActionResult<PullResult>> => {
+  const draw = useCallback(
+    async (type: DrawType): Promise<ActionResult<{ draws: CardDraw[]; refund: number }>> => {
       if (storageRef.current === 'browser') {
         const current = readLocal();
-        if (current.shards < PULL_COST[type]) return { ok: false, error: `You need ${PULL_COST[type]} Emerald Shards.` };
-        const result = rollPull(type, current.owned);
-        updateLocal(() => ({
-          shards: current.shards - PULL_COST[type] + result.refund,
-          owned: result.duplicate ? current.owned : [...current.owned, result.characterId],
-        }));
-        return { ok: true, value: result };
+        if (current.shards < DRAW_COST[type]) return { ok: false, error: `You need ${DRAW_COST[type]} Emerald Shards.` };
+        const result = drawCards(type, current.owned, current.cards);
+        updateLocal(() => ({ shards: current.shards - DRAW_COST[type] + result.refund, owned: result.owned, cards: result.cards }));
+        return { ok: true, value: { draws: result.draws, refund: result.refund } };
       }
       const { res, data } = await postJson('/api/gacha', { type });
-      if (!res.ok) return { ok: false, error: data?.error ?? 'Summon failed.' };
-      setCollection({ shards: data.shards, owned: data.owned });
-      return { ok: true, value: data.result as PullResult };
+      if (!res.ok) return { ok: false, error: data?.error ?? 'The draw failed.' };
+      setCollection({ shards: data.shards, owned: data.owned, cards: cleanCards(data.cards) });
+      return { ok: true, value: { draws: data.draws as CardDraw[], refund: data.refund as number } };
     },
     [updateLocal]
   );
@@ -230,12 +229,12 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         const current = readLocal();
         if (current.owned.includes(characterId)) return { ok: false, error: 'You already own this character.' };
         if (current.shards < SHOP_PRICE[rarity]) return { ok: false, error: `You need ${SHOP_PRICE[rarity]} Emerald Shards.` };
-        updateLocal(() => ({ shards: current.shards - SHOP_PRICE[rarity], owned: [...current.owned, characterId] }));
+        updateLocal(() => ({ ...current, shards: current.shards - SHOP_PRICE[rarity], owned: [...current.owned, characterId] }));
         return { ok: true, value: undefined };
       }
       const { res, data } = await postJson('/api/shop', { characterId });
       if (!res.ok) return { ok: false, error: data?.error ?? 'Purchase failed.' };
-      setCollection({ shards: data.shards, owned: data.owned });
+      setCollection((c) => ({ shards: data.shards, owned: data.owned, cards: data.cards ?? c.cards }));
       return { ok: true, value: undefined };
     },
     [updateLocal]
@@ -282,8 +281,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ...collection, ready, storage, warning, isUnlocked, addShards, pull, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally }),
-    [collection, ready, storage, warning, isUnlocked, addShards, pull, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally]
+    () => ({ ...collection, ready, storage, warning, isUnlocked, addShards, draw, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally }),
+    [collection, ready, storage, warning, isUnlocked, addShards, draw, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally]
   );
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;
 }

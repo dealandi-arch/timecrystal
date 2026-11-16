@@ -7,6 +7,7 @@ export interface Profile {
   nickname: string; // username: permanent, used to log in
   displayName?: string; // what everyone sees
   nameChangedAt?: string | null;
+  isAdmin?: boolean; // can open /admin and the Admin chat
   avatarColor: string;
   avatarPixels?: string | null;
 }
@@ -24,7 +25,8 @@ interface ProfileContextValue {
   logOut: () => Promise<void>;
   setAvatar: (pixels: string | null, color: string) => void;
   setDisplayName: (displayName: string, changedAt: string) => void;
-  submitRun: (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean) => Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean } | null>;
+  startRun: (levelId: number) => Promise<string | null>;
+  submitRun: (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean, ticket: string | null, replay?: unknown) => Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean } | null>;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -101,12 +103,23 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  // A signed start ticket from the server: finished runs bring it back to prove they really happened.
+  const startRun = useCallback(async (levelId: number): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/runs/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ levelId }) });
+      const data = await parseJson(res);
+      return typeof data?.ticket === 'string' ? data.ticket : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const submitRun = useCallback(
-    async (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean) => {
+    async (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean, ticket: string | null, replay?: unknown) => {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ levelId, timeMs, kills, secrets, usedAbility })
+        body: JSON.stringify({ levelId, timeMs, kills, secrets, usedAbility, ticket, replay })
       });
       if (!res.ok) return null;
       return parseJson(res) as Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean }>;
@@ -115,8 +128,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ profile, loading, signUp, logIn, logOut, submitRun, setAvatar, setDisplayName }),
-    [profile, loading, signUp, logIn, logOut, submitRun, setAvatar, setDisplayName]
+    () => ({ profile, loading, signUp, logIn, logOut, startRun, submitRun, setAvatar, setDisplayName }),
+    [profile, loading, signUp, logIn, logOut, startRun, submitRun, setAvatar, setDisplayName]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

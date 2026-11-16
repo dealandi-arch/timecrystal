@@ -8,6 +8,9 @@ import type { CameraMode, Renderer3D } from './Renderer3D';
 import { FLOOR, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS, getLevel } from './levels';
 import { clearOldLevelEdits, getTestLevel } from './testLevels';
 import { customRewardWeight } from './customLevels';
+import { type CrazeMinutes, crazeEnemyHp, crazeLevelId } from './craze';
+import { newReplay, recordSample } from './replay';
+import CrazeRank from './CrazeRank';
 import { LEVELS_3D, isRankedLevelId } from './levels3d';
 import { canStep, heightAt, isDark, kindAt } from './terrain';
 import { type Particle, drawParticles, spawnBurst, updateParticles } from './particles';
@@ -315,10 +318,20 @@ interface LevelRunnerProps {
   shardCount?: number; // hidden Emerald Shards in this level
   rankTitle?: string;
   rankLink?: { href: string; label: string }; // the full ranking this level belongs to
+  onStart?: () => void; // the level has opened (fetch a start ticket)
+  craze?: { minutes: CrazeMinutes }; // Multienemy Craze round instead of a normal level
   signedIn: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn, ranked = true, rankTitle, rankLink, shardCount = SHARDS_PER_LEVEL }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn, ranked = true, rankTitle, rankLink, shardCount = SHARDS_PER_LEVEL, onStart, craze }: LevelRunnerProps) {
+  const crazeRef = useRef(craze);
+  const [crazeBeaten, setCrazeBeaten] = useState(0);
+  const [crazeLeft, setCrazeLeft] = useState(craze ? craze.minutes * 60 : 0);
+  const [crazeEnd, setCrazeEnd] = useState<'time' | 'ko' | null>(null);
+  const onStartRef = useRef(onStart);
+  useEffect(() => {
+    onStartRef.current?.();
+  }, []);
   const charDef = CHARACTERS.find((c) => c.id === characterId) ?? CHARACTERS[0];
   const charStats = charDef.stats;
   const baseSignature = getSignatureWeapon(charDef.id);
@@ -399,6 +412,10 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     won: false,
     startTime: performance.now(),
     usedAbilityThisRun: false,
+    lastBasic: true, // the last attack used the basic gun (Echo repeats the same weapon)
+    crazeBeaten: 0,
+    crazeSecond: -1,
+    replay: newReplay(), // for the Cheat catcher
     perk: freshPerkState(),
     skill: freshSkillState()
   });
@@ -416,6 +433,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     s.shake = 0.3;
     s.won = false;
     s.startTime = performance.now();
+    s.replay = newReplay(); // a restart starts the run (and its replay) again
     setHp(maxHp);
     setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
   }
@@ -560,6 +578,12 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         if (killed) {
           spawnBurst(s.particles, hitX, hitY, ['#f472b6', '#fbcfe8', '#831843'], 14, 140, 220);
           sound.playEnemyDeath();
+          s.replay.kills.push([Math.round(performance.now() - s.startTime), enemy.gx, enemy.gy]);
+          if (crazeRef.current && !s.won) {
+            s.crazeBeaten++;
+            setCrazeBeaten(s.crazeBeaten);
+            spawnCrazeEnemy();
+          }
           setEnemiesLeft(s.enemies.filter((e) => e.alive).length);
           if (weapon.lifesteal) {
             const maxHp = powerActiveRef.current ? gearRef.current.hero.maxHp : gearRef.current.base.maxHp;
@@ -651,6 +675,37 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         enemy.moveT = 0;
         enemy.moving = true;
       }
+    }
+
+    // Multienemy Craze: a new enemy appears somewhere away from the hero for every one beaten.
+    function spawnCrazeEnemy() {
+      const p = s.player;
+      const spots: Point[] = [];
+      for (let y = 0; y < level.grid.length; y++) {
+        for (let x = 0; x < level.grid[y].length; x++) {
+          if (level.grid[y][x] !== FLOOR || Math.max(Math.abs(x - p.gx), Math.abs(y - p.gy)) < 4) continue;
+          if (s.enemies.some((e) => e.alive && e.gx === x && e.gy === y)) continue;
+          spots.push({ x, y });
+        }
+      }
+      const at = spots[Math.floor(Math.random() * spots.length)];
+      if (!at) return;
+      const hp = crazeEnemyHp(s.crazeBeaten);
+      s.enemies.push({ id: `craze${s.crazeBeaten}`, gx: at.x, gy: at.y, fromX: at.x, fromY: at.y, moveT: 1, moving: false, alive: true, hp, maxHp: hp, frozen: false, stunMs: 0, wanderTimer: ENEMY_WANDER_MS, isBoss: false });
+      // keep the list short: drop enemies that are long gone
+      if (s.enemies.length > 40) s.enemies = s.enemies.filter((e) => e.alive);
+      spawnBurst(s.particles, (at.x + 0.5) * TILE, (at.y + 0.5) * TILE, ['#f472b6', '#fff'], 10, 90, -40);
+    }
+
+    // The round is over: time ran out, or the hero was knocked out.
+    function endCraze(knockedOut: boolean) {
+      if (s.won || !crazeRef.current) return;
+      s.won = true;
+      const roundMs = crazeRef.current.minutes * 60 * 1000;
+      setCrazeEnd(knockedOut ? 'ko' : 'time');
+      setWon(true);
+      setRunStats({ timeMs: knockedOut ? Math.min(roundMs, Math.round(performance.now() - s.startTime)) : roundMs, kills: s.crazeBeaten, secrets: 0, usedAbility: false });
+      sound.playLevelComplete();
     }
 
     function collectShard(x: number, y: number) {
@@ -823,6 +878,18 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
     function update(dt: number) {
       if (s.won) return;
+      if (crazeRef.current) {
+        const left = crazeRef.current.minutes * 60 - (performance.now() - s.startTime) / 1000;
+        if (left <= 0) {
+          endCraze(false);
+          return;
+        }
+        const whole = Math.ceil(left);
+        if (whole !== s.crazeSecond) {
+          s.crazeSecond = whole;
+          setCrazeLeft(whole);
+        }
+      }
       const effectiveStats = powerActiveRef.current ? gearRef.current.hero : gearRef.current.base;
       const p = s.player;
 
@@ -856,6 +923,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
 
       const perk = activePerks();
+      recordSample(s.replay, performance.now() - s.startTime, lerp(p.fromX, p.gx, p.moveT), lerp(p.fromY, p.gy, p.moveT));
       if (s.perk.hasteT > 0) s.perk.hasteT -= dt;
       if (s.perk.frenzyT > 0) s.perk.frenzyT -= dt;
       for (const key of ['radarT', 'cloakT', 'blizzardT', 'guidingT', 'crystalFreezeT', 'flashT'] as const) {
@@ -904,13 +972,19 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         }
       }
 
+      // Keyboard: one attack per press. Touch: holding the fire zone ('touchfire') keeps attacking with the
+      // current weapon, and auto-fire ('autofire') keeps shooting basic bullets only.
       const attackKey = s.keys.has(' ') || s.keys.has('j');
+      const touchFire = s.keys.has('touchfire');
+      const autoFire = s.keys.has('autofire') && !attackKey && !touchFire;
       // Frenzy: weapons recharge 40% faster for a while after a kill.
       if (p.attackCooldown > 0) p.attackCooldown -= dt * 1000 * (s.perk.frenzyT > 0 ? 1 / 0.6 : 1);
-      if (attackKey && !attackWasPressed && p.attackCooldown <= 0) {
-        const weapon = s.weaponSlot === 0 ? gearRef.current.basicGun : gearRef.current.signature;
+      if (((attackKey && !attackWasPressed) || touchFire || autoFire) && p.attackCooldown <= 0) {
+        const basic = autoFire || s.weaponSlot === 0;
+        s.lastBasic = basic;
+        const weapon = basic ? gearRef.current.basicGun : gearRef.current.signature;
         p.attackTimer = effectiveStats.attackDurationMs;
-        p.attackCooldown = s.weaponSlot === 0 ? effectiveStats.attackCooldownMs : weapon.cooldownMs;
+        p.attackCooldown = basic ? effectiveStats.attackCooldownMs : weapon.cooldownMs;
         const fired = fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
         if (fired.dashTo) {
           // Blink: slide the hero to where the attack ended.
@@ -929,7 +1003,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       if (s.perk.echoT >= 0) {
         s.perk.echoT -= dt;
         if (s.perk.echoT < 0) {
-          const weapon = s.weaponSlot === 0 ? gearRef.current.basicGun : gearRef.current.signature;
+          const weapon = s.lastBasic ? gearRef.current.basicGun : gearRef.current.signature;
           fireWeapon(s.combat, hooks, weapon, { x: p.gx, y: p.gy }, DIR_VECTORS[p.facing], effectiveStats.bulletSpeed);
           spawnBurst(s.particles, (p.gx + 0.5) * TILE, (p.gy + 0.5) * TILE, ['#c084fc', '#fff'], 6, 70, 0);
         }
@@ -1028,7 +1102,8 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
           }
           setHp(p.hp);
           if (p.hp <= 0) {
-            resetLevelRuntime();
+            if (crazeRef.current) endCraze(true);
+            else resetLevelRuntime();
             return;
           }
         }
@@ -1081,8 +1156,12 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         if (remaining === 0) {
           s.won = true;
           setWon(true);
+          const endMs = Math.round(performance.now() - s.startTime);
+          s.replay.samples.push([endMs, p.gx * 10, p.gy * 10]);
+          s.replay.end = endMs;
           setRunStats({
-            timeMs: Math.round(performance.now() - s.startTime),
+            replay: s.replay,
+            timeMs: endMs,
             kills: level.enemies.length,
             secrets: s.discoveredSecrets.size,
             usedAbility: s.usedAbilityThisRun
@@ -1167,7 +1246,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
       const crystalPos = entityPixelPos(s.crystal);
       const bob = Math.sin(time * 3) * 4;
-      if (!view3d) drawDiamond(ctx, crystalPos.x + TILE / 2, crystalPos.y + TILE / 2 + bob, 14, '#67e8f9');
+      if (!view3d && !crazeRef.current) drawDiamond(ctx, crystalPos.x + TILE / 2, crystalPos.y + TILE / 2 + bob, 14, '#67e8f9');
 
       for (const enemy of s.enemies) {
         if (!enemy.alive || view3d || hiddenInDark(enemy)) continue;
@@ -1444,14 +1523,21 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
   const abilityDef = ABILITIES.find((a) => a.id === save.ability);
   const abilityBlockedHere = save.ability === 'killAll' && level.isBoss;
-  const canUseAbility = !!save.ability && !save.abilityUsed && !abilityBlockedHere;
+  const canUseAbility = !!save.ability && !save.abilityUsed && !abilityBlockedHere && !craze;
 
   return (
     <div className="rpg-shell" ref={shellRef}>
       <div className="rpg-hud">
         <span>{displayName ?? level.name}</span>
         <span>HP: {'❤'.repeat(Math.max(0, hp))}{'♡'.repeat(Math.max(0, effectiveMaxHp - hp))}</span>
-        <span>Enemies left: {enemiesLeft}</span>
+        {craze ? (
+          <>
+            <span className={`craze-timer${crazeLeft <= 10 ? ' low' : ''}`}>⏱ {Math.floor(crazeLeft / 60)}:{String(crazeLeft % 60).padStart(2, '0')}</span>
+            <span className="craze-count">👾 {crazeBeaten} beaten</span>
+          </>
+        ) : (
+          <span>Enemies left: {enemiesLeft}</span>
+        )}
         <span className="emerald-count" title="Hidden Emerald Shards found in this level">
           💎 {emeraldsFound}/{shardCount}
         </span>
@@ -1498,7 +1584,26 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         {view3d && <div ref={view3dRef} className="view3d" />}
         {view3dError && <div className="rpg-toast">{view3dError}</div>}
         {toast && <div className="rpg-toast">{toast}</div>}
-        {won && runStats && (
+        {won && runStats && craze && (
+          <div className="game-overlay craze-over">
+            <h2>{crazeEnd === 'ko' ? 'Knocked out!' : 'Time’s up!'}</h2>
+            <p className="craze-score">
+              You beat <strong>{runStats.kills}</strong> enem{runStats.kills === 1 ? 'y' : 'ies'}
+              {crazeEnd === 'ko' ? ` in ${formatTime(runStats.timeMs)}` : ` in ${craze.minutes} minute${craze.minutes > 1 ? 's' : ''}`}.
+            </p>
+            {signedIn ? reward?.reason && <p className="run-reward">{reward.reason}</p> : <p className="run-reward">Sign in to get on the Craze Rank.</p>}
+            <CrazeRank minutes={craze.minutes} compact refreshKey={reward?.reason} />
+            <button
+              onClick={() => {
+                sound.playMenuClick();
+                onLevelComplete(runStats);
+              }}
+            >
+              Done
+            </button>
+          </div>
+        )}
+        {won && runStats && !craze && (
           <div className="game-overlay">
             <h2>{level.isBoss ? 'The Time Crystal Is Whole Again' : 'Crystal Secured'}</h2>
             <p>{level.isBoss ? 'You defeated the guardian and restored the final shard.' : 'On to the next level.'}</p>
@@ -1728,6 +1833,7 @@ export interface CustomPlay {
   customLevelId?: number; // a published public level: rewards are claimed against it
   ownLevel?: boolean; // the player made it: no Emerald Shards (they could replay it for free shards)
   rank?: { title: string; link: { href: string; label: string } }; // which ranking the runs go on
+  craze?: { minutes: CrazeMinutes }; // a Multienemy Craze round
   rewards?: boolean; // false for test plays in the level builder
   finale: { title: string; text: string };
 }
@@ -1749,7 +1855,9 @@ export default function TimeCrystalRPG({
   const soundRef = useRef<SoundEngine | null>(null);
   if (!soundRef.current) soundRef.current = getSoundEngine();
   const sound = soundRef.current;
-  const { profile, submitRun } = useProfile();
+  const { profile, startRun, submitRun } = useProfile();
+  // Start ticket for the level being played (see lib/runCheck.ts).
+  const ticketRef = useRef<Promise<string | null> | null>(null);
   const { addShards, grantSecret, rollSecretLocally } = useCollection();
   const { signedIn, levelOf, claimRun, equippedSkill } = useProgression();
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
@@ -1757,7 +1865,10 @@ export default function TimeCrystalRPG({
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
-    if (profile && (isRankedLevelId(level.id) || custom?.customLevelId)) submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility);
+    if (profile && !custom?.craze && (isRankedLevelId(level.id) || custom?.customLevelId)) {
+      const ticket = ticketRef.current ?? Promise.resolve(null);
+      ticket.then((t) => submitRun(level.id, stats.timeMs, stats.kills, stats.secrets, stats.usedAbility, t, stats.replay));
+    }
     updateSave({
       ...currentSave,
       crystalsCollected: currentSave.crystalsCollected + 1,
@@ -1817,8 +1928,26 @@ export default function TimeCrystalRPG({
   // Builder test plays never count.
   async function finishRun(level: LevelDef, stats: LevelRunStats): Promise<ClaimResult | null> {
     if (custom && custom.rewards === false) return null;
+    if (custom?.craze) {
+      // Craze rounds go on the Craze Rank (no Aizodon, no shards, no Secret heroes).
+      if (!signedIn) return null;
+      const ticket = ticketRef.current ? await ticketRef.current : null;
+      try {
+        const res = await fetch('/api/craze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: custom.craze.minutes, kills: stats.kills, durationMs: stats.timeMs, ticket }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { earned: 0, rank: '', reason: data?.error ?? 'Your score couldn’t be saved.' };
+        return {
+          earned: 0,
+          rank: '',
+          reason: data.personalBest ? `New personal best! You’re #${data.place} in the world.` : `Your best is ${data.best} (#${data.place} in the world).`,
+        };
+      } catch {
+        return { earned: 0, rank: '', reason: 'Your score couldn’t be saved.' };
+      }
+    }
     if (signedIn) {
-      const result = await claimRun(level.id, stats.timeMs, stats.usedAbility, custom?.customLevelId);
+      const ticket = ticketRef.current ? await ticketRef.current : null;
+      const result = await claimRun(level.id, stats.timeMs, stats.usedAbility, custom?.customLevelId, ticket, stats.replay);
       if (result?.secret) grantSecret(result.secret);
       return result;
     }
@@ -1904,7 +2033,7 @@ export default function TimeCrystalRPG({
     const level = customLevels ? customLevels[save.currentLevel - 1] : (testLevels && builtIn ? getTestLevel(builtIn.id) : undefined) ?? builtIn;
     // No shards on builder test plays or your own public level; fewer on small public levels.
     const shardCount =
-      custom?.rewards === false || custom?.ownLevel
+      custom?.rewards === false || custom?.ownLevel || custom?.craze
         ? 0
         : custom?.customLevelId && level
           ? Math.round(SHARDS_PER_LEVEL * customRewardWeight(level.enemies))
@@ -1939,11 +2068,15 @@ export default function TimeCrystalRPG({
             skill={signedIn ? equippedSkill(save.characterId ?? 'wanderer') : null}
             view3d={is3d || !!level.terrain}
             signedIn={signedIn}
-            ranked={isRankedLevelId(level.id) || !!custom?.customLevelId}
+            ranked={!custom?.craze && (isRankedLevelId(level.id) || !!custom?.customLevelId)}
+            craze={custom?.craze}
             shardCount={shardCount}
             rankTitle={custom?.rank?.title ?? (custom?.customLevelId ? 'Level Rank' : undefined)}
             rankLink={custom?.rank?.link ?? (custom?.customLevelId ? { href: '/levels/rank', label: 'See the Public Levels Rank' } : undefined)}
             onRunFinished={(stats) => finishRun(level, stats)}
+            onStart={() => {
+              ticketRef.current = profile ? startRun(custom?.craze ? crazeLevelId(custom.craze.minutes) : level.id) : null;
+            }}
             autoWeapon={settings.autoWeapon}
             paused={settingsOpen}
             onLevelComplete={(stats) => handleLevelComplete(level, save, stats)}

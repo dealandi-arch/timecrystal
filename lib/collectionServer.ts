@@ -2,11 +2,14 @@ import { randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from './supabase';
 import { SESSION_COOKIE_NAME, verifySessionToken } from './session';
-import { UNLOCKABLE_CHARACTERS } from '../components/rpg/gacha';
+import { type Cards, UNLOCKABLE_CHARACTERS, cleanCards } from '../components/rpg/gacha';
+import { selectWithFallback } from './profileFields';
 
 export interface Collection {
   shards: number;
   owned: string[];
+  cards: Cards;
+  cardsReady: boolean; // false until the hero_cards column exists
 }
 
 // Crypto-backed float in [0, 1) so gacha rolls can't be predicted from the client.
@@ -26,23 +29,26 @@ export function requireSession(req: NextRequest): Authed {
 }
 
 export async function loadCollection(profileId: string): Promise<Collection | null> {
-  const { data, error } = await getSupabase()
-    .from('profiles')
-    .select('emerald_shards, owned_characters')
-    .eq('id', profileId)
-    .maybeSingle();
+  const { data, error, upToDate } = await selectWithFallback(
+    (columns) => getSupabase().from('profiles').select(columns).eq('id', profileId).maybeSingle(),
+    'emerald_shards, owned_characters, hero_cards',
+    'emerald_shards, owned_characters'
+  );
   if (error || !data) return null;
+  const row = data as unknown as { emerald_shards: number | null; owned_characters: string[] | null; hero_cards?: unknown };
   return {
-    shards: data.emerald_shards ?? 0,
-    owned: ((data.owned_characters ?? []) as string[]).filter((id) => UNLOCKABLE_CHARACTERS.includes(id)),
+    shards: row.emerald_shards ?? 0,
+    owned: (row.owned_characters ?? []).filter((id) => UNLOCKABLE_CHARACTERS.includes(id)),
+    cards: cleanCards(row.hero_cards),
+    cardsReady: upToDate,
   };
 }
 
 // Writes only if the balance is still what we read, so two requests can't spend the same shards twice.
-export async function saveCollection(profileId: string, previousShards: number, next: Collection): Promise<boolean> {
+export async function saveCollection(profileId: string, previousShards: number, next: { shards: number; owned: string[]; cards?: Cards }): Promise<boolean> {
   const { data, error } = await getSupabase()
     .from('profiles')
-    .update({ emerald_shards: next.shards, owned_characters: next.owned })
+    .update(next.cards ? { emerald_shards: next.shards, owned_characters: next.owned, hero_cards: next.cards } : { emerald_shards: next.shards, owned_characters: next.owned })
     .eq('id', profileId)
     .eq('emerald_shards', previousShards)
     .select('id');

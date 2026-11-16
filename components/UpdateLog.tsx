@@ -5,50 +5,53 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '10';
+export const CURRENT_UPDATE = '10.5.0';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   {
-    icon: '🍞',
-    title: 'New Rare hero: Ovenhead',
-    text: 'A baker who leaned too close to his own oven and became it. Oven Door sends out a ring of heat 3 tiles wide that leaves enemies burning, and anyone who touches him gets scorched. Find him in the Gacha or the Shop.',
+    icon: '👾',
+    title: 'New mode: Multienemy Craze',
+    text: 'Pick 1, 2, 3 or 5 minutes and beat as many enemies as you can. Every enemy you beat is replaced by a new one, and they get tougher as you go. Each round length has its own world rank.',
+    href: '/craze',
+  },
+  {
+    icon: '🃏',
+    title: 'Card gacha',
+    text: 'Draws now give hero cards, and every hero has the same chance. Collect enough cards to unlock a hero: Rare 2, Epic 3, Legendary 5, Mythic 8. One card costs 7 Emerald Shards, ten cost 60. A card for a hero you own gives 1 shard back. Cards you’ve collected are saved.',
     href: '/gacha',
   },
   {
-    icon: '✔',
-    title: 'Public level verification',
-    text: 'New public levels stay hidden until their creator beats them once. Every level on Public Levels is proven to be clearable, and shows how fast its creator verified it.',
-    href: '/levels',
+    icon: '🕹️',
+    title: 'Easier phone controls',
+    text: 'The joystick reacts sooner, doesn’t flicker between directions near a diagonal, gives a tiny buzz when you turn, and has more room. Holding the fire zone now keeps attacking, and auto-fire shoots basic bullets only.',
   },
   {
-    icon: '🏆',
-    title: 'A ranking for every public level',
-    text: 'Each public level now has its own Level Rank: the fastest clears by every player, shown on the level’s page and after you win.',
-    href: '/levels',
+    icon: '🚨',
+    title: 'Cheat catcher',
+    text: 'The game now records a short replay of every run. Runs that couldn’t really have been played don’t count: the player gets a reminder, and admins get the replay to watch.',
   },
   {
-    icon: '🏅',
-    title: 'Event Rank and Public Levels Rank',
-    text: 'Event runs now have their own Event Rank, separate from the main World’s Best lists. The Public Levels Rank shows who has cleared the most public levels, and fastest.',
-    href: '/events/rank',
+    icon: '🪨',
+    title: 'Parkster’s Rockslide Call, reworked',
+    text: 'One boulder that rolls fast the way he faces, crushing every enemy in its path and scooping up shards. Aim it, and it’s ready again in under a second.',
   },
   {
-    icon: '🪪',
-    title: 'Display names',
-    text: 'Change the name everyone sees, for free, from your profile: on leaderboards, rankings, public levels and search. Your original name stays as your @username (you still log in with it) and shows under your display name. After a change, you can change it again in 5 days.',
+    icon: '⚖️',
+    title: 'Fairer special weapons',
+    text: 'Weapons that beat the final boss in a few seconds at level 1 (such as Starfall, Carrot Barrage, Aurora Prism, Dragon Breath, Gatling Arm and Venom Fangs) now hit for normal damage, and get stronger as you level up.',
+  },
+  {
+    icon: '💬',
+    title: 'World chat and admins',
+    text: 'Talk to everyone in the World chat. Admins have their own chat, an Admin panel for fixing records, and can make other players admins.',
+    href: '/chat',
   },
   {
     icon: '🛡',
-    title: 'Stage editor removed',
-    text: 'The Stage editor could change the original levels and make them easier while still earning Aizodon and World’s Best times. It’s gone, and the game always plays the original levels. Build your own levels in the Level Builder on Public Levels instead.',
-    href: '/levels',
-  },
-  {
-    icon: '🛒',
-    title: 'Shop price change',
-    text: 'Rare heroes now cost 450 Emerald Shards in the Shop, so buying one outright still costs more than summoning for it.',
+    title: 'Run checking and warnings',
+    text: 'Every run on a World’s Best list is now checked: it must really have taken as long as it says, and be possible at the fastest speed any hero can reach. Made-up times are refused, and the player gets a warning.',
   },
 ];
 

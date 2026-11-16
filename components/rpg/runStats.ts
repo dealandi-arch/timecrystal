@@ -1,8 +1,11 @@
+import type { Replay } from './replay';
+
 export interface LevelRunStats {
   timeMs: number;
   kills: number;
   secrets: number;
   usedAbility: boolean;
+  replay?: Replay; // sent to the server for the Cheat catcher; not kept in the browser
 }
 
 interface LocalBest extends LevelRunStats {
@@ -34,7 +37,7 @@ export function saveLocalBestIfBetter(levelId: number, stats: LevelRunStats): bo
   const all = readAll();
   const existing = all[levelId];
   if (existing && existing.timeMs <= stats.timeMs) return false;
-  all[levelId] = { ...stats, completedAt: new Date().toISOString() };
+  all[levelId] = { timeMs: stats.timeMs, kills: stats.kills, secrets: stats.secrets, usedAbility: stats.usedAbility, completedAt: new Date().toISOString() };
   writeAll(all);
   return true;
 }

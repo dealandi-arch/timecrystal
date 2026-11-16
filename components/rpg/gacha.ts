@@ -1,7 +1,6 @@
 // Gacha rules shared by the client UI and the server API routes (no React, no browser APIs).
 
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'secret';
-export type PullType = 'normal' | 'lucky';
 export type GachaRarity = Exclude<Rarity, 'common' | 'secret'>;
 
 export const RARITY_INFO: Record<Rarity, { name: string; color: string }> = {
@@ -76,43 +75,64 @@ export function rollSecret(owned: string[], random: () => number = Math.random):
   return missing[Math.floor(random() * missing.length)];
 }
 
-export const PULL_COST: Record<PullType, number> = { normal: 20, lucky: 70 };
+// Card gacha: each draw gives a card for one gacha hero, every hero equally likely.
+// Collect enough cards for a hero to unlock them; rarer heroes need more cards.
+export type DrawType = 'single' | 'ten';
+export const DRAW_COST: Record<DrawType, number> = { single: 7, ten: 60 };
+export const DRAW_COUNT: Record<DrawType, number> = { single: 1, ten: 10 };
+export const CARDS_TO_UNLOCK: Record<GachaRarity, number> = { rare: 2, epic: 3, legendary: 5, mythic: 8 };
+// A card for a hero you already own turns into Emerald Shards.
+export const OWNED_CARD_REFUND = 1;
 
-// Percent chance of each rarity per pull. Each row adds up to 100.
-export const PULL_RATES: Record<PullType, Record<GachaRarity, number>> = {
-  normal: { rare: 70, epic: 22, legendary: 7, mythic: 1 },
-  lucky: { rare: 35, epic: 39, legendary: 21, mythic: 5 },
-};
+export type Cards = Record<string, number>;
 
-// Buying a specific character outright always costs more than summoning for one on average.
-export const SHOP_PRICE: Record<GachaRarity, number> = { rare: 450, epic: 700, legendary: 1800, mythic: 7500 };
+export function cardsNeeded(characterId: string): number {
+  const rarity = CHARACTER_RARITY[characterId];
+  return rarity ? CARDS_TO_UNLOCK[rarity] : 0;
+}
 
-// Pulling a character you already own gives some shards back.
-export const DUPLICATE_REFUND: Record<GachaRarity, number> = { rare: 5, epic: 12, legendary: 30, mythic: 80 };
-
-export const SHARDS_PER_LEVEL = 5;
-
-export interface PullResult {
+export interface CardDraw {
   characterId: string;
   rarity: GachaRarity;
-  duplicate: boolean;
-  refund: number;
+  cards: number; // cards held for this hero after the draw
+  needed: number;
+  unlockedNow: boolean; // this card completed the set
+  alreadyOwned: boolean; // turned into shards instead
 }
 
 // `random` returns a float in [0, 1). The server passes a crypto-backed source.
-export function rollPull(type: PullType, owned: string[], random: () => number = Math.random): PullResult {
-  const rates = PULL_RATES[type];
-  let roll = random() * 100;
-  let rarity: GachaRarity = 'rare';
-  for (const r of GACHA_RARITIES) {
-    if (roll < rates[r]) {
-      rarity = r;
-      break;
+export function drawCards(type: DrawType, owned: string[], cards: Cards, random: () => number = Math.random): { draws: CardDraw[]; owned: string[]; cards: Cards; refund: number } {
+  const nextOwned = [...owned];
+  const nextCards: Cards = { ...cards };
+  const draws: CardDraw[] = [];
+  let refund = 0;
+  for (let i = 0; i < DRAW_COUNT[type]; i++) {
+    const characterId = GACHA_CHARACTERS[Math.floor(random() * GACHA_CHARACTERS.length)];
+    const rarity = CHARACTER_RARITY[characterId];
+    const needed = CARDS_TO_UNLOCK[rarity];
+    if (nextOwned.includes(characterId)) {
+      refund += OWNED_CARD_REFUND;
+      draws.push({ characterId, rarity, cards: nextCards[characterId] ?? needed, needed, unlockedNow: false, alreadyOwned: true });
+      continue;
     }
-    roll -= rates[r];
+    nextCards[characterId] = (nextCards[characterId] ?? 0) + 1;
+    const unlockedNow = nextCards[characterId] >= needed;
+    if (unlockedNow) nextOwned.push(characterId);
+    draws.push({ characterId, rarity, cards: nextCards[characterId], needed, unlockedNow, alreadyOwned: false });
   }
-  const pool = GACHA_CHARACTERS.filter((id) => CHARACTER_RARITY[id] === rarity);
-  const characterId = pool[Math.floor(random() * pool.length)];
-  const duplicate = owned.includes(characterId);
-  return { characterId, rarity, duplicate, refund: duplicate ? DUPLICATE_REFUND[rarity] : 0 };
+  return { draws, owned: nextOwned, cards: nextCards, refund };
 }
+
+// Keeps only real heroes and whole numbers.
+export function cleanCards(raw: unknown): Cards {
+  if (!raw || typeof raw !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter(([id, n]) => id in CHARACTER_RARITY && Number.isInteger(n) && (n as number) > 0) as [string, number][]
+  );
+}
+
+// Buying a specific character outright always costs more than drawing cards for them on average.
+export const SHOP_PRICE: Record<GachaRarity, number> = { rare: 450, epic: 700, legendary: 1800, mythic: 7500 };
+
+export const SHARDS_PER_LEVEL = 5;
+

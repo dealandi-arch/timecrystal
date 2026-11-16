@@ -25,7 +25,10 @@ interface TouchControlsProps {
 }
 
 const STICK_TRAVEL = 46; // px the knob can move from the centre of the stick
-const DEAD_ZONE = 12; // px of drag before the hero starts moving
+const DEAD_ZONE = 8; // px of drag before the hero starts moving
+// Once moving one way, the other axis has to be clearly bigger before the direction flips,
+// so a thumb near a diagonal doesn't flicker between two directions.
+const SWITCH_BIAS = 1.35;
 const AUTO_FIRE_KEY = 'timeCrystalAutoFire';
 
 interface Stick {
@@ -45,23 +48,34 @@ export default function TouchControls({ onPress, onRelease, onToggleWeapon, weap
   const firePointers = useRef(new Set<number>());
   const base = useRef({ x: 0, y: 0 });
   const fireHeld = useRef(false);
+  const autoHeld = useRef(false);
 
   function setDirection(next: Direction | null) {
     if (next === dirRef.current) return;
     if (dirRef.current) onRelease(dirRef.current);
-    if (next) onPress(next);
+    if (next) {
+      onPress(next);
+      // A tiny buzz when the direction changes, on phones that support it.
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(8);
+    }
     dirRef.current = next;
     setDir(next);
   }
 
   // Holds the attack key while a finger is on the fire zone, or all the time with auto-fire on.
   function updateFire(auto = autoFire) {
-    const want = auto || firePointers.current.size > 0;
-    if (want === fireHeld.current) return;
-    fireHeld.current = want;
-    if (want) onPress(' ');
-    else onRelease(' ');
-    setFiring(want);
+    const holding = firePointers.current.size > 0;
+    if (holding !== fireHeld.current) {
+      fireHeld.current = holding;
+      if (holding) onPress('touchfire');
+      else onRelease('touchfire');
+    }
+    if (auto !== autoHeld.current) {
+      autoHeld.current = auto;
+      if (auto) onPress('autofire');
+      else onRelease('autofire');
+    }
+    setFiring(holding || auto);
   }
 
   useEffect(() => {
@@ -75,7 +89,8 @@ export default function TouchControls({ onPress, onRelease, onToggleWeapon, weap
     // Let go of everything when the controls go away (level won, page left).
     return () => {
       if (dirRef.current) onRelease(dirRef.current);
-      if (fireHeld.current) onRelease(' ');
+      if (fireHeld.current) onRelease('touchfire');
+      if (autoHeld.current) onRelease('autofire');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -108,8 +123,17 @@ export default function TouchControls({ onPress, onRelease, onToggleWeapon, weap
       dy = (dy / dist) * STICK_TRAVEL;
     }
     setStick({ baseX: base.current.x, baseY: base.current.y, knobX: dx, knobY: dy });
-    if (dist < DEAD_ZONE) setDirection(null);
-    else if (Math.abs(dx) > Math.abs(dy)) setDirection(dx > 0 ? 'arrowright' : 'arrowleft');
+    if (dist < DEAD_ZONE) {
+      setDirection(null);
+      return;
+    }
+    const current = dirRef.current;
+    const horizontalNow = current === 'arrowleft' || current === 'arrowright';
+    const verticalNow = current === 'arrowup' || current === 'arrowdown';
+    let horizontal = Math.abs(dx) > Math.abs(dy);
+    if (horizontalNow) horizontal = Math.abs(dy) < Math.abs(dx) * SWITCH_BIAS;
+    else if (verticalNow) horizontal = Math.abs(dx) > Math.abs(dy) * SWITCH_BIAS;
+    if (horizontal) setDirection(dx > 0 ? 'arrowright' : 'arrowleft');
     else setDirection(dy > 0 ? 'arrowdown' : 'arrowup');
   }
 
@@ -190,7 +214,7 @@ export default function TouchControls({ onPress, onRelease, onToggleWeapon, weap
             </button>
           )}
           <button type="button" className={`touch-autofire${autoFire ? ' on' : ''}`} aria-pressed={autoFire} onClick={toggleAutoFire}>
-            {autoFire ? '🔥 Auto-fire on' : 'Auto-fire off'}
+            {autoFire ? '🔥 Auto-fire on (bullets)' : 'Auto-fire off'}
           </button>
         </div>
         <button type="button" className={`touch-attack ${firing ? 'on' : ''}`} aria-label="Attack (hold)" tabIndex={-1}>

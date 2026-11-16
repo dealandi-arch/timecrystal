@@ -1,0 +1,79 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabase } from '../../../../lib/supabase';
+import { logAdmin, requireAdmin } from '../../../../lib/admin';
+import { addNotification } from '../../../../lib/notify';
+
+// Admin actions on a player's records. Each one is logged in admin_log.
+//   setTime      { targetId, levelId, timeMs }   change one World's Best time
+//   deleteRun    { targetId, levelId }           remove one World's Best time
+//   resetUnder   { targetId, timeMs }            every built-in level (1-11) faster than timeMs becomes timeMs
+//   deleteCraze  { targetId, minutes }           remove a Craze score
+//   warn         { targetId, title, message }    send the player a warning notification
+//   setAdmin     { targetId, isAdmin }           give or remove admin power (not your own)
+export async function POST(req: NextRequest) {
+  const admin = await requireAdmin(req);
+  if (!admin.ok) return admin.response;
+  const body = await req.json().catch(() => null);
+  const action = String(body?.action ?? '');
+  const targetId = String(body?.targetId ?? '');
+  if (!/^\d+$/.test(targetId)) return NextResponse.json({ error: 'Pick a player.' }, { status: 400 });
+  const supabase = getSupabase();
+  const levelId = Number(body?.levelId);
+  const timeMs = Math.round(Number(body?.timeMs));
+  const fmt = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
+
+  if (action === 'setTime' || action === 'deleteRun') {
+    if (!Number.isInteger(levelId)) return NextResponse.json({ error: 'Pick a level.' }, { status: 400 });
+    const { data: before } = await supabase.from('best_runs').select('time_ms').eq('profile_id', targetId).eq('level_id', levelId).maybeSingle();
+    if (!before) return NextResponse.json({ error: 'That player has no time on that level.' }, { status: 404 });
+    if (action === 'deleteRun') {
+      const { error } = await supabase.from('best_runs').delete().eq('profile_id', targetId).eq('level_id', levelId);
+      if (error) return NextResponse.json({ error: 'Could not delete the run.' }, { status: 500 });
+      await logAdmin(admin.adminId, targetId, 'deleteRun', `level ${levelId}: removed ${fmt(before.time_ms)}`);
+      return NextResponse.json({ ok: true });
+    }
+    if (!Number.isFinite(timeMs) || timeMs <= 0 || timeMs > 60 * 60 * 1000) return NextResponse.json({ error: 'Enter a time in seconds.' }, { status: 400 });
+    const { error } = await supabase.from('best_runs').update({ time_ms: timeMs }).eq('profile_id', targetId).eq('level_id', levelId);
+    if (error) return NextResponse.json({ error: 'Could not change the time.' }, { status: 500 });
+    await logAdmin(admin.adminId, targetId, 'setTime', `level ${levelId}: ${fmt(before.time_ms)} → ${fmt(timeMs)}`);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'resetUnder') {
+    if (!Number.isFinite(timeMs) || timeMs <= 0 || timeMs > 10 * 60 * 1000) return NextResponse.json({ error: 'Enter a time in seconds.' }, { status: 400 });
+    const { data, error } = await supabase.from('best_runs').update({ time_ms: timeMs }).eq('profile_id', targetId).lte('level_id', 11).lt('time_ms', timeMs).select('level_id');
+    if (error) return NextResponse.json({ error: 'Could not reset the times.' }, { status: 500 });
+    const levels = (data ?? []).map((r) => r.level_id).sort((a, b) => a - b);
+    await logAdmin(admin.adminId, targetId, 'resetUnder', `levels ${levels.join(', ') || 'none'} set to ${fmt(timeMs)}`);
+    return NextResponse.json({ ok: true, changed: levels.length });
+  }
+
+  if (action === 'deleteCraze') {
+    const minutes = Number(body?.minutes);
+    const { data, error } = await supabase.from('craze_scores').delete().eq('profile_id', targetId).eq('minutes', minutes).select('kills');
+    if (error || !data?.length) return NextResponse.json({ error: 'No Craze score to delete.' }, { status: 404 });
+    await logAdmin(admin.adminId, targetId, 'deleteCraze', `${minutes} min: removed ${data[0].kills}`);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'setAdmin') {
+    const makeAdmin = body?.isAdmin === true;
+    if (targetId === admin.adminId && !makeAdmin) return NextResponse.json({ error: 'You can’t remove your own admin power.' }, { status: 400 });
+    const { data, error } = await supabase.from('profiles').update({ is_admin: makeAdmin }).eq('id', targetId).select('nickname');
+    if (error || !data?.length) return NextResponse.json({ error: 'Could not change admin power.' }, { status: 500 });
+    await logAdmin(admin.adminId, targetId, makeAdmin ? 'makeAdmin' : 'removeAdmin', `${data[0].nickname} ${makeAdmin ? 'is now an admin' : 'is no longer an admin'}`);
+    if (makeAdmin) await addNotification(targetId, 'info', 'You’re now an admin', 'You can open the Admin panel and the Admin chat from the 🛡 Admin link next to your name.');
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'warn') {
+    const title = String(body?.title ?? '').trim().slice(0, 80) || 'Warning from an admin';
+    const message = String(body?.message ?? '').trim().slice(0, 500);
+    if (message.length < 3) return NextResponse.json({ error: 'Write the warning message.' }, { status: 400 });
+    if (!(await addNotification(targetId, 'warning', title, message))) return NextResponse.json({ error: 'Could not send the warning.' }, { status: 500 });
+    await logAdmin(admin.adminId, targetId, 'warn', `${title}: ${message}`);
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
+}

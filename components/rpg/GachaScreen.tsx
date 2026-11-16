@@ -4,16 +4,18 @@ import { useEffect, useRef, useState } from 'react';
 import { type SoundEngine, getSoundEngine } from './audio';
 import { CHARACTERS, type Appearance, type CharacterDef, getCharacterLook, getSpriteCanvas } from './pixelArt';
 import {
-  DUPLICATE_REFUND,
+  CARDS_TO_UNLOCK,
+  type CardDraw,
+  DRAW_COST,
+  DRAW_COUNT,
+  type DrawType,
   GACHA_CHARACTERS,
   GACHA_RARITIES,
-  PULL_COST,
-  PULL_RATES,
-  type PullResult,
-  type PullType,
+  OWNED_CARD_REFUND,
   RARITY_INFO,
   SHARDS_PER_LEVEL,
   SHOP_PRICE,
+  cardsNeeded,
   rarityOf,
 } from './gacha';
 import { getSignatureWeapon } from './weapons';
@@ -48,62 +50,69 @@ export function HeroSprite({ char, size = 96, appearance = 'original', silhouett
   return <canvas ref={ref} width={size} height={size} className="gacha-sprite" />;
 }
 
-function Reveal({ result, onClose }: { result: PullResult; onClose: () => void }) {
-  const [phase, setPhase] = useState<'charge' | 'burst' | 'show'>('charge');
-  const char = CHARACTERS.find((c) => c.id === result.characterId) ?? CHARACTERS[0];
-  const info = RARITY_INFO[result.rarity];
-  const weapon = getSignatureWeapon(char.id);
-
+function CardReveal({ draws, refund, onClose }: { draws: CardDraw[]; refund: number; onClose: () => void }) {
+  const [shown, setShown] = useState(0); // cards flip over one after another
   useEffect(() => {
-    const t1 = window.setTimeout(() => setPhase('burst'), 1300);
-    const t2 = window.setTimeout(() => setPhase('show'), 1750);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
-  }, []);
+    if (shown >= draws.length) return;
+    const t = window.setTimeout(() => setShown((n) => n + 1), shown === 0 ? 450 : 220);
+    return () => window.clearTimeout(t);
+  }, [shown, draws.length]);
+  const unlocked = draws.filter((d) => d.unlockedNow);
 
   return (
-    <div className={`gacha-reveal phase-${phase}`} style={{ ['--rarity' as string]: info.color }} onClick={phase === 'show' ? onClose : () => setPhase('show')}>
-      {phase !== 'show' && (
-        <div className="gacha-capsule">
-          <div className="gacha-capsule-gem" />
+    <div className="card-reveal" onClick={() => (shown < draws.length ? setShown(draws.length) : onClose())}>
+      <div className="card-reveal-inner" onClick={(e) => e.stopPropagation()}>
+        <h2>{draws.length === 1 ? 'Your card' : `Your ${draws.length} cards`}</h2>
+        <div className={`card-grid count-${draws.length}`}>
+          {draws.map((d, i) => {
+            const char = CHARACTERS.find((c) => c.id === d.characterId) ?? CHARACTERS[0];
+            const info = RARITY_INFO[d.rarity];
+            const open = i < shown;
+            return (
+              <div key={i} className={`hero-card ${open ? 'open' : ''} ${d.unlockedNow ? 'unlocked' : ''}`} style={{ ['--rarity' as string]: info.color }}>
+                {open ? (
+                  <>
+                    <span className="rarity-badge" style={{ background: info.color }}>{info.name}</span>
+                    <HeroSprite char={char} size={64} />
+                    <strong className="hero-card-name">{char.name}</strong>
+                    {d.alreadyOwned ? (
+                      <small className="hero-card-note">Owned · +{OWNED_CARD_REFUND} 💎</small>
+                    ) : d.unlockedNow ? (
+                      <small className="hero-card-new">UNLOCKED!</small>
+                    ) : (
+                      <>
+                        <span className="card-progress"><span style={{ width: `${(d.cards / d.needed) * 100}%` }} /></span>
+                        <small className="hero-card-note">{d.cards}/{d.needed} cards</small>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span className="hero-card-back">💎</span>
+                )}
+              </div>
+            );
+          })}
         </div>
-      )}
-      {phase === 'burst' && <div className="gacha-flash" />}
-      {phase === 'show' && (
-        <div className="gacha-card">
-          <div className="gacha-rays" />
-          <span className="rarity-badge big" style={{ background: info.color }}>{info.name}</span>
-          <HeroSprite char={char} size={144} />
-          <h2>{char.name}</h2>
-          <p className="gacha-weapon" style={{ color: weapon.color }}>⚔ {weapon.name} — {weapon.desc}</p>
-          <p>{char.stats.passiveName} — {char.stats.passiveDesc}</p>
-          <ul className="char-perks">
-            {getPerks(char.id).map((perk) => (
-              <li key={perk.kind}><strong>{perk.name}:</strong> {perk.desc}</li>
-            ))}
-          </ul>
-          {result.duplicate ? (
-            <p className="gacha-dup">Already owned — refunded 💎 {result.refund}</p>
-          ) : (
-            <p className="gacha-new">NEW HERO UNLOCKED!</p>
-          )}
-          <button className="ability-btn" onClick={onClose}>Continue</button>
-        </div>
-      )}
+        {shown >= draws.length && (
+          <>
+            {unlocked.length > 0 && <p className="gacha-new">New hero{unlocked.length > 1 ? 'es' : ''} unlocked: {unlocked.map((d) => CHARACTERS.find((c) => c.id === d.characterId)?.name).join(', ')}!</p>}
+            {refund > 0 && <p className="gacha-dup">Cards for heroes you own: +{refund} 💎</p>}
+            <button className="ability-btn" onClick={onClose}>Continue</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 export default function GachaScreen() {
-  const { shards, owned, ready, storage, warning, isUnlocked, pull, buy } = useCollection();
+  const { shards, owned, cards, ready, storage, warning, isUnlocked, draw, buy } = useCollection();
   const { profile } = useProfile();
   const [tab, setTab] = useState<Tab>('summon');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [result, setResult] = useState<PullResult | null>(null);
+  const [result, setResult] = useState<{ draws: CardDraw[]; refund: number } | null>(null);
   const soundRef = useRef<SoundEngine | null>(null);
   if (!soundRef.current) soundRef.current = getSoundEngine();
   const sound = soundRef.current;
@@ -112,12 +121,12 @@ export default function GachaScreen() {
     sound.setMuted(window.localStorage.getItem(MUTE_STORAGE_KEY) === 'true');
   }, [sound]);
 
-  async function doPull(type: PullType) {
+  async function doDraw(type: DrawType) {
     sound.resume();
     setError(null);
     setNotice(null);
     setBusy(true);
-    const res = await pull(type);
+    const res = await draw(type);
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
@@ -125,9 +134,9 @@ export default function GachaScreen() {
     }
     sound.playMenuClick();
     window.setTimeout(() => {
-      if (res.value.rarity === 'legendary' || res.value.rarity === 'mythic') sound.playLevelComplete();
+      if (res.value.draws.some((d) => d.unlockedNow)) sound.playLevelComplete();
       else sound.playCrystalPickup();
-    }, 1500);
+    }, 600);
     setResult(res.value);
   }
 
@@ -167,7 +176,7 @@ export default function GachaScreen() {
       <div className="gacha-tabs" role="tablist">
         {(['summon', 'shop', 'collection'] as Tab[]).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-            {t === 'summon' ? 'Summon' : t === 'shop' ? 'Shop' : `Collection (${owned.length}/${GACHA_CHARACTERS.length})`}
+            {t === 'summon' ? 'Card Draw' : t === 'shop' ? 'Shop' : `Collection (${owned.filter((id) => GACHA_CHARACTERS.includes(id)).length}/${GACHA_CHARACTERS.length})`}
           </button>
         ))}
       </div>
@@ -177,33 +186,36 @@ export default function GachaScreen() {
 
       {tab === 'summon' && (
         <div className="gacha-banners">
-          {(['normal', 'lucky'] as PullType[]).map((type) => (
-            <div key={type} className={`gacha-banner banner-${type}`}>
-              <h2>{type === 'normal' ? 'Summon' : 'Lucky Summon'}</h2>
-              <p>{type === 'normal' ? 'A standard summon from the shard well.' : 'Much better odds of Epic, Legendary and Mythic heroes.'}</p>
-              <table className="gacha-rates">
-                <tbody>
-                  {GACHA_RARITIES.map((r) => (
-                    <tr key={r}>
-                      <td>
-                        <span className="rarity-dot" style={{ background: RARITY_INFO[r].color }} />
-                        {RARITY_INFO[r].name}
-                      </td>
-                      <td className="gacha-rate-bar">
-                        <span style={{ width: `${PULL_RATES[type][r]}%`, background: RARITY_INFO[r].color }} />
-                      </td>
-                      <td className="gacha-rate">{PULL_RATES[type][r]}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <button className="ability-btn gacha-pull" disabled={busy || !ready || shards < PULL_COST[type]} onClick={() => doPull(type)}>
-                Summon for 💎 {PULL_COST[type]}
-              </button>
+          <div className="gacha-banner banner-cards">
+            <h2>Card Draw</h2>
+            <p>
+              Every draw gives you a card for one hero, and every hero has the same chance: 1 in {GACHA_CHARACTERS.length} (
+              {(100 / GACHA_CHARACTERS.length).toFixed(1)}%). Collect enough cards for a hero to unlock them. Rarer heroes need more cards.
+            </p>
+            <table className="gacha-rates">
+              <tbody>
+                {GACHA_RARITIES.map((r) => (
+                  <tr key={r}>
+                    <td>
+                      <span className="rarity-dot" style={{ background: RARITY_INFO[r].color }} />
+                      {RARITY_INFO[r].name}
+                    </td>
+                    <td className="gacha-rate">{CARDS_TO_UNLOCK[r]} cards to unlock</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="draw-buttons">
+              {(['single', 'ten'] as DrawType[]).map((type) => (
+                <button key={type} className="ability-btn gacha-pull" disabled={busy || !ready || shards < DRAW_COST[type]} onClick={() => doDraw(type)}>
+                  Draw {DRAW_COUNT[type]} card{DRAW_COUNT[type] > 1 ? 's' : ''} · 💎 {DRAW_COST[type]}
+                </button>
+              ))}
             </div>
-          ))}
+            <p className="gacha-fine">A card for a hero you already own gives back {OWNED_CARD_REFUND} 💎. Drawing 10 at once saves 10 shards.</p>
+          </div>
           <div className="gacha-pool">
-            <h3>Heroes in the well</h3>
+            <h3>Heroes you can draw</h3>
             <div className="gacha-pool-grid">
               {gachaHeroes.map((c) => {
                 const r = rarityOf(c.id);
@@ -212,18 +224,19 @@ export default function GachaScreen() {
                     <HeroSprite char={c} size={64} silhouette={!isUnlocked(c.id)} />
                     <span>{isUnlocked(c.id) ? c.name : '???'}</span>
                     <small style={{ color: RARITY_INFO[r].color }}>{RARITY_INFO[r].name}</small>
+                    {!isUnlocked(c.id) && <small className="pool-cards">🃏 {cards[c.id] ?? 0}/{cardsNeeded(c.id)}</small>}
                   </div>
                 );
               })}
             </div>
-            <p className="gacha-fine">Getting a hero you already own refunds shards: {GACHA_RARITIES.map((r) => `${RARITY_INFO[r].name} ${DUPLICATE_REFUND[r]}`).join(' · ')}.</p>
+
           </div>
         </div>
       )}
 
       {tab === 'shop' && (
         <div className="gacha-shop">
-          <p>Pick exactly the hero you want. It costs more than summoning, but there is no luck involved.</p>
+          <p>Pick exactly the hero you want. It costs more than drawing cards for them, but there is no luck involved.</p>
           <div className="ability-grid">
             {gachaHeroes.map((c) => {
               const r = rarityOf(c.id);
@@ -262,14 +275,14 @@ export default function GachaScreen() {
                 <span className="rarity-badge" style={{ background: RARITY_INFO[r].color }}>{RARITY_INFO[r].name}</span>
                 <HeroSprite char={c} size={80} silhouette={!have} />
                 <h3>{have ? c.name : '???'}</h3>
-                <p className="char-weapon">{have ? `⚔ ${getSignatureWeapon(c.id).name}` : 'Locked'}</p>
+                <p className="char-weapon">{have ? `⚔ ${getSignatureWeapon(c.id).name}` : GACHA_CHARACTERS.includes(c.id) ? `🃏 ${cards[c.id] ?? 0}/${cardsNeeded(c.id)} cards` : 'Locked'}</p>
               </div>
             );
           })}
         </div>
       )}
 
-      {result && <Reveal result={result} onClose={() => setResult(null)} />}
+      {result && <CardReveal draws={result.draws} refund={result.refund} onClose={() => setResult(null)} />}
     </div>
   );
 }

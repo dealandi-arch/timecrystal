@@ -1220,7 +1220,7 @@ body {
 
 @media (hover: none) and (pointer: coarse) {
   .keyboard-hint { display: none; }
-  .rpg-shell { padding-bottom: 12.5rem; scroll-margin-top: 0.25rem; }
+  .rpg-shell { padding-bottom: 14rem; scroll-margin-top: 0.25rem; }
   .rpg-hud { gap: 0.4rem 0.75rem; font-size: 0.85rem; padding-right: 8.2rem; }
   .rpg-hud .ability-btn { margin-left: 0; padding: 0.35rem 0.7rem; font-size: 0.8rem; }
 
@@ -1537,7 +1537,7 @@ body {
 
 /* Touch controls for two hands: drag joystick on the left, fire zone on the right. */
 @media (hover: none) and (pointer: coarse) {
-  .touch-controls { height: 12rem; align-items: stretch; gap: 0.5rem; padding-top: 0.25rem; }
+  .touch-controls { height: 13.5rem; align-items: stretch; gap: 0.5rem; padding-top: 0.25rem; }
   .touch-stick-zone, .touch-fire-zone {
     position: relative;
     flex: 1 1 50%;
@@ -1645,3 +1645,103 @@ body {
   .touch-attack { left: 50%; top: 68%; width: 5.4rem; height: 5.4rem; margin: -2.7rem 0 0 -2.7rem; font-size: 1.9rem; }
   .touch-buttons { left: 0; align-items: stretch; max-width: none; }
 }
+
+/* Card gacha */
+.draw-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.draw-buttons .gacha-pull { flex: 1 1 12rem; }
+.pool-cards { font-size: 0.72rem; opacity: 0.85; }
+.card-reveal { position: fixed; inset: 0; z-index: 900; background: rgba(2, 4, 12, 0.85); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.card-reveal-inner { width: min(100%, 44rem); max-height: calc(100dvh - 32px); overflow: auto; text-align: center; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.2rem, 1fr)); gap: 0.6rem; margin: 0.75rem 0; }
+.card-grid.count-1 { grid-template-columns: minmax(9rem, 12rem); justify-content: center; }
+.hero-card { position: relative; min-height: 9.5rem; padding: 0.5rem 0.4rem; border-radius: 0.75rem; border: 2px solid var(--rarity); background: #0b1020; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2rem; transform: rotateY(90deg); transition: transform 0.25s ease-out; }
+.hero-card.open { transform: none; }
+.hero-card .rarity-badge { position: static; font-size: 0.6rem; }
+.hero-card.unlocked { box-shadow: 0 0 22px var(--rarity); }
+.hero-card-back { font-size: 2rem; }
+.hero-card-name { font-size: 0.85rem; }
+.hero-card-note { font-size: 0.72rem; opacity: 0.8; }
+.hero-card-new { color: #4ade80; font-weight: 800; font-size: 0.8rem; }
+.card-progress { width: 80%; height: 6px; border-radius: 999px; background: rgba(148, 163, 184, 0.25); overflow: hidden; }
+.card-progress span { display: block; height: 100%; background: var(--rarity); }
+
+/* Notifications (warnings) */
+.notice-backdrop { z-index: 1100; }
+.notice-box { width: min(100%, 28rem); padding: 1.25rem; border-radius: 1rem; background: #0b1020; border: 2px solid #38bdf8; text-align: center; animation: secret-pop 0.3s ease-out; }
+.notice-box h2 { margin-top: 0; }
+.notice-box small { display: block; margin: 0.25rem 0 0.9rem; opacity: 0.6; }
+.notice-warning { border-color: #ef4444; box-shadow: 0 0 40px rgba(239, 68, 68, 0.3); }
+.notice-warning .update-ok { background: #ef4444; color: #fff; }
+
+/* Multienemy Craze */
+.craze-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.craze-length { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+.craze-length strong { font-size: 2.2rem; line-height: 1; }
+.craze-timer { font-weight: 800; color: #67e8f9; font-variant-numeric: tabular-nums; }
+.craze-timer.low { color: #f87171; animation: craze-pulse 0.6s ease-in-out infinite alternate; }
+.craze-count { font-weight: 800; color: #f9a8d4; }
+.craze-score { font-size: 1.15rem; }
+.craze-score strong { font-size: 1.6rem; color: #f9a8d4; }
+.craze-rank .rank3d-tabs { margin: 0.4rem 0; }
+@keyframes craze-pulse { from { opacity: 1; } to { opacity: 0.55; } }
+
+/* Admin */
+.admin-found { display: grid; gap: 0.35rem; margin: 0.5rem 0; }
+.admin-player { text-align: left; padding: 0.5rem 0.75rem; border-radius: 0.6rem; border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(15, 23, 42, 0.6); color: inherit; font: inherit; cursor: pointer; }
+.admin-player.on { border-color: #67e8f9; }
+.admin-player small { opacity: 0.6; }
+.admin-detail { margin-top: 1rem; padding: 1rem; border-radius: 1rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(239, 68, 68, 0.35); }
+.admin-detail h2 small { font-size: 0.9rem; opacity: 0.6; }
+.admin-actions { display: flex; gap: 0.3rem; }
+.admin-actions .ability-btn { margin: 0; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+.admin-warn { display: grid; gap: 0.4rem; max-width: 32rem; }
+.admin-warn input, .admin-warn textarea { padding: 0.5rem 0.7rem; border-radius: 0.5rem; border: 1px solid rgba(148, 163, 184, 0.5); background: #0b1020; color: inherit; font: inherit; }
+.admin-log { font-size: 0.85rem; }
+.auth-admin { color: #fca5a5 !important; }
+/* Chat */
+.chat { max-width: 44rem; }
+.chat-list { height: min(60vh, 32rem); overflow-y: auto; padding: 0.5rem; border-radius: 0.75rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(103, 232, 249, 0.2); display: flex; flex-direction: column; gap: 0.5rem; }
+.chat-admin .chat-list { border-color: rgba(239, 68, 68, 0.4); }
+.chat-msg { display: flex; gap: 0.5rem; align-items: flex-start; }
+.chat-msg p { margin: 0.1rem 0 0; overflow-wrap: anywhere; }
+.chat-msg.mine p { color: #bae6fd; }
+.chat-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+.chat-meta a { font-weight: 700; color: inherit; }
+.chat-meta small { opacity: 0.5; }
+.chat-admin { font-size: 0.7rem; padding: 0 0.4rem; border-radius: 999px; background: rgba(239, 68, 68, 0.2); color: #fca5a5; font-weight: 800; }
+.chat-delete { border: 0; background: transparent; color: #f87171; cursor: pointer; font-size: 0.8rem; }
+.chat-form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.chat-form input { flex: 1; min-width: 0; padding: 0.55rem 0.75rem; border-radius: 0.5rem; border: 1px solid rgba(148, 163, 184, 0.5); background: #0b1020; color: inherit; font: inherit; }
+.chat-form .ability-btn { margin: 0; }
+
+/* Home page */
+.home-modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem; }
+.home-mode { display: flex; flex-direction: column; gap: 0.3rem; padding: 1rem; border-radius: 1rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(103, 232, 249, 0.2); color: inherit; text-decoration: none; transition: border-color 0.15s, transform 0.15s; }
+.home-mode:hover { border-color: #67e8f9; transform: translateY(-2px); }
+.home-mode-icon { font-size: 1.8rem; }
+.home-mode span:last-child { font-size: 0.9rem; opacity: 0.8; }
+.home-features { line-height: 1.7; }
+.home-more { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.home-more a { padding: 0.4rem 0.8rem; border-radius: 999px; border: 1px solid rgba(148, 163, 184, 0.35); color: inherit; text-decoration: none; font-size: 0.9rem; }
+.home-more a:hover { border-color: #67e8f9; }
+
+/* Cheat catcher */
+.cheat-catcher { margin: 1rem 0 1.5rem; padding: 1rem; border-radius: 1rem; background: rgba(127, 29, 29, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); }
+.cheat-catcher h2 { margin-top: 0; }
+.cheat-catcher .rank3d-tabs .ability-btn { margin: 0 0 0 auto; }
+.report-list { display: grid; gap: 0.5rem; }
+.report-row { display: grid; gap: 0.2rem; padding: 0.6rem 0.8rem; border-radius: 0.7rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(148, 163, 184, 0.3); color: inherit; text-decoration: none; }
+.report-row:hover { border-color: #f87171; }
+.report-row small { opacity: 0.6; }
+.report-status { font-size: 0.75rem; font-weight: 800; color: #fca5a5; }
+.status-review .report-status { color: #fbbf24; }
+.status-cleared .report-status { color: #4ade80; }
+.report-reason { font-size: 0.9rem; }
+.replay { margin: 0.75rem 0; }
+.replay-canvas { max-width: 100%; height: auto; border-radius: 0.5rem; background: #020617; image-rendering: pixelated; }
+.replay-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.replay-controls input[type=range] { flex: 1 1 12rem; }
+.replay-controls .ability-btn { margin: 0; }
+.replay-time { font-variant-numeric: tabular-nums; }
+.report-decide { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.notice-confirm { background: #b91c1c !important; color: #fff !important; }

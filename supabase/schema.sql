@@ -69,3 +69,81 @@ create index if not exists custom_levels_verified_idx on custom_levels (verified
 -- display_name is what everyone sees (null = show the username). It can change once every 5 days.
 alter table profiles add column if not exists display_name text;
 alter table profiles add column if not exists display_name_changed_at timestamptz;
+
+-- Update 10.5.0 (safe to re-run).
+-- notifications: messages shown to a player next time they open the site (e.g. a warning for a rejected run).
+create table if not exists notifications (
+  id bigserial primary key,
+  profile_id text not null references public.profiles(id) on delete cascade,
+  kind text not null default 'info',
+  title text not null,
+  message text not null,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index if not exists notifications_unread_idx on notifications (profile_id, read_at);
+-- hero_cards: card gacha progress, { heroId: cards collected }.
+alter table public.profiles add column if not exists hero_cards jsonb not null default '{}';
+-- craze_scores: best Multienemy Craze score per player and round length (minutes).
+create table if not exists craze_scores (
+  profile_id text not null references public.profiles(id) on delete cascade,
+  minutes int not null,
+  kills int not null,
+  duration_ms int not null,
+  achieved_at timestamptz not null default now(),
+  primary key (profile_id, minutes)
+);
+create index if not exists craze_scores_rank_idx on craze_scores (minutes, kills desc);
+
+-- Admins and chat (safe to re-run).
+-- is_admin: can use /admin (fix records, warn players, make admins) and the Admin chat.
+alter table public.profiles add column if not exists is_admin boolean not null default false;
+create table if not exists admin_log (
+  id bigserial primary key,
+  admin_id text not null references public.profiles(id) on delete cascade,
+  target_id text,
+  action text not null,
+  detail text,
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_log_target_idx on admin_log (target_id, created_at desc);
+-- chat_messages: the World chat (everyone) and the Admin chat (admins only).
+create table if not exists chat_messages (
+  id bigserial primary key,
+  channel text not null check (channel in ('world', 'admin')),
+  profile_id text not null references public.profiles(id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create index if not exists chat_messages_channel_idx on chat_messages (channel, id desc);
+create index if not exists chat_messages_author_idx on chat_messages (profile_id, created_at desc);
+
+-- Cheat catcher (safe to re-run).
+-- cheat_reports: runs the catcher refused ('open') or records that look suspicious ('review'), with the replay
+-- so admins can watch how it was done; admins mark them 'confirmed' or 'cleared'.
+create table if not exists cheat_reports (
+  id bigserial primary key,
+  profile_id text not null references public.profiles(id) on delete cascade,
+  level_id int not null,
+  level_name text not null,
+  time_ms int not null,
+  reason text not null,
+  status text not null default 'open' check (status in ('open', 'review', 'confirmed', 'cleared')),
+  replay jsonb,
+  level_snapshot jsonb,
+  created_at timestamptz not null default now(),
+  reviewed_by text,
+  reviewed_at timestamptz
+);
+create index if not exists cheat_reports_status_idx on cheat_reports (status, created_at desc);
+create index if not exists cheat_reports_player_idx on cheat_reports (profile_id, level_id, created_at desc);
+-- run_replays: the replay of each player's best run on each level, so any record can be watched.
+create table if not exists run_replays (
+  profile_id text not null references public.profiles(id) on delete cascade,
+  level_id int not null,
+  time_ms int not null,
+  replay jsonb,
+  created_at timestamptz not null default now(),
+  primary key (profile_id, level_id)
+);

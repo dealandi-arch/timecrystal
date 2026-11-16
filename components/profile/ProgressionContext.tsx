@@ -20,7 +20,7 @@ interface ProgressionContextValue {
   error: string | null;
   aizodon: number;
   levelOf: (characterId: string) => number;
-  claimRun: (levelId: number, timeMs: number, usedAbility: boolean, customLevelId?: number) => Promise<ClaimResult | null>;
+  claimRun: (levelId: number, timeMs: number, usedAbility: boolean, customLevelId?: number, ticket?: string | null, replay?: unknown) => Promise<ClaimResult | null>;
   levelUp: (characterId: string) => Promise<{ ok: boolean; error?: string }>;
   skills: SkillState;
   skillsReady: boolean;
@@ -35,6 +35,8 @@ interface PendingClaim {
   timeMs: number;
   usedAbility: boolean;
   customLevelId?: number; // public levels
+  ticket?: string | null; // start ticket that proves the run happened
+  replay?: unknown; // the run's replay, for the Cheat catcher
 }
 const MAX_PENDING_CLAIMS = 20;
 const RETRY_TOO_SOON_MS = 15000;
@@ -90,6 +92,11 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
       while (left.length && profileIdRef.current === id) {
         const { res, data } = await postJson('/api/progression/claim', left[0]);
         if (!res.ok) break;
+        if (data.own || data.rejected) {
+          left = left.slice(1); // will never pay: drop it
+          writePending(id, left);
+          continue;
+        }
         if (data.earned === 0) {
           tooSoon = true; // the server spaces out rewards, so try this one again shortly
           break;
@@ -146,9 +153,9 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
   const levelOf = useCallback((characterId: string) => levels[characterId] ?? 1, [levels]);
 
   const claimRun = useCallback(
-    async (levelId: number, timeMs: number, usedAbility: boolean, customLevelId?: number): Promise<ClaimResult | null> => {
+    async (levelId: number, timeMs: number, usedAbility: boolean, customLevelId?: number, ticket?: string | null, replay?: unknown): Promise<ClaimResult | null> => {
       if (!profileId) return null;
-      const claim = customLevelId === undefined ? { levelId, timeMs, usedAbility } : { levelId, timeMs, usedAbility, customLevelId };
+      const claim = { levelId, timeMs, usedAbility, ticket: ticket ?? null, replay: replay ?? null, ...(customLevelId === undefined ? {} : { customLevelId }) };
       const keepForLater = (): ClaimResult => {
         writePending(profileId, [...readPending(profileId), claim]);
         return { earned: 0, rank: '', pending: true };
@@ -159,7 +166,8 @@ export function ProgressionProvider({ children }: { children: ReactNode }) {
         setAizodon(data.aizodon);
         // The server spaces out rewards, so one refused as too soon is kept and paid shortly.
         // Your own public level never pays, so there's nothing to keep for later.
-        if (data.own) return { earned: 0, rank: '', reason: data.reason as string };
+        // Your own public level never pays, and a run that failed the check isn't kept to retry.
+        if (data.own || data.rejected) return { earned: 0, rank: '', reason: data.reason as string };
         const refused = data.earned === 0;
         const result = refused ? keepForLater() : { earned: data.earned, rank: data.rank, secret: (data.secret as string | null) ?? null };
         flushPending(profileId);

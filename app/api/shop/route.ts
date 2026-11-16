@@ -18,5 +18,5 @@ export async function POST(req: NextRequest) {
 
   const next = { shards: current.shards - price, owned: [...current.owned, characterId] };
   if (!(await saveCollection(auth.profileId, current.shards, next))) return conflictError();
-  return NextResponse.json(next);
+  return NextResponse.json({ ...next, cards: current.cards });
 }
