@@ -186,8 +186,8 @@ export default function AdminPanel() {
             ))
           )}
 
-          <h3>Give a hero or a tryout</h3>
-          <div className="event-code admin-give">
+          {profile.nickname.toLowerCase() === 'lavatatorr' && <h3>Give a hero or a tryout</h3>}
+          {profile.nickname.toLowerCase() === 'lavatatorr' && <div className="event-code admin-give">
             <select value={giveId} onChange={(e) => setGiveId(e.target.value)} aria-label="Hero">
               {GIVEABLE.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -203,7 +203,7 @@ export default function AdminPanel() {
             <button className="ability-btn" onClick={() => act({ action: 'giveTrial', heroId: giveId, days: Number(giveDays) }, `${giveDays}-day tryout given.`)}>
               ⏳ Give tryout
             </button>
-          </div>
+          </div>}
 
           <h3>Send a warning</h3>
           <form

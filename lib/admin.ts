@@ -12,6 +12,15 @@ export async function isAdmin(profileId: string): Promise<boolean> {
   return !error && !!(data as { is_admin?: boolean } | null)?.is_admin;
 }
 
+// The super admin is the only one who can give heroes or tryouts. Matched by login name (nicknames are unique).
+export const SUPER_ADMIN_NICKNAME = 'lavatatorr';
+
+export async function isSuperAdmin(profileId: string): Promise<boolean> {
+  const { data, error } = await getSupabase().from('profiles').select('nickname, is_admin').eq('id', profileId).maybeSingle();
+  const p = data as { nickname?: string; is_admin?: boolean } | null;
+  return !error && !!p?.is_admin && p.nickname?.toLowerCase() === SUPER_ADMIN_NICKNAME;
+}
+
 export async function requireAdmin(req: NextRequest): Promise<AdminCheck> {
   if (!isBackendConfigured()) return { ok: false, response: NextResponse.json({ error: 'Profiles are not set up on this server yet.' }, { status: 503 }) };
   const session = verifySessionToken(req.cookies.get(SESSION_COOKIE_NAME)?.value);

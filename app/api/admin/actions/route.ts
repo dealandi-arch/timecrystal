@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
-import { logAdmin, requireAdmin } from '../../../../lib/admin';
+import { isSuperAdmin, logAdmin, requireAdmin } from '../../../../lib/admin';
 import { addNotification } from '../../../../lib/notify';
 import { UNLOCKABLE_CHARACTERS } from '../../../../components/rpg/gacha';
 import { CHARACTERS } from '../../../../components/rpg/pixelArt';
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'giveHero' || action === 'giveTrial') {
+    if (!(await isSuperAdmin(admin.adminId))) return NextResponse.json({ error: 'Only the super admin can give heroes or tryouts.' }, { status: 403 });
     const heroId = String(body?.heroId ?? '');
     const hero = CHARACTERS.find((c) => c.id === heroId);
     if (!hero || !UNLOCKABLE_CHARACTERS.includes(heroId)) return NextResponse.json({ error: 'Pick a gacha or Secret hero.' }, { status: 400 });
