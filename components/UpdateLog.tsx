@@ -5,12 +5,17 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '13';
+export const CURRENT_UPDATE = '13.1';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   // Newest first. Every update gets an entry here and a bump of CURRENT_UPDATE above.
+  {
+    icon: '📌',
+    title: 'Pin your heroes',
+    text: 'Tap 📍 Pin on any hero in the hero list to keep them at the top. Tap 📌 Pinned to unpin. Your pins are remembered on this device.',
+  },
   {
     icon: '⚔️',
     title: 'PvP Arena and challenges',

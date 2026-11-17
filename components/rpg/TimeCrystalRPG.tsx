@@ -1778,6 +1778,8 @@ function AppearanceToggle({ appearance, onChange }: { appearance: Appearance; on
   );
 }
 
+const PINNED_KEY = 'timeCrystalPinnedHeroes';
+
 export function CharacterSelectScreen({
   onChoose,
   appearance,
@@ -1797,7 +1799,27 @@ export function CharacterSelectScreen({
 }) {
   const { isUnlocked, shards, trialEndsAt } = useCollection();
   // Secret heroes stay hidden until you have one (or a trial); events can limit the list.
-  const heroes = CHARACTERS.filter((c) => (onlyHeroes ? onlyHeroes.includes(c.id) : !isSecret(c.id) || isUnlocked(c.id)));
+  const visible = CHARACTERS.filter((c) => (onlyHeroes ? onlyHeroes.includes(c.id) : !isSecret(c.id) || isUnlocked(c.id)));
+  // Pinned heroes go to the top (kept in this browser).
+  const [pinned, setPinned] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(PINNED_KEY) ?? '[]');
+      if (Array.isArray(saved)) setPinned(saved.filter((id): id is string => typeof id === 'string'));
+    } catch {
+      /* no storage: pins just won't be remembered */
+    }
+  }, []);
+  function togglePin(id: string) {
+    const next = pinned.includes(id) ? pinned.filter((p) => p !== id) : [...pinned, id];
+    setPinned(next);
+    try {
+      window.localStorage.setItem(PINNED_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+  const heroes = [...visible.filter((c) => pinned.includes(c.id)), ...visible.filter((c) => !pinned.includes(c.id))];
   const { signedIn, levelOf, equippedSkill } = useProgression();
   return (
     <div className="ability-select">
@@ -1819,9 +1841,10 @@ export function CharacterSelectScreen({
           const unlocked = isUnlocked(c.id);
           const trialEnd = trialEndsAt(c.id);
           const weapon = getSignatureWeapon(c.id);
+          const isPinned = pinned.includes(c.id);
           return (
+          <div key={c.id} className="hero-slot">
           <button
-            key={c.id}
             className={`ability-card rarity-${rarity} ${unlocked ? '' : 'locked'}`}
             onClick={() => unlocked && onChoose(c.id)}
             aria-disabled={!unlocked}
@@ -1858,6 +1881,10 @@ export function CharacterSelectScreen({
               </p>
             )}
           </button>
+          <button className={`pin-btn${isPinned ? ' on' : ''}`} onClick={() => togglePin(c.id)} aria-pressed={isPinned} title={isPinned ? 'Unpin from the top' : 'Pin to the top'}>
+            {isPinned ? '📌 Pinned' : '📍 Pin'}
+          </button>
+          </div>
           );
         })}
       </div>
