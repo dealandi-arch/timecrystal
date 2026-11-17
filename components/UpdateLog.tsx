@@ -5,11 +5,17 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '10.5.0';
+export const CURRENT_UPDATE = '10.8';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
+  // Newest first. Every update gets an entry here and a bump of CURRENT_UPDATE above.
+  {
+    icon: '👑',
+    title: 'Super admin',
+    text: 'Only the super admin can give heroes or tryouts, and take heroes away from players. Other admins can still fix records, send warnings and use the Admin chat.',
+  },
   {
     icon: '👾',
     title: 'New mode: Multienemy Craze',
