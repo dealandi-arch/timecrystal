@@ -14,19 +14,24 @@ export const GHOST_WIN_SHARDS = 2;
 export const GHOST_REWARDS_PER_DAY = 5;
 export const LIVE_START_DELAY_MS = 3000; // from both players at the start to "GO"
 export const WAITING_TTL_MS = 90 * 1000;
+export const INVITE_TTL_MS = 5 * 60 * 1000; // how long a challenge waits to be accepted
 export const NO_SHOW_MS = 30 * 1000; // no news from the opponent for this long after the start: they forfeit
 export const RACE_LEVELS = Array.from({ length: TOTAL_LEVELS }, (_, i) => i + 1);
+
+export type PosRow = { x: number; y: number; ms: number; at: number; [extra: string]: unknown };
 
 export type MatchRow = {
   id: number;
   mode: 'ghost' | 'live';
+  kind: 'race' | 'arena'; // live matches are either a race or an arena fight (arena: level_id 0)
+  invite: boolean; // a challenge sent to one player, not a queue match
   level_id: number;
   a_id: string;
   b_id: string | null;
   status: 'waiting' | 'ready' | 'done' | 'cancelled';
   start_at: string | null;
-  a_pos: { x: number; y: number; ms: number; at: number } | null;
-  b_pos: { x: number; y: number; ms: number; at: number } | null;
+  a_pos: PosRow | null;
+  b_pos: PosRow | null;
   a_time_ms: number | null;
   b_time_ms: number | null;
   winner_id: string | null;
@@ -152,6 +157,9 @@ export async function matchView(match: MatchRow, me: string) {
   return {
     id: match.id,
     mode: match.mode,
+    kind: match.kind,
+    invite: match.invite,
+    side: iAmA ? 'a' : 'b',
     levelId: match.level_id,
     status: match.status,
     startAt: match.start_at ? new Date(match.start_at).getTime() : null,

@@ -5,12 +5,18 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '12';
+export const CURRENT_UPDATE = '13';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   // Newest first. Every update gets an entry here and a bump of CURRENT_UPDATE above.
+  {
+    icon: '⚔️',
+    title: 'PvP Arena and challenges',
+    text: 'Fight another player live in the Arena: dodge, fire, and land 5 hits before they do. You can also challenge a friend by username or #ID to a live race or an arena fight. They get a notification and 5 minutes to accept. Arena wins count on the PvP rank and earn Emerald Shards too.',
+    href: '/pvp',
+  },
   {
     icon: '🏁',
     title: 'New: PvP Race',

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
-import { LIVE_START_DELAY_MS, NO_SHOW_MS, WAITING_TTL_MS, loadMatch, matchView, requirePlayer, settleMatch } from '../../../../lib/pvp';
+import { INVITE_TTL_MS, LIVE_START_DELAY_MS, NO_SHOW_MS, WAITING_TTL_MS, loadMatch, matchView, requirePlayer, settleMatch } from '../../../../lib/pvp';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ async function respond(id: number, me: string, pos?: { x: number; y: number; ms:
   const supabase = getSupabase();
 
   // Tidy up matches that can't finish.
-  if (match.status === 'waiting' && now - new Date(match.created_at).getTime() > WAITING_TTL_MS) {
+  if (match.status === 'waiting' && now - new Date(match.created_at).getTime() > (match.invite ? INVITE_TTL_MS : WAITING_TTL_MS)) {
     await supabase.from('pvp_matches').update({ status: 'cancelled' }).eq('id', id).eq('status', 'waiting');
     match = { ...match, status: 'cancelled' };
   }

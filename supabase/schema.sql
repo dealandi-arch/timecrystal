@@ -240,3 +240,13 @@ create table if not exists pvp_matches (
 create index if not exists pvp_matches_waiting_idx on pvp_matches (status, mode, created_at);
 create index if not exists pvp_matches_player_idx on pvp_matches (a_id, mode, finished_at desc);
 create index if not exists profiles_pvp_rating_idx on public.profiles (pvp_rating desc);
+
+-- PvP arena fights and challenges (safe to re-run).
+-- kind: a live match is either a 'race' or an 'arena' fight (arena rows use level_id 0).
+-- invite: a challenge sent to one player (b_id is set from the start), not a queue match.
+alter table pvp_matches add column if not exists kind text not null default 'race';
+alter table pvp_matches add column if not exists invite boolean not null default false;
+do $$ begin
+  alter table pvp_matches add constraint pvp_matches_kind_check check (kind in ('race', 'arena'));
+exception when duplicate_object then null; end $$;
+create index if not exists pvp_matches_invite_idx on pvp_matches (b_id, status) where invite;

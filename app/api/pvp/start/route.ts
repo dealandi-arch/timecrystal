@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 // Start a race.
 //   { mode: 'ghost', levelId, opponentId }  race a recorded run of another player (the match starts right away)
-//   { mode: 'live' }                        join the queue: you're matched with the next waiting player on a random level
+//   { mode: 'live', kind: 'race' | 'arena' }                        join the queue: you're matched with the next waiting player on a random level
 export async function POST(req: NextRequest) {
   const auth = requirePlayer(req);
   if (!auth.ok) return auth.response;
@@ -37,9 +37,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (body?.mode === 'live') {
+    const kind: 'race' | 'arena' = body?.kind === 'arena' ? 'arena' : 'race';
     // Stale queue entries are cleared so nobody is matched with someone who left.
-    await supabase.from('pvp_matches').update({ status: 'cancelled' }).eq('status', 'waiting').lt('created_at', new Date(Date.now() - WAITING_TTL_MS).toISOString());
-    const { data: waiting } = await supabase.from('pvp_matches').select('*').eq('mode', 'live').eq('status', 'waiting').neq('a_id', me).order('id', { ascending: true }).limit(5);
+    await supabase.from('pvp_matches').update({ status: 'cancelled' }).eq('status', 'waiting').is('b_id', null).lt('created_at', new Date(Date.now() - WAITING_TTL_MS).toISOString());
+    const { data: waiting } = await supabase.from('pvp_matches').select('*').eq('mode', 'live').eq('kind', kind).eq('status', 'waiting').is('b_id', null).neq('a_id', me).order('id', { ascending: true }).limit(5);
     for (const w of (waiting ?? []) as unknown as MatchRow[]) {
       // Claim it only if it's still waiting (two joiners can't take the same match).
       const { data: claimed } = await supabase
@@ -50,8 +51,8 @@ export async function POST(req: NextRequest) {
         .select('*');
       if (claimed?.length) return NextResponse.json({ match: await matchView(claimed[0] as unknown as MatchRow, me) });
     }
-    const levelId = RACE_LEVELS[Math.floor(secureRandom() * RACE_LEVELS.length)];
-    const { data: created, error } = await supabase.from('pvp_matches').insert({ mode: 'live', level_id: levelId, a_id: me, status: 'waiting' }).select('*').single();
+    const levelId = kind === 'arena' ? 0 : RACE_LEVELS[Math.floor(secureRandom() * RACE_LEVELS.length)];
+    const { data: created, error } = await supabase.from('pvp_matches').insert({ mode: 'live', kind, level_id: levelId, a_id: me, status: 'waiting' }).select('*').single();
     if (error || !created) return notReady();
     return NextResponse.json({ match: await matchView(created as unknown as MatchRow, me) });
   }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TimeCrystalRPG from '../rpg/TimeCrystalRPG';
+import ArenaGame from './ArenaGame';
 import { LEVELS, getLevel } from '../rpg/levels';
 import type { Replay } from '../rpg/replay';
 import type { RaceConfig } from '../rpg/race';
@@ -11,6 +12,9 @@ import { useProfile } from '../profile/ProfileContext';
 type MatchView = {
   id: number;
   mode: 'ghost' | 'live';
+  kind: 'race' | 'arena';
+  invite: boolean;
+  side: 'a' | 'b';
   levelId: number;
   status: 'waiting' | 'ready' | 'done' | 'cancelled';
   startAt: number | null;
@@ -43,6 +47,9 @@ export default function PvpHub() {
   const [levelId, setLevelId] = useState(1);
   const [ghosts, setGhosts] = useState<Ghost[] | null>(null);
   const [board, setBoard] = useState<Entry[] | null>(null);
+  const [challenges, setChallenges] = useState<MatchView[]>([]);
+  const [friend, setFriend] = useState('');
+  const [friendKind, setFriendKind] = useState<'race' | 'arena'>('arena');
 
   // Live race plumbing (refs so the game loop always sees the latest).
   const oppRef = useRef<{ x: number; y: number } | null>(null);
@@ -72,8 +79,23 @@ export default function PvpHub() {
       .catch(() => setGhosts([]));
   }, [profile, levelId]);
 
+  // Challenges other players sent you: check every few seconds while you're on the menu.
+  const onMenu = !playing && !(view && view.status === 'waiting');
+  useEffect(() => {
+    if (!profile || !onMenu) return;
+    const load = () =>
+      fetch('/api/pvp/challenge', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((d) => setChallenges(d.challenges ?? []))
+        .catch(() => {});
+    load();
+    const timer = window.setInterval(load, 5000);
+    return () => window.clearInterval(timer);
+  }, [profile, onMenu]);
+
   // Waiting for a live opponent: check every second.
   const waitingId = view?.mode === 'live' && view.status === 'waiting' ? view.id : null;
+  const waitingInvite = !!view?.invite;
   useEffect(() => {
     if (waitingId === null) return;
     const timer = window.setInterval(async () => {
@@ -82,10 +104,13 @@ export default function PvpHub() {
       if (!data.match) return;
       apply(data.match);
       if (data.match.status === 'ready') setPlaying(true);
-      if (data.match.status === 'cancelled') setError('Nobody joined. Try again in a moment.');
+      if (data.match.status === 'cancelled') {
+        setError(waitingInvite ? 'The challenge was declined or ran out of time.' : 'Nobody joined. Try again in a moment.');
+        setView(null);
+      }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [waitingId, apply]);
+  }, [waitingId, waitingInvite, apply]);
 
   async function raceGhost(g: Ghost) {
     setBusy(true);
@@ -98,10 +123,37 @@ export default function PvpHub() {
     setPlaying(true);
   }
 
-  async function findLive() {
+  async function sendChallenge() {
     setBusy(true);
     setError(null);
-    const { ok, data } = await post('/api/pvp/start', { mode: 'live' });
+    const { ok, data } = await post('/api/pvp/challenge', { action: 'send', who: friend, kind: friendKind, levelId });
+    setBusy(false);
+    if (!ok) return setError(data?.error ?? 'Could not send the challenge.');
+    setGhost(null);
+    apply(data.match);
+  }
+
+  async function acceptChallenge(c: MatchView) {
+    setBusy(true);
+    setError(null);
+    const { ok, data } = await post('/api/pvp/challenge', { action: 'accept', matchId: c.id });
+    setBusy(false);
+    if (!ok) return setError(data?.error ?? 'Could not accept.');
+    setGhost(null);
+    setChallenges([]);
+    apply(data.match);
+    setPlaying(true);
+  }
+
+  async function declineChallenge(c: MatchView) {
+    await post('/api/pvp/leave', { matchId: c.id });
+    setChallenges((list) => list.filter((x) => x.id !== c.id));
+  }
+
+  async function findLive(kind: 'race' | 'arena') {
+    setBusy(true);
+    setError(null);
+    const { ok, data } = await post('/api/pvp/start', { mode: 'live', kind });
     setBusy(false);
     if (!ok) return setError(data?.error ?? 'Could not join the queue.');
     setGhost(null);
@@ -167,6 +219,39 @@ export default function PvpHub() {
   if (loading) return <p>Loading…</p>;
   if (!profile) return <p>Sign in to race other players.</p>;
 
+  if (playing && view && view.kind === 'arena') {
+    const draw = view.status === 'cancelled' && !view.finished;
+    return (
+      <div>
+        <p>
+          <button className="ability-btn story-skip" onClick={view.finished || draw ? backToMenu : leave}>
+            {view.finished || draw ? '← Back to the race menu' : '← Leave fight'}
+          </button>{' '}
+          <strong>
+            ⚔️ Arena fight vs {view.opponent?.name ?? 'Opponent'}
+            {view.opponent ? ` (${view.opponent.rating})` : ''}
+          </strong>
+        </p>
+        {view.finished && (
+          <div className="pvp-result">
+            <h2>{view.youWon ? '🏆 You won!' : 'You lost'}</h2>
+            <p>
+              {view.ratingChange !== null && `Rating ${view.ratingChange >= 0 ? '+' : ''}${view.ratingChange}. `}
+              {view.reward > 0 && `+${view.reward} Emerald Shards. `}
+            </p>
+          </div>
+        )}
+        {draw && (
+          <div className="pvp-result">
+            <h2>Draw</h2>
+            <p>Time ran out with equal hits. No rating change.</p>
+          </div>
+        )}
+        <ArenaGame key={view.id} matchId={view.id} side={view.side} opponentName={view.opponent?.name ?? 'Opponent'} onMatch={apply} />
+      </div>
+    );
+  }
+
   if (playing && view && play) {
     const level = getLevel(view.levelId);
     return (
@@ -201,8 +286,14 @@ export default function PvpHub() {
   if (view && view.mode === 'live' && view.status === 'waiting') {
     return (
       <div>
-        <h2>Looking for an opponent…</h2>
-        <p>You’ll be matched with the next player who joins. The level is picked for you both.</p>
+        <h2>{view.invite ? `Waiting for ${view.opponent?.name ?? 'your friend'} to accept…` : 'Looking for an opponent…'}</h2>
+        <p>
+          {view.invite
+            ? 'They’ve been notified and have 5 minutes to accept.'
+            : view.kind === 'arena'
+              ? 'You’ll be matched with the next player who joins the arena.'
+              : 'You’ll be matched with the next player who joins. The level is picked for you both.'}
+        </p>
         <button className="ability-btn story-skip" onClick={leave}>
           Cancel
         </button>
@@ -218,11 +309,51 @@ export default function PvpHub() {
       </p>
       {error && <p className="event-error">{error}</p>}
 
+      {challenges.length > 0 && (
+        <>
+          <h2>📨 Challenges for you</h2>
+          <ul className="pvp-list">
+            {challenges.map((c) => (
+              <li key={c.id}>
+                <span>
+                  {c.opponent?.name ?? 'A player'} <small>{c.kind === 'arena' ? 'arena fight' : `live race on ${getLevel(c.levelId)?.name ?? 'a level'}`}</small>
+                </span>
+                <button className="ability-btn" disabled={busy} onClick={() => acceptChallenge(c)}>
+                  Accept
+                </button>
+                <button className="ability-btn story-skip" onClick={() => declineChallenge(c)}>
+                  Decline
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <h2>⚡ Live race</h2>
       <p>Get matched with another player right now. You each pick a hero, and the race starts when you’re both at the start. Win: +6 Emerald Shards.</p>
-      <button className="event-play" disabled={busy} onClick={findLive}>
-        Find an opponent
+      <button className="event-play" disabled={busy} onClick={() => findLive('race')}>
+        Find a race opponent
       </button>
+
+      <h2>⚔️ Arena fight</h2>
+      <p>A live 1v1 fight in a walled room. Dodge, fire, and land 5 hits before they do. Win: +6 Emerald Shards. Needs two players online at the same time.</p>
+      <button className="event-play" disabled={busy} onClick={() => findLive('arena')}>
+        Find an arena opponent
+      </button>
+
+      <h2>🤝 Challenge a friend</h2>
+      <p>Type a player’s username or #ID. They get a notification and 5 minutes to accept.</p>
+      <div className="event-code">
+        <input value={friend} onChange={(e) => setFriend(e.target.value)} placeholder="Username or #ID" aria-label="Player to challenge" />
+        <select value={friendKind} onChange={(e) => setFriendKind(e.target.value as 'race' | 'arena')} aria-label="Kind">
+          <option value="arena">Arena fight</option>
+          <option value="race">Race on level {levelId}</option>
+        </select>
+        <button className="ability-btn" disabled={busy || !friend.trim()} onClick={sendChallenge}>
+          Challenge
+        </button>
+      </div>
 
       <h2>👻 Ghost race</h2>
       <p>Race the recorded best run of another player, any time. Win: +2 Emerald Shards (up to 5 rewarded wins a day), and half the rating.</p>

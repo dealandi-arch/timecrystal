@@ -1809,3 +1809,12 @@ ol.pvp-list li::before { counter-increment: pvp; content: counter(pvp) "."; min-
 .pvp-result h2 { margin: 0 0 0.25rem; }
 .craze-length.on { outline: 2px solid #67e8f9; }
 .race-count h2 { font-size: 2.6rem; }
+
+/* PvP arena */
+.arena-hud { display: flex; justify-content: space-between; gap: 1rem; font-weight: 800; margin: 0.4rem 0; flex-wrap: wrap; }
+.arena-stage { position: relative; max-width: 640px; }
+.arena-canvas { width: 100%; height: auto; border: 2px solid #334155; border-radius: 8px; display: block; touch-action: none; }
+.arena-help { font-size: 0.9rem; opacity: 0.85; max-width: 640px; }
+.arena-pad { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; max-width: 640px; margin-top: 0.5rem; touch-action: none; user-select: none; }
+.arena-pad button { min-width: 3rem; min-height: 3rem; margin: 0.15rem; font-size: 1.2rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08); color: inherit; touch-action: none; }
+.arena-pad .arena-fire { min-width: 6rem; font-weight: 800; background: rgba(251, 146, 60, 0.25); }
