@@ -203,6 +203,9 @@ export default function AdminPanel() {
             <button className="ability-btn" onClick={() => act({ action: 'giveTrial', heroId: giveId, days: Number(giveDays) }, `${giveDays}-day tryout given.`)}>
               ⏳ Give tryout
             </button>
+            <button className="ability-btn story-skip" onClick={() => window.confirm(`Remove ${GIVEABLE.find((c) => c.id === giveId)?.name} from ${detail.player.displayName}?`) && act({ action: 'removeHero', heroId: giveId }, 'Hero removed.')}>
+              🗑 Remove hero
+            </button>
           </div>}
 
           <h3>Send a warning</h3>

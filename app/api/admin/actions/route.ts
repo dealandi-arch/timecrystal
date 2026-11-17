@@ -14,6 +14,7 @@ import { CHARACTERS } from '../../../../components/rpg/pixelArt';
 //   setAdmin     { targetId, isAdmin }           give or remove admin power (not your own)
 //   giveHero     { targetId, heroId }            give a gacha or Secret hero to keep
 //   giveTrial    { targetId, heroId, days }      give a tryout of a hero for 1-30 days
+//   removeHero   { targetId, heroId }            take a hero (and any tryout of them) away (super admin only)
 export async function POST(req: NextRequest) {
   const admin = await requireAdmin(req);
   if (!admin.ok) return admin.response;
@@ -67,6 +68,28 @@ export async function POST(req: NextRequest) {
     if (error || !data?.length) return NextResponse.json({ error: 'Could not change admin power.' }, { status: 500 });
     await logAdmin(admin.adminId, targetId, makeAdmin ? 'makeAdmin' : 'removeAdmin', `${data[0].nickname} ${makeAdmin ? 'is now an admin' : 'is no longer an admin'}`);
     if (makeAdmin) await addNotification(targetId, 'info', 'You’re now an admin', 'You can open the Admin panel and the Admin chat from the 🛡 Admin link next to your name.');
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'removeHero') {
+    if (!(await isSuperAdmin(admin.adminId))) return NextResponse.json({ error: 'Only the super admin can remove heroes.' }, { status: 403 });
+    const heroId = String(body?.heroId ?? '');
+    const hero = CHARACTERS.find((c) => c.id === heroId);
+    if (!hero || !UNLOCKABLE_CHARACTERS.includes(heroId)) return NextResponse.json({ error: 'Pick a gacha or Secret hero.' }, { status: 400 });
+    const { data: p, error: readError } = await supabase.from('profiles').select('owned_characters, recent_characters, trials').eq('id', targetId).maybeSingle();
+    if (readError || !p) return NextResponse.json({ error: 'Could not read that player.' }, { status: 500 });
+    const row = p as { owned_characters?: string[]; recent_characters?: string[]; trials?: Record<string, string> };
+    const owned = row.owned_characters ?? [];
+    const trials = { ...(row.trials ?? {}) };
+    if (!owned.includes(heroId) && !(heroId in trials)) return NextResponse.json({ error: `They don’t have ${hero.name}.` }, { status: 400 });
+    delete trials[heroId];
+    const { error } = await supabase
+      .from('profiles')
+      .update({ owned_characters: owned.filter((id) => id !== heroId), recent_characters: (row.recent_characters ?? []).filter((id) => id !== heroId), trials })
+      .eq('id', targetId);
+    if (error) return NextResponse.json({ error: 'Could not remove the hero.' }, { status: 500 });
+    await addNotification(targetId, 'info', `${hero.name} was removed`, `An admin removed ${hero.name} from your heroes.`);
+    await logAdmin(admin.adminId, targetId, 'removeHero', hero.name);
     return NextResponse.json({ ok: true });
   }
 
