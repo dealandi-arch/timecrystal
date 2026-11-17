@@ -147,3 +147,68 @@ create table if not exists run_replays (
   created_at timestamptz not null default now(),
   primary key (profile_id, level_id)
 );
+
+-- Email linking, tryouts on the profile, daily rewards, trading (safe to re-run).
+-- email: optional and private (only the player sees it). trials: { heroId: ends at } (admins can give tryouts).
+-- daily: { day, spun, progress, claimed } for the daily wheel and quests.
+alter table public.profiles add column if not exists email text;
+create unique index if not exists profiles_email_idx on public.profiles (lower(email)) where email is not null;
+alter table public.profiles add column if not exists trials jsonb not null default '{}';
+alter table public.profiles add column if not exists daily jsonb not null default '{}';
+-- trades: an offer of shards and hero cards for shards and hero cards.
+create table if not exists trades (
+  id bigserial primary key,
+  from_id text not null references public.profiles(id) on delete cascade,
+  to_id text not null references public.profiles(id) on delete cascade,
+  give jsonb not null default '{}',
+  want jsonb not null default '{}',
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'cancelled')),
+  created_at timestamptz not null default now(),
+  decided_at timestamptz
+);
+create index if not exists trades_to_idx on trades (to_id, status);
+create index if not exists trades_from_idx on trades (from_id, status);
+-- accept_trade: checks both players still have what they're trading and swaps it all in one go.
+create or replace function accept_trade(p_trade bigint, p_by text) returns text
+language plpgsql as $$
+declare
+  t trades%rowtype;
+  a public.profiles%rowtype;
+  b public.profiles%rowtype;
+  k text;
+  v int;
+  gs int;
+  ws int;
+begin
+  select * into t from trades where id = p_trade for update;
+  if not found then return 'That trade doesn''t exist.'; end if;
+  if t.status <> 'pending' then return 'That trade is already finished.'; end if;
+  if t.to_id <> p_by then return 'This offer isn''t for you.'; end if;
+  select * into a from public.profiles where id = t.from_id for update;
+  select * into b from public.profiles where id = t.to_id for update;
+  gs := coalesce((t.give->>'shards')::int, 0);
+  ws := coalesce((t.want->>'shards')::int, 0);
+  if a.emerald_shards < gs then return 'They don''t have the shards they offered any more.'; end if;
+  if b.emerald_shards < ws then return 'You don''t have enough Emerald Shards.'; end if;
+  for k, v in select key, value::int from jsonb_each_text(coalesce(t.give->'cards', '{}')) loop
+    if k = any(a.owned_characters) then return 'They own that hero now, so those cards can''t be traded.'; end if;
+    if coalesce((a.hero_cards->>k)::int, 0) < v then return 'They don''t have those cards any more.'; end if;
+  end loop;
+  for k, v in select key, value::int from jsonb_each_text(coalesce(t.want->'cards', '{}')) loop
+    if k = any(b.owned_characters) then return 'You own that hero, so those cards can''t be traded.'; end if;
+    if coalesce((b.hero_cards->>k)::int, 0) < v then return 'You don''t have those cards.'; end if;
+  end loop;
+  for k, v in select key, value::int from jsonb_each_text(coalesce(t.give->'cards', '{}')) loop
+    a.hero_cards := jsonb_set(a.hero_cards, array[k], to_jsonb(coalesce((a.hero_cards->>k)::int, 0) - v));
+    b.hero_cards := jsonb_set(b.hero_cards, array[k], to_jsonb(coalesce((b.hero_cards->>k)::int, 0) + v));
+  end loop;
+  for k, v in select key, value::int from jsonb_each_text(coalesce(t.want->'cards', '{}')) loop
+    b.hero_cards := jsonb_set(b.hero_cards, array[k], to_jsonb(coalesce((b.hero_cards->>k)::int, 0) - v));
+    a.hero_cards := jsonb_set(a.hero_cards, array[k], to_jsonb(coalesce((a.hero_cards->>k)::int, 0) + v));
+  end loop;
+  update public.profiles set emerald_shards = a.emerald_shards - gs + ws, hero_cards = a.hero_cards where id = a.id;
+  update public.profiles set emerald_shards = b.emerald_shards - ws + gs, hero_cards = b.hero_cards where id = b.id;
+  update trades set status = 'accepted', decided_at = now() where id = t.id;
+  return 'ok';
+end;
+$$;

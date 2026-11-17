@@ -9,6 +9,7 @@ import { formatTime } from '../../../components/profile/formatTime';
 import Avatar from '../../../components/profile/Avatar';
 import AvatarEditor from '../../../components/profile/AvatarEditor';
 import DisplayNameEditor from '../../../components/profile/DisplayNameEditor';
+import EmailLink from '../../../components/profile/EmailLink';
 import { useProfile } from '../../../components/profile/ProfileContext';
 import { CHARACTERS } from '../../../components/rpg/pixelArt';
 import { RARITY_INFO, rarityOf } from '../../../components/rpg/gacha';
@@ -54,7 +55,7 @@ function lastOnline(iso: string | null): string {
 
 export default function ProfileViewPage() {
   const params = useParams<{ id: string }>();
-  const { profile: me, setAvatar, setDisplayName } = useProfile();
+  const { profile: me, setAvatar, setDisplayName, setEmail } = useProfile();
   const [profile, setProfile] = useState<ProfileData | null | undefined>(undefined);
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [editing, setEditing] = useState(false);
@@ -125,6 +126,7 @@ export default function ProfileViewPage() {
                   }}
                 />
               )}
+              {isMe && <EmailLink email={me?.email ?? null} onChange={setEmail} />}
               {isMe && (
                 <div>
                   <button className="ability-btn profile-edit-avatar" onClick={() => setEditing(true)}>

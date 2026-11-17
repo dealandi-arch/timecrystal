@@ -7,6 +7,10 @@ import { formatTime } from '../profile/formatTime';
 import { getAnyLevel } from '../rpg/levels3d';
 import { CUSTOM_ID_OFFSET } from '../rpg/customLevels';
 import CheatCatcher from './CheatCatcher';
+import { CHARACTERS } from '../rpg/pixelArt';
+import { RARITY_INFO, UNLOCKABLE_CHARACTERS, rarityOf } from '../rpg/gacha';
+
+const GIVEABLE = CHARACTERS.filter((c) => UNLOCKABLE_CHARACTERS.includes(c.id)).sort((a, b) => a.name.localeCompare(b.name));
 
 interface Found {
   id: string;
@@ -33,6 +37,8 @@ export default function AdminPanel() {
   const [resetTo, setResetTo] = useState('5');
   const [warnTitle, setWarnTitle] = useState('Warning from an admin');
   const [warnText, setWarnText] = useState('');
+  const [giveId, setGiveId] = useState(GIVEABLE[0]?.id ?? '');
+  const [giveDays, setGiveDays] = useState('3');
 
   const open = useCallback(async (id: string) => {
     const res = await fetch(`/api/admin/players/${id}`, { cache: 'no-store' });
@@ -179,6 +185,25 @@ export default function AdminPanel() {
               </p>
             ))
           )}
+
+          <h3>Give a hero or a tryout</h3>
+          <div className="event-code admin-give">
+            <select value={giveId} onChange={(e) => setGiveId(e.target.value)} aria-label="Hero">
+              {GIVEABLE.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({RARITY_INFO[rarityOf(c.id)].name})
+                </option>
+              ))}
+            </select>
+            <button className="ability-btn" onClick={() => window.confirm(`Give ${GIVEABLE.find((c) => c.id === giveId)?.name} to ${detail.player.displayName} to keep?`) && act({ action: 'giveHero', heroId: giveId }, 'Hero given.')}>
+              🎁 Give hero
+            </button>
+            <input value={giveDays} onChange={(e) => setGiveDays(e.target.value)} size={3} aria-label="Tryout days" />
+            <span>days</span>
+            <button className="ability-btn" onClick={() => act({ action: 'giveTrial', heroId: giveId, days: Number(giveDays) }, `${giveDays}-day tryout given.`)}>
+              ⏳ Give tryout
+            </button>
+          </div>
 
           <h3>Send a warning</h3>
           <form

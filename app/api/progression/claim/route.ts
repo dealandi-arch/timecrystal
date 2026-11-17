@@ -5,6 +5,8 @@ import { loadProgression, progressionStorageError, saveProgression } from '../..
 import { getAnyLevel } from '../../../../components/rpg/levels3d';
 import { CUSTOM_ID_OFFSET, customRewardWeight, toLevelDef } from '../../../../components/rpg/customLevels';
 import { checkRun } from '../../../../lib/runCheck';
+import { bumpDaily } from '../../../../lib/daily';
+import { isAdmin } from '../../../../lib/admin';
 import { analyzeReplay, replayChecksOn, reportCheat } from '../../../../lib/cheatCatcher';
 import { loadCustomLevel, markVerified } from '../../../../lib/customLevelsServer';
 import { minimumCreditedMs, runReward } from '../../../../components/rpg/progression';
@@ -47,14 +49,14 @@ export async function POST(req: NextRequest) {
   if (!check.ok) {
     if (check.cheat) await reportCheat({ profileId: auth.profileId, level, timeMs, reason: check.reason, replay: body?.replay, status: 'rejected' });
     const current = await loadProgression(auth.profileId);
-    return NextResponse.json({ earned: 0, rank: '', aizodon: current?.aizodon ?? 0, reason: check.reason, rejected: true });
+    return NextResponse.json({ earned: 0, rank: '', aizodon: current?.aizodon ?? 0, reason: check.cheat ? 'This run is waiting for an admin to check it before it counts.' : check.reason, rejected: true });
   }
   // Cheat catcher: the replay has to show the level really being played.
-  const problems = usedAbility || !replayChecksOn() ? [] : analyzeReplay(level, timeMs, body?.replay);
+  const problems = usedAbility || !replayChecksOn() || (await isAdmin(auth.profileId)) ? [] : analyzeReplay(level, timeMs, body?.replay);
   if (problems.length) {
     await reportCheat({ profileId: auth.profileId, level, timeMs, reason: problems.join(' '), replay: body?.replay, status: 'rejected' });
     const current = await loadProgression(auth.profileId);
-    return NextResponse.json({ earned: 0, rank: '', aizodon: current?.aizodon ?? 0, reason: 'The Cheat catcher stopped this run: ' + problems[0], rejected: true });
+    return NextResponse.json({ earned: 0, rank: '', aizodon: current?.aizodon ?? 0, reason: 'This run is waiting for an admin to check it before it counts.', rejected: true });
   }
   // Public levels pay half, and nobody earns from their own level.
   // Beating your own level verifies it (and makes it public).
@@ -86,7 +88,10 @@ export async function POST(req: NextRequest) {
 
     const aizodon = current.aizodon + reward.earned;
     const saved = await saveProgression(auth.profileId, current.aizodon, { aizodon, aizodon_claimed_at: new Date().toISOString() });
-    if (saved) return NextResponse.json({ earned: reward.earned, rank: reward.rank, aizodon, secret: await maybeGrantSecret(auth.profileId) });
+    if (saved) {
+      await bumpDaily(auth.profileId, 'clear3', 1); // daily quest: clear 3 levels
+      return NextResponse.json({ earned: reward.earned, rank: reward.rank, aizodon, secret: await maybeGrantSecret(auth.profileId) });
+    }
   }
   return conflictError();
 }

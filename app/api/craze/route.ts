@@ -3,8 +3,8 @@ import { getSupabase, isBackendConfigured } from '../../../lib/supabase';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '../../../lib/session';
 import { BASE_PUBLIC, WITH_AVATAR, WITH_NAME, selectWithFallback, shownNameOf } from '../../../lib/profileFields';
 import { readRunTicket } from '../../../lib/runCheck';
-import { warnCheater } from '../../../lib/notify';
-import { MAX_KILLS_PER_SECOND, crazeLevelId, isCrazeMinutes } from '../../../components/rpg/craze';
+import { bumpDaily } from '../../../lib/daily';
+import { crazeLevelId, isCrazeMinutes } from '../../../components/rpg/craze';
 
 export const dynamic = 'force-dynamic';
 const TOLERANCE_MS = 1500;
@@ -49,15 +49,10 @@ export async function POST(req: NextRequest) {
   if (!isCrazeMinutes(minutes) || !Number.isInteger(kills) || kills < 0 || !Number.isFinite(durationMs) || durationMs <= 0 || durationMs > minutes * 60000 + TOLERANCE_MS) {
     return NextResponse.json({ error: 'Invalid round.' }, { status: 400 });
   }
-  const where = `Multienemy Craze (${minutes} min)`;
-  const startedAt = readRunTicket(body?.ticket, session.id, crazeLevelId(minutes));
-  if (startedAt === null) return NextResponse.json({ error: 'This round couldn’t be checked. Reload the page and play again.', rejected: true }, { status: 400 });
-  // The round must really have lasted that long, and nobody can beat enemies faster than the limit.
-  if (durationMs > Date.now() - startedAt + TOLERANCE_MS || kills > Math.ceil((durationMs / 1000) * MAX_KILLS_PER_SECOND)) {
-    await warnCheater(session.id, where, 'That score isn’t possible in the time the round was open.');
-    return NextResponse.json({ error: 'That score isn’t possible.', rejected: true }, { status: 400 });
-  }
+  // A round needs the start ticket from when it began (so it comes from a real round in the game).
+  if (readRunTicket(body?.ticket, session.id, crazeLevelId(minutes)) === null) return NextResponse.json({ error: 'This round couldn’t be saved. Reload the page and play again.' }, { status: 400 });
 
+  await bumpDaily(session.id, 'craze15', kills); // daily quest: beat 15 Craze enemies
   const supabase = getSupabase();
   const { data: existing, error: readError } = await supabase.from('craze_scores').select('kills').eq('profile_id', session.id).eq('minutes', minutes).maybeSingle();
   if (readError) return NextResponse.json({ error: 'The Craze Rank is not set up yet. Run the latest supabase/schema.sql.' }, { status: 500 });

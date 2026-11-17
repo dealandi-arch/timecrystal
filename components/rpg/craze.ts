@@ -14,9 +14,6 @@ export function isCrazeMinutes(m: unknown): m is CrazeMinutes {
 // Each round length is its own "level" for start tickets (see lib/runCheck.ts).
 export const crazeLevelId = (minutes: CrazeMinutes) => 300 + minutes;
 
-// Nobody can beat more than this many enemies a second (the fastest weapons, every enemy in reach).
-export const MAX_KILLS_PER_SECOND = 2.5;
-
 // Enemies get tougher: 1 health, +1 for every 15 beaten.
 export const crazeEnemyHp = (beaten: number) => 1 + Math.floor(beaten / 15);
 

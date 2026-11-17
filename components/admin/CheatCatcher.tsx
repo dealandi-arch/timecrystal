@@ -18,7 +18,7 @@ interface ReportRow {
   hasReplay: boolean;
 }
 
-const STATUS_LABEL: Record<string, string> = { open: 'Refused', review: 'Counted, check it', confirmed: 'Cheating confirmed', cleared: 'Cleared' };
+const STATUS_LABEL: Record<string, string> = { open: 'Held back, waiting for you', review: 'Counted, check it', confirmed: 'Cheat', cleared: 'No cheat' };
 
 // The Cheat catcher's reports for admins: runs it refused, records that look suspicious, and a scan of old records.
 export default function CheatCatcher() {
@@ -54,8 +54,8 @@ export default function CheatCatcher() {
     <section className="cheat-catcher">
       <h2>🚨 Cheat catcher</h2>
       <p className="gacha-fine">
-        Every run is checked as it’s sent in. Refused runs and suspicious records show up here with their replay. Scan the records already on the lists to
-        catch older cheating.
+        Every run is checked as it’s sent in. Runs it holds back and suspicious records show up here with their replay. Players aren’t told anything until
+        you choose Cheat (they get a reminder) or No cheat (the run counts). Scan the records already on the lists to catch older cheating.
       </p>
       <div className="rank3d-tabs">
         <button className={tab === 'todo' ? 'on' : ''} onClick={() => setTab('todo')}>
@@ -126,7 +126,7 @@ export function ReportView({ id }: { id: number }) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) setError(data?.error ?? 'That didn’t work.');
     else {
-      setDone(decision === 'confirm' ? `Confirmed as cheating. The player has been warned${data.removed ? ' and the time removed' : ''}.` : 'Cleared: not cheating.');
+      setDone(decision === 'confirm' ? `Marked as cheat. The player has been sent a reminder${data.removed ? ' and the time removed' : ''}.` : `Marked as no cheat. The player has been told${data.counted ? ' and the run is on the list' : ''}.`);
       load();
     }
   }
@@ -148,11 +148,11 @@ export function ReportView({ id }: { id: number }) {
       {done && <p className="event-ok">{done}</p>}
       {(report.status === 'open' || report.status === 'review') && (
         <p className="report-decide">
-          <button className="ability-btn notice-confirm" onClick={() => window.confirm('Confirm this was cheating? The player is warned and, if this time is on a list, it’s removed.') && decide('confirm')}>
-            🚫 Confirm cheat
+          <button className="ability-btn notice-confirm" onClick={() => window.confirm('Cheat? The player gets a reminder to play fair and, if this time is on a list, it’s removed.') && decide('confirm')}>
+            🚫 Cheat
           </button>
-          <button className="ability-btn story-skip" onClick={() => decide('clear')}>
-            ✓ Not cheating
+          <button className="ability-btn report-fine" onClick={() => window.confirm('No cheat? The run counts and the player is told.') && decide('clear')}>
+            ✅ No cheat
           </button>
         </p>
       )}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { conflictError, loadCollection, requireSession, saveCollection, storageError } from '../../../../lib/collectionServer';
+import { bumpDaily } from '../../../../lib/daily';
 import { SHARDS_PER_LEVEL } from '../../../../components/rpg/gacha';
 
 // Called when a hidden Emerald Shard is picked up in a level.
@@ -16,7 +17,10 @@ export async function POST(req: NextRequest) {
     if (!current) return storageError();
     // Only shards change here; cards are left alone (and work before the hero_cards column exists).
     const next = { shards: current.shards + count, owned: current.owned };
-    if (await saveCollection(auth.profileId, current.shards, next)) return NextResponse.json({ ...next, cards: current.cards });
+    if (await saveCollection(auth.profileId, current.shards, next)) {
+      await bumpDaily(auth.profileId, 'shards5', count); // daily quest: find 5 shards
+      return NextResponse.json({ ...next, cards: current.cards });
+    }
   }
   return conflictError();
 }

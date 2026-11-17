@@ -31,6 +31,8 @@ interface CollectionContextValue extends Collection {
   grantSecret: (characterId: string) => void;
   // Guests roll for a Secret hero here after each clear (signed-in players roll on the server).
   rollSecretLocally: () => string | null;
+  // Load the collection again from the server (after a trade or a daily reward).
+  reload: () => void;
 }
 
 const LOCAL_KEY = 'timeCrystalCollection';
@@ -110,6 +112,9 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   profileIdRef.current = profile?.id ?? null;
   const flushingRef = useRef(false);
   const [trials, setTrials] = useState<Record<string, number>>({});
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+  const [profileTrials, setProfileTrials] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     setTrials(readTrials());
@@ -162,6 +167,13 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
           setStorage('profile');
           setWarning(null);
           setCollection({ shards: (data.shards ?? 0) + readPending(profile.id), owned: data.owned ?? [], cards: cleanCards(data.cards) });
+          // Tryouts saved on the profile (an admin can give these).
+          const fromProfile: Record<string, number> = {};
+          for (const [id, end] of Object.entries((data.trials ?? {}) as Record<string, string>)) {
+            const t = Date.parse(end);
+            if (UNLOCKABLE_CHARACTERS.includes(id) && Number.isFinite(t)) fromProfile[id] = t;
+          }
+          setProfileTrials(fromProfile);
           setReady(true);
           flushPending();
         } else {
@@ -174,7 +186,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [profile, profileLoading, fallBackToBrowser, flushPending]);
+  }, [profile, profileLoading, fallBackToBrowser, flushPending, reloadKey]);
 
   const updateLocal = useCallback((fn: (c: Collection) => Collection) => {
     setCollection((prev) => {
@@ -240,10 +252,11 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     [updateLocal]
   );
 
+  // A tryout from this browser (events, codes) or from the profile (given by an admin): whichever lasts longer.
   const trialEndsAt = useCallback((characterId: string) => {
-    const end = trials[characterId];
+    const end = Math.max(trials[characterId] ?? 0, profileTrials[characterId] ?? 0);
     return end && end > now ? end : null;
-  }, [trials, now]);
+  }, [trials, profileTrials, now]);
 
   // Each trial can be started once per browser; it unlocks the hero until it runs out.
   const startTrial = useCallback((characterId: string, days: number): ActionResult<number> => {
@@ -281,8 +294,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ...collection, ready, storage, warning, isUnlocked, addShards, draw, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally }),
-    [collection, ready, storage, warning, isUnlocked, addShards, draw, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally]
+    () => ({ ...collection, ready, storage, warning, isUnlocked, addShards, draw, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally, reload }),
+    [collection, ready, storage, warning, isUnlocked, addShards, draw, buy, trials, trialEndsAt, startTrial, grantSecret, rollSecretLocally, reload]
   );
   return <CollectionContext.Provider value={value}>{children}</CollectionContext.Provider>;
 }

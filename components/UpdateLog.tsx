@@ -28,9 +28,27 @@ const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
     text: 'The joystick reacts sooner, doesn’t flicker between directions near a diagonal, gives a tiny buzz when you turn, and has more room. Holding the fire zone now keeps attacking, and auto-fire shoots basic bullets only.',
   },
   {
+    icon: '🎡',
+    title: 'Daily wheel and quests',
+    text: 'Spin the wheel once a day for Emerald Shards, Aizodon or a hero card, and finish three daily quests for more rewards.',
+    href: '/daily',
+  },
+  {
+    icon: '🤝',
+    title: 'Trading',
+    text: 'Offer Emerald Shards and hero cards to other players for theirs. They accept or decline, and the swap happens all at once.',
+    href: '/trade',
+  },
+  {
+    icon: '👥',
+    title: 'Players list and email',
+    text: 'The Players page shows everyone straight away, most recently online first. You can link an email to your account from your profile if you want to (it stays private).',
+    href: '/profiles',
+  },
+  {
     icon: '🚨',
     title: 'Cheat catcher',
-    text: 'The game now records a short replay of every run. Runs that couldn’t really have been played don’t count: the player gets a reminder, and admins get the replay to watch.',
+    text: 'The game now records a short replay of every run. Runs that look impossible are held back, and the admins watch the replay and choose Cheat or No cheat before anything is said to the player.',
   },
   {
     icon: '🪨',
@@ -45,7 +63,7 @@ const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   {
     icon: '💬',
     title: 'World chat and admins',
-    text: 'Talk to everyone in the World chat. Admins have their own chat, an Admin panel for fixing records, and can make other players admins.',
+    text: 'Talk to everyone in the World chat. Admins have their own chat and an Admin panel for fixing records, giving heroes or tryouts, and making other players admins.',
     href: '/chat',
   },
   {

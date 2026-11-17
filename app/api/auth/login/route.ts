@@ -20,12 +20,13 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabase();
   const { data, upToDate } = await selectWithFallback(
     (columns) => supabase.from('profiles').select(columns).ilike('nickname', nickname).maybeSingle(),
+    'id, nickname, password_hash, avatar_color, avatar_pixels, last_seen_at, display_name, display_name_changed_at, is_admin, email',
     'id, nickname, password_hash, avatar_color, avatar_pixels, last_seen_at, display_name, display_name_changed_at, is_admin',
     'id, nickname, password_hash, avatar_color, avatar_pixels, last_seen_at, display_name, display_name_changed_at',
     'id, nickname, password_hash, avatar_color, avatar_pixels, last_seen_at',
     'id, nickname, password_hash, avatar_color'
   );
-  const profile = data as unknown as { id: string; nickname: string; is_admin?: boolean; display_name?: string | null; display_name_changed_at?: string | null; password_hash: string; avatar_color: string; avatar_pixels?: string | null } | null;
+  const profile = data as unknown as { id: string; nickname: string; is_admin?: boolean; email?: string | null; display_name?: string | null; display_name_changed_at?: string | null; password_hash: string; avatar_color: string; avatar_pixels?: string | null } | null;
 
   if (!profile) return NextResponse.json({ error: 'Nickname or password is incorrect.' }, { status: 401 });
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const token = createSessionToken({ id: profile.id, nickname: profile.nickname });
   const res = NextResponse.json({
-    profile: { id: profile.id, nickname: profile.nickname, displayName: profile.display_name?.trim() || profile.nickname, nameChangedAt: profile.display_name_changed_at ?? null, isAdmin: !!profile.is_admin, avatarColor: profile.avatar_color, avatarPixels: profile.avatar_pixels ?? null }
+    profile: { id: profile.id, nickname: profile.nickname, displayName: profile.display_name?.trim() || profile.nickname, nameChangedAt: profile.display_name_changed_at ?? null, isAdmin: !!profile.is_admin, email: profile.email ?? null, avatarColor: profile.avatar_color, avatarPixels: profile.avatar_pixels ?? null }
   });
   res.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,

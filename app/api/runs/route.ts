@@ -3,6 +3,7 @@ import { getSupabase, isBackendConfigured } from '../../../lib/supabase';
 import { getAnyLevel, isRankedLevelId } from '../../../components/rpg/levels3d';
 import { CUSTOM_ID_OFFSET, toLevelDef } from '../../../components/rpg/customLevels';
 import { checkRun } from '../../../lib/runCheck';
+import { isAdmin } from '../../../lib/admin';
 import { analyzeReplay, replayChecksOn, keepReplay, reportCheat } from '../../../lib/cheatCatcher';
 import { customLevelForRuns } from '../../../lib/customLevelsServer';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '../../../lib/session';
@@ -34,14 +35,17 @@ export async function POST(req: NextRequest) {
   // The run must have really happened (see lib/runCheck.ts). Impossible times earn a warning.
   const check = checkRun(body?.ticket, session.id, level, timeMs);
   if (!check.ok) {
-    if (check.cheat) await reportCheat({ profileId: session.id, level, timeMs, reason: check.reason, replay: body?.replay, status: 'rejected' });
+    if (check.cheat) {
+      await reportCheat({ profileId: session.id, level, timeMs, reason: check.reason, replay: body?.replay, status: 'rejected' });
+      return NextResponse.json({ error: 'This run is waiting for an admin to check it before it counts.', rejected: true }, { status: 400 });
+    }
     return NextResponse.json({ error: check.reason, rejected: true }, { status: 400 });
   }
   // Cheat catcher: the replay has to show the level really being played.
-  const problems = usedAbility || !replayChecksOn() ? [] : analyzeReplay(level, timeMs, body?.replay);
+  const problems = usedAbility || !replayChecksOn() || (await isAdmin(session.id)) ? [] : analyzeReplay(level, timeMs, body?.replay);
   if (problems.length) {
     await reportCheat({ profileId: session.id, level, timeMs, reason: problems.join(' '), replay: body?.replay, status: 'rejected' });
-    return NextResponse.json({ error: 'The Cheat catcher stopped this run: ' + problems[0], rejected: true }, { status: 400 });
+    return NextResponse.json({ error: 'This run is waiting for an admin to check it before it counts.', rejected: true }, { status: 400 });
   }
 
   if (usedAbility) {

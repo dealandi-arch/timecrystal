@@ -6,8 +6,9 @@ import { type Replay, REPLAY_EVERY_MS } from '../components/rpg/replay';
 
 // The Cheat catcher checks every finished run's replay (recorded by the game while you play):
 // the hero has to have really walked the level, beaten every enemy and reached the crystal, in the time claimed.
-// Anything impossible is refused; the player gets a reminder, and every admin gets a report with the replay
-// so they can watch exactly how it was done.
+// Anything impossible is held back and every admin gets a report with the replay. Nothing is said to the player
+// until an admin decides: "Cheat" sends them a reminder, "No cheat" puts the run on the list.
+// Admins are never reported.
 
 const FASTEST_TILES_PER_S = 25; // 40ms steps at the very fastest
 const ALLOWED_JUMPS = 6; // blink/dash/teleport skills move several tiles at once a few times per run
@@ -28,6 +29,8 @@ export function analyzeReplay(level: LevelDef, timeMs: number, replay: unknown):
   let jumps = 0;
   let wallAt: number | null = null;
   const solidAt = (x: number, y: number) => {
+    // Where the hero starts always counts as open (level 4 starts on a wall tile).
+    if (x === level.start.x && y === level.start.y) return false;
     const tile = level.grid[y]?.[x];
     return tile === undefined || (tile !== FLOOR && tile !== 2) || kindAt(level, x, y) === 'fence';
   };
@@ -61,6 +64,8 @@ export function analyzeReplay(level: LevelDef, timeMs: number, replay: unknown):
   return problems;
 }
 
+import { isAdmin } from './admin';
+
 interface Report {
   profileId: string;
   level: LevelDef;
@@ -76,10 +81,11 @@ async function playerName(profileId: string): Promise<string> {
   return (data as { nickname?: string } | null)?.nickname ?? `#${profileId}`;
 }
 
-// Saves the report, reminds the player (only when the run was refused) and tells every admin.
+// Saves the report and tells every admin. The player hears nothing until an admin decides.
 export async function reportCheat(report: Report): Promise<void> {
   const supabase = getSupabase();
   try {
+    if (await isAdmin(report.profileId)) return; // admins don't get reported
     // One report per player and level every 10 minutes is plenty (rewards and records are checked separately).
     const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: recent } = await supabase.from('cheat_reports').select('id').eq('profile_id', report.profileId).eq('level_id', report.level.id).gte('created_at', since).limit(1);
@@ -100,21 +106,13 @@ export async function reportCheat(report: Report): Promise<void> {
       .single();
     if (error || !saved) return;
     const name = await playerName(report.profileId);
-    if (report.status === 'rejected') {
-      await addNotification(
-        report.profileId,
-        'warning',
-        'Reminder: play fair',
-        `The Cheat catcher stopped your run on ${report.level.name} (${(report.timeMs / 1000).toFixed(2)}s): ${report.reason} It didn’t count, and the admins have been sent the replay to review.`
-      );
-    }
     const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
     for (const a of (admins ?? []) as { id: string }[]) {
       await addNotification(
         a.id,
         'info',
         `Cheat catcher: ${name} on ${report.level.name}`,
-        `${report.status === 'rejected' ? 'Refused' : 'Counted but suspicious'}: ${(report.timeMs / 1000).toFixed(2)}s. ${report.reason} Watch the replay: Admin → Cheat catcher → report #${saved.id}.`
+        `${report.status === 'rejected' ? 'Held back' : 'Counted but suspicious'}: ${(report.timeMs / 1000).toFixed(2)}s. ${report.reason} Watch the replay and choose Cheat or No cheat: Admin → Cheat catcher → report #${saved.id}.`
       );
     }
   } catch {

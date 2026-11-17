@@ -8,6 +8,7 @@ export interface Profile {
   displayName?: string; // what everyone sees
   nameChangedAt?: string | null;
   isAdmin?: boolean; // can open /admin and the Admin chat
+  email?: string | null; // optional, private: only shown to the player themselves
   avatarColor: string;
   avatarPixels?: string | null;
 }
@@ -25,6 +26,7 @@ interface ProfileContextValue {
   logOut: () => Promise<void>;
   setAvatar: (pixels: string | null, color: string) => void;
   setDisplayName: (displayName: string, changedAt: string) => void;
+  setEmail: (email: string | null) => void;
   startRun: (levelId: number) => Promise<string | null>;
   submitRun: (levelId: number, timeMs: number, kills: number, secrets: number, usedAbility: boolean, ticket: string | null, replay?: unknown) => Promise<{ savedAsPersonalBest: boolean; isWorldBest: boolean; skipped?: boolean } | null>;
 }
@@ -52,6 +54,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const setAvatar = useCallback((pixels: string | null, color: string) => {
     setProfile((p) => (p ? { ...p, avatarPixels: pixels, avatarColor: color } : p));
+  }, []);
+
+  const setEmail = useCallback((email: string | null) => {
+    setProfile((p) => (p ? { ...p, email } : p));
   }, []);
 
   const setDisplayName = useCallback((displayName: string, changedAt: string) => {
@@ -128,8 +134,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ profile, loading, signUp, logIn, logOut, startRun, submitRun, setAvatar, setDisplayName }),
-    [profile, loading, signUp, logIn, logOut, startRun, submitRun, setAvatar, setDisplayName]
+    () => ({ profile, loading, signUp, logIn, logOut, startRun, submitRun, setAvatar, setDisplayName, setEmail }),
+    [profile, loading, signUp, logIn, logOut, startRun, submitRun, setAvatar, setDisplayName, setEmail]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
 import { logAdmin, requireAdmin } from '../../../../lib/admin';
 import { addNotification } from '../../../../lib/notify';
+import { UNLOCKABLE_CHARACTERS } from '../../../../components/rpg/gacha';
+import { CHARACTERS } from '../../../../components/rpg/pixelArt';
 
 // Admin actions on a player's records. Each one is logged in admin_log.
 //   setTime      { targetId, levelId, timeMs }   change one World's Best time
@@ -10,6 +12,8 @@ import { addNotification } from '../../../../lib/notify';
 //   deleteCraze  { targetId, minutes }           remove a Craze score
 //   warn         { targetId, title, message }    send the player a warning notification
 //   setAdmin     { targetId, isAdmin }           give or remove admin power (not your own)
+//   giveHero     { targetId, heroId }            give a gacha or Secret hero to keep
+//   giveTrial    { targetId, heroId, days }      give a tryout of a hero for 1-30 days
 export async function POST(req: NextRequest) {
   const admin = await requireAdmin(req);
   if (!admin.ok) return admin.response;
@@ -63,6 +67,33 @@ export async function POST(req: NextRequest) {
     if (error || !data?.length) return NextResponse.json({ error: 'Could not change admin power.' }, { status: 500 });
     await logAdmin(admin.adminId, targetId, makeAdmin ? 'makeAdmin' : 'removeAdmin', `${data[0].nickname} ${makeAdmin ? 'is now an admin' : 'is no longer an admin'}`);
     if (makeAdmin) await addNotification(targetId, 'info', 'You’re now an admin', 'You can open the Admin panel and the Admin chat from the 🛡 Admin link next to your name.');
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'giveHero' || action === 'giveTrial') {
+    const heroId = String(body?.heroId ?? '');
+    const hero = CHARACTERS.find((c) => c.id === heroId);
+    if (!hero || !UNLOCKABLE_CHARACTERS.includes(heroId)) return NextResponse.json({ error: 'Pick a gacha or Secret hero.' }, { status: 400 });
+    const { data: p, error: readError } = await supabase.from('profiles').select('owned_characters, trials').eq('id', targetId).maybeSingle();
+    if (readError || !p) return NextResponse.json({ error: 'Could not read that player. (Run the latest supabase/schema.sql if tryouts are new.)' }, { status: 500 });
+    const owned = ((p as { owned_characters?: string[] }).owned_characters ?? []) as string[];
+    if (action === 'giveHero') {
+      if (owned.includes(heroId)) return NextResponse.json({ error: `They already have ${hero.name}.` }, { status: 400 });
+      const { error } = await supabase.from('profiles').update({ owned_characters: [...owned, heroId] }).eq('id', targetId);
+      if (error) return NextResponse.json({ error: 'Could not give the hero.' }, { status: 500 });
+      await addNotification(targetId, 'info', `You got ${hero.name}!`, `An admin gave you ${hero.name}. They’re yours to keep: pick them from the hero list.`);
+      await logAdmin(admin.adminId, targetId, 'giveHero', hero.name);
+      return NextResponse.json({ ok: true });
+    }
+    const days = Math.round(Number(body?.days));
+    if (!Number.isInteger(days) || days < 1 || days > 30) return NextResponse.json({ error: 'A tryout lasts 1 to 30 days.' }, { status: 400 });
+    if (owned.includes(heroId)) return NextResponse.json({ error: `They already own ${hero.name}.` }, { status: 400 });
+    const ends = new Date(Date.now() + days * 86400000).toISOString();
+    const trials = { ...(((p as { trials?: Record<string, string> }).trials ?? {}) as Record<string, string>), [heroId]: ends };
+    const { error } = await supabase.from('profiles').update({ trials }).eq('id', targetId);
+    if (error) return NextResponse.json({ error: 'Could not give the tryout.' }, { status: 500 });
+    await addNotification(targetId, 'info', `Free tryout: ${hero.name}`, `An admin gave you a ${days}-day tryout of ${hero.name}. Pick them from the hero list before it runs out!`);
+    await logAdmin(admin.adminId, targetId, 'giveTrial', `${hero.name} for ${days} day${days > 1 ? 's' : ''}`);
     return NextResponse.json({ ok: true });
   }
 
