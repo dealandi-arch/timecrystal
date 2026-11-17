@@ -8,6 +8,7 @@ const BUTTONS = [
   { href: '/story', icon: '📖', label: 'Story mode' },
   { href: '/3d', icon: '🧊', label: '3D maps' },
   { href: '/craze', icon: '👾', label: 'Multienemy Craze' },
+  { href: '/pvp', icon: '🏁', label: 'PvP Race' },
   { href: '/daily', icon: '🎡', label: 'Daily wheel & quests' },
   { href: '/levels', icon: '🧱', label: 'Public levels' },
   { href: '/events', icon: '🎟️', label: 'Events' },

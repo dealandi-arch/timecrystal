@@ -1797,3 +1797,15 @@ body {
 .card-add { display: inline-flex; gap: 0.3rem; align-items: center; }
 .card-add select { padding: 0.35rem; border-radius: 0.4rem; background: #0b1020; color: inherit; border: 1px solid rgba(148, 163, 184, 0.5); font: inherit; max-width: 12rem; }
 .card-add .ability-btn { margin: 0; padding: 0.25rem 0.6rem; }
+
+/* PvP races */
+.pvp-hub h2 { margin: 1.4rem 0 0.4rem; }
+.pvp-list { list-style: none; padding: 0; margin: 0.5rem 0; display: grid; gap: 0.4rem; }
+ol.pvp-list { counter-reset: pvp; }
+ol.pvp-list li::before { counter-increment: pvp; content: counter(pvp) "."; min-width: 1.8rem; font-weight: 800; color: #fde047; }
+.pvp-list li { display: flex; align-items: center; gap: 0.75rem; justify-content: space-between; padding: 0.45rem 0.7rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; background: rgba(255, 255, 255, 0.04); }
+.pvp-list li > span:first-of-type { flex: 1; }
+.pvp-result { margin: 0.6rem 0; padding: 0.7rem 1rem; border: 2px solid #fde047; border-radius: 10px; background: rgba(253, 224, 71, 0.08); }
+.pvp-result h2 { margin: 0 0 0.25rem; }
+.craze-length.on { outline: 2px solid #67e8f9; }
+.race-count h2 { font-size: 2.6rem; }

@@ -5,12 +5,18 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '10.8';
+export const CURRENT_UPDATE = '12';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   // Newest first. Every update gets an entry here and a bump of CURRENT_UPDATE above.
+  {
+    icon: '🏁',
+    title: 'New: PvP Race',
+    text: 'Race another player on the same level and the faster finish wins. Play a live race against someone who’s online, or race the recorded run of any player as a ghost. Win to climb the PvP rank (everyone starts at 1000) and earn Emerald Shards. Help abilities are off in races.',
+    href: '/pvp',
+  },
   {
     icon: '👑',
     title: 'Super admin',

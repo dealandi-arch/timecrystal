@@ -9,7 +9,8 @@ import { FLOOR, SECRET, TILE, type LevelDef, type Point, TOTAL_LEVELS, getLevel 
 import { clearOldLevelEdits, getTestLevel } from './testLevels';
 import { customRewardWeight } from './customLevels';
 import { type CrazeMinutes, crazeEnemyHp, crazeLevelId } from './craze';
-import { newReplay, recordSample } from './replay';
+import { newReplay, positionAt, recordSample } from './replay';
+import { RACE_COUNTDOWN_MS, type RaceConfig } from './race';
 import CrazeRank from './CrazeRank';
 import { LEVELS_3D, isRankedLevelId } from './levels3d';
 import { canStep, heightAt, isDark, kindAt } from './terrain';
@@ -320,11 +321,18 @@ interface LevelRunnerProps {
   rankLink?: { href: string; label: string }; // the full ranking this level belongs to
   onStart?: () => void; // the level has opened (fetch a start ticket)
   craze?: { minutes: CrazeMinutes }; // Multienemy Craze round instead of a normal level
+  race?: RaceConfig; // a PvP race: countdown, opponent marker, no help abilities
   signedIn: boolean;
 }
 
-function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn, ranked = true, rankTitle, rankLink, shardCount = SHARDS_PER_LEVEL, onStart, craze }: LevelRunnerProps) {
+function LevelRunner({ level, save, sound, characterId, theme, appearance, displayName, onToggleAppearance, onLevelComplete, onAbilityUsed, onPowerActivated, onEmeraldFound, autoWeapon, paused, heroLevel, skill, view3d = false, onRunFinished, signedIn, ranked = true, rankTitle, rankLink, shardCount = SHARDS_PER_LEVEL, onStart, craze, race }: LevelRunnerProps) {
   const crazeRef = useRef(craze);
+  const raceRef = useRef(race);
+  // Everyone is held at the start until this moment (ghost races: a few seconds from now; live races: the
+  // server's start time, once both players are at the start).
+  const raceGateRef = useRef(race && !race.live ? Date.now() + RACE_COUNTDOWN_MS : 0);
+  const raceCountRef = useRef(race ? 99 : 0);
+  const [raceCount, setRaceCount] = useState(race ? 99 : 0);
   const [crazeBeaten, setCrazeBeaten] = useState(0);
   const [crazeLeft, setCrazeLeft] = useState(craze ? craze.minutes * 60 : 0);
   const [crazeEnd, setCrazeEnd] = useState<'time' | 'ko' | null>(null);
@@ -415,6 +423,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
     lastBasic: true, // the last attack used the basic gun (Echo repeats the same weapon)
     crazeBeaten: 0,
     crazeSecond: -1,
+    racePosAt: 0,
     replay: newReplay(), // for the Cheat catcher
     perk: freshPerkState(),
     skill: freshSkillState()
@@ -878,6 +887,30 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
     function update(dt: number) {
       if (s.won) return;
+      if (raceRef.current) {
+        const live = raceRef.current.live;
+        const gate = live ? live.getStartAt() : raceGateRef.current;
+        const wait = gate === null ? Infinity : gate - Date.now();
+        if (live && wait > 0 && performance.now() - s.racePosAt > 400) {
+          // Tell the server I'm at the start (and hear when the other player is too).
+          s.racePosAt = performance.now();
+          live.send(s.player.gx, s.player.gy, -1);
+        }
+        if (wait > 0) {
+          s.startTime = performance.now(); // the clock starts when the countdown ends
+          const whole = wait === Infinity ? 99 : Math.ceil(wait / 1000);
+          if (whole !== raceCountRef.current) {
+            raceCountRef.current = whole;
+            setRaceCount(whole);
+          }
+          return;
+        }
+        if (raceCountRef.current !== 0) {
+          raceCountRef.current = 0;
+          setRaceCount(0);
+          s.startTime = performance.now() + wait; // a late start still counts from the real start time
+        }
+      }
       if (crazeRef.current) {
         const left = crazeRef.current.minutes * 60 - (performance.now() - s.startTime) / 1000;
         if (left <= 0) {
@@ -924,6 +957,10 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
       const perk = activePerks();
       recordSample(s.replay, performance.now() - s.startTime, lerp(p.fromX, p.gx, p.moveT), lerp(p.fromY, p.gy, p.moveT));
+      if (raceRef.current?.live && performance.now() - s.racePosAt > 400) {
+        s.racePosAt = performance.now();
+        raceRef.current.live.send(lerp(p.fromX, p.gx, p.moveT), lerp(p.fromY, p.gy, p.moveT), Math.round(performance.now() - s.startTime));
+      }
       if (s.perk.hasteT > 0) s.perk.hasteT -= dt;
       if (s.perk.frenzyT > 0) s.perk.frenzyT -= dt;
       for (const key of ['radarT', 'cloakT', 'blizzardT', 'guidingT', 'crystalFreezeT', 'flashT'] as const) {
@@ -1345,6 +1382,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       }
 
       drawParticles(ctx, s.particles);
+      drawRaceOpponent();
       ctx.restore();
 
       const r3d = rendererRef.current;
@@ -1422,6 +1460,32 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
       );
     }
 
+    // The other racer: a see-through marker with their name (a recorded ghost, or the live player).
+    function drawRaceOpponent() {
+      const r = raceRef.current;
+      if (!r || raceCountRef.current === 99) return;
+      let at: { x: number; y: number } | null = null;
+      if (r.ghost) at = positionAt(r.ghost, Math.max(0, performance.now() - s.startTime));
+      else if (r.live) at = r.live.opponent.current;
+      if (!at) return;
+      const cx = (at.x + 0.5) * TILE;
+      const cy = (at.y + 0.5) * TILE;
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#fb923c';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, TILE * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(r.ghost ? `👻 ${r.opponentName}` : r.opponentName, cx, cy - TILE * 0.5);
+      ctx.restore();
+    }
     function drawTerrain(c: CanvasRenderingContext2D) {
       for (let y = 0; y < level.grid.length; y++) {
         for (let x = 0; x < level.grid[y].length; x++) {
@@ -1523,7 +1587,7 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
 
   const abilityDef = ABILITIES.find((a) => a.id === save.ability);
   const abilityBlockedHere = save.ability === 'killAll' && level.isBoss;
-  const canUseAbility = !!save.ability && !save.abilityUsed && !abilityBlockedHere && !craze;
+  const canUseAbility = !!save.ability && !save.abilityUsed && !abilityBlockedHere && !craze && !race;
 
   return (
     <div className="rpg-shell" ref={shellRef}>
@@ -1584,6 +1648,12 @@ function LevelRunner({ level, save, sound, characterId, theme, appearance, displ
         {view3d && <div ref={view3dRef} className="view3d" />}
         {view3dError && <div className="rpg-toast">{view3dError}</div>}
         {toast && <div className="rpg-toast">{toast}</div>}
+        {race && raceCount > 0 && (
+          <div className="game-overlay race-count">
+            <p>Race vs {race.opponentName}</p>
+            <h2>{raceCount > 4 ? 'Waiting for your opponent…' : raceCount > 3 ? 'Get ready…' : raceCount}</h2>
+          </div>
+        )}
         {won && runStats && craze && (
           <div className="game-overlay craze-over">
             <h2>{crazeEnd === 'ko' ? 'Knocked out!' : 'Time’s up!'}</h2>
@@ -1834,6 +1904,7 @@ export interface CustomPlay {
   ownLevel?: boolean; // the player made it: no Emerald Shards (they could replay it for free shards)
   rank?: { title: string; link: { href: string; label: string } }; // which ranking the runs go on
   craze?: { minutes: CrazeMinutes }; // a Multienemy Craze round
+  race?: RaceConfig; // a PvP race against a ghost or a live player
   rewards?: boolean; // false for test plays in the level builder
   finale: { title: string; text: string };
 }
@@ -1928,6 +1999,10 @@ export default function TimeCrystalRPG({
   // Builder test plays never count.
   async function finishRun(level: LevelDef, stats: LevelRunStats): Promise<ClaimResult | null> {
     if (custom && custom.rewards === false) return null;
+    if (custom?.race) {
+      const ticket = ticketRef.current ? await ticketRef.current : null;
+      custom.race.onFinish({ timeMs: stats.timeMs, usedAbility: stats.usedAbility, replay: stats.replay }, ticket);
+    }
     if (custom?.craze) {
       // Craze rounds go on the Craze Rank (no Aizodon, no shards, no Secret heroes).
       if (!signedIn) return null;
@@ -2070,6 +2145,7 @@ export default function TimeCrystalRPG({
             signedIn={signedIn}
             ranked={!custom?.craze && (isRankedLevelId(level.id) || !!custom?.customLevelId)}
             craze={custom?.craze}
+            race={custom?.race}
             shardCount={shardCount}
             rankTitle={custom?.rank?.title ?? (custom?.customLevelId ? 'Level Rank' : undefined)}
             rankLink={custom?.rank?.link ?? (custom?.customLevelId ? { href: '/levels/rank', label: 'See the Public Levels Rank' } : undefined)}

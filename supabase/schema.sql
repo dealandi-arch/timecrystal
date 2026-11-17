@@ -212,3 +212,31 @@ begin
   return 'ok';
 end;
 $$;
+
+-- PvP races (safe to re-run).
+-- pvp_rating: Elo-style rating (start 1000). pvp_matches: a race against a ghost (a recorded run) or a live player.
+alter table public.profiles add column if not exists pvp_rating int not null default 1000;
+alter table public.profiles add column if not exists pvp_wins int not null default 0;
+alter table public.profiles add column if not exists pvp_losses int not null default 0;
+create table if not exists pvp_matches (
+  id bigserial primary key,
+  mode text not null check (mode in ('ghost', 'live')),
+  level_id int not null,
+  a_id text not null references public.profiles(id) on delete cascade,
+  b_id text references public.profiles(id) on delete cascade,
+  status text not null default 'waiting' check (status in ('waiting', 'ready', 'done', 'cancelled')),
+  start_at timestamptz,
+  a_pos jsonb,
+  b_pos jsonb,
+  a_time_ms int,
+  b_time_ms int,
+  winner_id text,
+  a_change int,
+  b_change int,
+  reward int not null default 0,
+  created_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+create index if not exists pvp_matches_waiting_idx on pvp_matches (status, mode, created_at);
+create index if not exists pvp_matches_player_idx on pvp_matches (a_id, mode, finished_at desc);
+create index if not exists profiles_pvp_rating_idx on public.profiles (pvp_rating desc);
