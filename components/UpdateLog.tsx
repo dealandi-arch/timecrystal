@@ -5,12 +5,29 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '13.1';
+export const CURRENT_UPDATE = '14';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   // Newest first. Every update gets an entry here and a bump of CURRENT_UPDATE above.
+  {
+    icon: '🗺️',
+    title: 'Six paths, six stories',
+    text: 'Pick a path: the Normal Path (the original), the Nature Path, the Shadow Path, the Sea Path, the Politics Path or the Fire Path. Each has 11 crystal levels with its own look, its own kind of map, a story card before every level and a boss at the end. Every level on every path has its own World Record.',
+    href: '/paths',
+  },
+  {
+    icon: '⚔️',
+    title: 'Player Fight is now 3D',
+    text: 'PvP is now a 3D fight: pick your hero, aim with the crosshair and fire. Every hero fights differently, and your health comes back a few seconds after the last hit. Challenge someone and they see it on any page, even the home page, for 10 minutes. Close the window while you wait: when they accept, you are taken straight into hero select.',
+    href: '/pvp',
+  },
+  {
+    icon: '🚨',
+    title: 'A much quieter cheat catcher',
+    text: 'Only clear-cut cases are flagged now, a couple per day at most. Standing on a wall tile no longer counts against anyone.',
+  },
   {
     icon: '📌',
     title: 'Pin your heroes',

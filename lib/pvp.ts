@@ -14,7 +14,7 @@ export const GHOST_WIN_SHARDS = 2;
 export const GHOST_REWARDS_PER_DAY = 5;
 export const LIVE_START_DELAY_MS = 3000; // from both players at the start to "GO"
 export const WAITING_TTL_MS = 90 * 1000;
-export const INVITE_TTL_MS = 5 * 60 * 1000; // how long a challenge waits to be accepted
+export const INVITE_TTL_MS = 10 * 60 * 1000; // how long a challenge waits to be accepted
 export const NO_SHOW_MS = 30 * 1000; // no news from the opponent for this long after the start: they forfeit
 export const RACE_LEVELS = Array.from({ length: TOTAL_LEVELS }, (_, i) => i + 1);
 

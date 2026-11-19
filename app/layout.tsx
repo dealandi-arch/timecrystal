@@ -6,6 +6,7 @@ import { CollectionProvider } from '../components/profile/CollectionContext';
 import { ProgressionProvider } from '../components/profile/ProgressionContext';
 import UpdateLog from '../components/UpdateLog';
 import NotificationPopup from '../components/NotificationPopup';
+import ChallengeWatcher from '../components/pvp/ChallengeWatcher';
 
 const font = Space_Grotesk({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'] });
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
               <UpdateLog />
               <NotificationPopup />
+              <ChallengeWatcher />
             </ProgressionProvider>
           </CollectionProvider>
         </ProfileProvider>

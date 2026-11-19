@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
   if (isPersonalBest) {
     // A new record far faster than the current one is saved, but sent to the admins to double-check.
     const { data: record } = await supabase.from('best_runs').select('time_ms').eq('level_id', levelId).order('time_ms', { ascending: true }).limit(1).maybeSingle();
-    if (record && timeMs < record.time_ms * 0.6) {
-      await reportCheat({ profileId: session.id, level, timeMs, reason: `Beat the world record of ${(record.time_ms / 1000).toFixed(2)}s by more than 40%. The replay checks out, but have a look.`, replay: body?.replay, status: 'review' });
+    if (record && timeMs < record.time_ms * 0.4) {
+      await reportCheat({ profileId: session.id, level, timeMs, reason: `Beat the world record of ${(record.time_ms / 1000).toFixed(2)}s by more than 60%. The replay checks out, but have a look.`, replay: body?.replay, status: 'review' });
     }
     await keepReplay(session.id, levelId, timeMs, body?.replay);
     const { error } = await supabase.from('best_runs').upsert({

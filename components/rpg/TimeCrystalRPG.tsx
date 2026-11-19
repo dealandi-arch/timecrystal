@@ -130,6 +130,31 @@ export const LEVEL_THEMES: LevelTheme[] = [
     floorAPalette: { b: '#2d0505', a: '#440808', h: '#5c0c0c', c: '#1a0303' },
     floorBPalette: { b: '#280404', a: '#3c0707', h: '#510a0a', c: '#160202' },
     wallPalette:   { m: '#450a0a', a: '#7f1d1d' } },
+  // 12 — Nature Path: bright forest floor, tree-trunk walls
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #166534 0%, #052e16 100%)',
+    floorAPalette: { b: '#14401c', a: '#1d5a28', h: '#2a7a37', c: '#0c2a12' },
+    floorBPalette: { b: '#113a19', a: '#194f24', h: '#246b30', c: '#0a2410' },
+    wallPalette:   { m: '#5b3a17', a: '#854d0e' } },
+  // 13 — Shadow Path: black and violet
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #2e1065 0%, #000000 100%)',
+    floorAPalette: { b: '#0d0714', a: '#150b21', h: '#1f1033', c: '#06030a' },
+    floorBPalette: { b: '#0a0510', a: '#11081b', h: '#190d2b', c: '#040208' },
+    wallPalette:   { m: '#1e1b2e', a: '#5b4a9a' } },
+  // 14 — Sea Path: shallow water, coral walls
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #0e7490 0%, #04202b 100%)',
+    floorAPalette: { b: '#0e4a5c', a: '#136a82', h: '#1c8aa8', c: '#093342' },
+    floorBPalette: { b: '#0c4455', a: '#115f76', h: '#187c99', c: '#082e3b' },
+    wallPalette:   { m: '#be185d', a: '#fb7185' } },
+  // 15 — Politics Path: burgundy carpet, dark wood walls
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #7f1d1d 0%, #1c0508 100%)',
+    floorAPalette: { b: '#3b0a14', a: '#521222', h: '#6d1a30', c: '#26060d' },
+    floorBPalette: { b: '#350912', a: '#4b101e', h: '#63172b', c: '#22050b' },
+    wallPalette:   { m: '#451a03', a: '#ca8a04' } },
+  // 16 — Fire Path: charred floor, glowing lava walls
+  { pageGradient: 'radial-gradient(ellipse at 50% 0%, #9a3412 0%, #1c0702 100%)',
+    floorAPalette: { b: '#2b0a05', a: '#431407', h: '#6a230c', c: '#180502' },
+    floorBPalette: { b: '#260904', a: '#3b1106', h: '#5e1f0a', c: '#150401' },
+    wallPalette:   { m: '#9a3412', a: '#f97316' } },
 ];
 
 type Dir = 'up' | 'down' | 'left' | 'right';
@@ -1932,6 +1957,9 @@ export interface CustomPlay {
   rank?: { title: string; link: { href: string; label: string } }; // which ranking the runs go on
   craze?: { minutes: CrazeMinutes }; // a Multienemy Craze round
   race?: RaceConfig; // a PvP race against a ghost or a live player
+  chapters?: { title: string; text: string }[]; // a path: a story card is shown before each level
+  pathName?: string;
+  pathIcon?: string;
   rewards?: boolean; // false for test plays in the level builder
   finale: { title: string; text: string };
 }
@@ -1960,6 +1988,7 @@ export default function TimeCrystalRPG({
   const { signedIn, levelOf, claimRun, equippedSkill } = useProgression();
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [introSeen, setIntroSeen] = useState(0); // path story cards: the last level whose card was dismissed
 
   function handleLevelComplete(level: LevelDef, currentSave: Save, stats: LevelRunStats) {
     saveLocalBestIfBetter(level.id, stats);
@@ -2143,7 +2172,19 @@ export default function TimeCrystalRPG({
     if (level) {
       const theme = LEVEL_THEMES[Math.min(level.themeIndex ?? level.id - 1, LEVEL_THEMES.length - 1)];
       const chapterTitle = isStory ? getChapterTitle(level.id - 1) : undefined;
-      body = (
+      const chapter = custom?.chapters?.[save.currentLevel - 1];
+      body = chapter && introSeen < save.currentLevel ? (
+        <div className="path-card" style={{ background: theme.pageGradient }}>
+          <span className="path-card-kicker">
+            {custom?.pathIcon} {custom?.pathName} · Chapter {save.currentLevel} of {levelCount}
+          </span>
+          <h2>{chapter.title}</h2>
+          <p>{chapter.text}</p>
+          <button className="update-ok" onClick={() => setIntroSeen(save.currentLevel)}>
+            {level.isBoss ? 'Face the boss' : 'Begin'}
+          </button>
+        </div>
+      ) : (
         <div>
           <div className="journey-bar">
             <span>

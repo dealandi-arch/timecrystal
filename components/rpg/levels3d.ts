@@ -2,6 +2,7 @@
 import { getLevel, type LevelDef } from './levels';
 import { type MapSpec, parseMap } from './terrain';
 import { PARKSTER_EVENT_LEVELS } from './events';
+import { allPathLevels } from './paths';
 
 const MAPS: MapSpec[] = [
   {
@@ -230,9 +231,10 @@ const MAPS: MapSpec[] = [
 
 export const LEVELS_3D: LevelDef[] = MAPS.map(parseMap);
 
-// Any level the server knows: the classic levels (1-11), the 3D maps (101+) and event levels (201+).
+// Any level the server knows: the classic levels (1-11), the 3D maps (101+), event levels (201+) and the
+// levels of every other path (1001+). Every one of them has its own World's Best.
 export function getAnyLevel(id: number): LevelDef | undefined {
-  return getLevel(id) ?? LEVELS_3D.find((l) => l.id === id) ?? PARKSTER_EVENT_LEVELS.find((l) => l.id === id);
+  return getLevel(id) ?? LEVELS_3D.find((l) => l.id === id) ?? PARKSTER_EVENT_LEVELS.find((l) => l.id === id) ?? allPathLevels().find((l) => l.id === id);
 }
 
 export function isRankedLevelId(id: number): boolean {

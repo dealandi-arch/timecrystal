@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TimeCrystalRPG from '../rpg/TimeCrystalRPG';
-import ArenaGame from './ArenaGame';
+import FightGame3D from './FightGame3D';
+import { CharacterSelectScreen } from '../rpg/TimeCrystalRPG';
+import { fightStatsOf } from './fightHeroes';
 import { LEVELS, getLevel } from '../rpg/levels';
 import type { Replay } from '../rpg/replay';
 import type { RaceConfig } from '../rpg/race';
@@ -50,6 +52,7 @@ export default function PvpHub() {
   const [challenges, setChallenges] = useState<MatchView[]>([]);
   const [friend, setFriend] = useState('');
   const [friendKind, setFriendKind] = useState<'race' | 'arena'>('arena');
+  const [fightHero, setFightHero] = useState<string | null>(null);
 
   // Live race plumbing (refs so the game loop always sees the latest).
   const oppRef = useRef<{ x: number; y: number } | null>(null);
@@ -61,6 +64,22 @@ export default function PvpHub() {
     oppRef.current = m.opponentPos;
     if (m.startAt) startRef.current = m.startAt - (m.serverNow - Date.now()); // corrected for the gap between the server's clock and this one
   }, []);
+
+  // Opened from a challenge ("/pvp?match=12"): jump straight into that match (a Player Fight starts with picking a hero).
+  useEffect(() => {
+    if (!profile) return;
+    const id = Number(new URLSearchParams(window.location.search).get('match'));
+    if (!Number.isInteger(id) || id <= 0) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    fetch(`/api/pvp/match?id=${id}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.match) return;
+        apply(d.match);
+        if (d.match.status === 'ready') setPlaying(true);
+      })
+      .catch(() => {});
+  }, [profile, apply]);
 
   const loadBoard = useCallback(() => {
     fetch('/api/pvp/leaderboard', { cache: 'no-store' })
@@ -169,6 +188,7 @@ export default function PvpHub() {
     setPlaying(false);
     setView(null);
     setGhost(null);
+    setFightHero(null);
     loadBoard();
   }
 
@@ -176,6 +196,7 @@ export default function PvpHub() {
     setPlaying(false);
     setView(null);
     setGhost(null);
+    setFightHero(null);
     loadBoard();
   }
 
@@ -219,8 +240,27 @@ export default function PvpHub() {
   if (loading) return <p>Loading…</p>;
   if (!profile) return <p>Sign in to race other players.</p>;
 
-  if (playing && view && view.kind === 'arena') {
+  if (playing && view && view.kind === 'arena' && !fightHero) {
+    return (
+      <div>
+        <p>
+          <button className="ability-btn story-skip" onClick={leave}>
+            ← Leave fight
+          </button>{' '}
+          <strong>⚔️ Player Fight vs {view.opponent?.name ?? 'your opponent'}</strong>
+        </p>
+        <CharacterSelectScreen
+          title="Pick your fighter"
+          subtitle="Every hero fights differently: sturdy heroes have more health and hit softer, quick heroes run faster. Your health comes back a few seconds after the last hit. The fight starts when you’ve both picked."
+          onChoose={(id) => setFightHero(id)}
+        />
+      </div>
+    );
+  }
+
+  if (playing && view && view.kind === 'arena' && fightHero) {
     const draw = view.status === 'cancelled' && !view.finished;
+    const stats = fightStatsOf(fightHero);
     return (
       <div>
         <p>
@@ -228,7 +268,7 @@ export default function PvpHub() {
             {view.finished || draw ? '← Back to the race menu' : '← Leave fight'}
           </button>{' '}
           <strong>
-            ⚔️ Arena fight vs {view.opponent?.name ?? 'Opponent'}
+            ⚔️ Player Fight vs {view.opponent?.name ?? 'Opponent'}
             {view.opponent ? ` (${view.opponent.rating})` : ''}
           </strong>
         </p>
@@ -244,10 +284,11 @@ export default function PvpHub() {
         {draw && (
           <div className="pvp-result">
             <h2>Draw</h2>
-            <p>Time ran out with equal hits. No rating change.</p>
+            <p>Time ran out with equal health. No rating change.</p>
           </div>
         )}
-        <ArenaGame key={view.id} matchId={view.id} side={view.side} opponentName={view.opponent?.name ?? 'Opponent'} onMatch={apply} />
+        {stats && <p className="hero-pick-note">Your hero: {stats.hp} health · speed {stats.speed} · {stats.damage} damage per hit</p>}
+        <FightGame3D key={`${view.id}-${fightHero}`} matchId={view.id} side={view.side} heroId={fightHero} opponentName={view.opponent?.name ?? 'Opponent'} onMatch={apply} />
       </div>
     );
   }
@@ -289,9 +330,9 @@ export default function PvpHub() {
         <h2>{view.invite ? `Waiting for ${view.opponent?.name ?? 'your friend'} to accept…` : 'Looking for an opponent…'}</h2>
         <p>
           {view.invite
-            ? 'They’ve been notified and have 5 minutes to accept.'
+            ? 'They’ve been notified and have 10 minutes to accept. You can leave this page: when they accept, you’ll be taken straight into the match.'
             : view.kind === 'arena'
-              ? 'You’ll be matched with the next player who joins the arena.'
+              ? 'You’ll be matched with the next player who joins a Player Fight.'
               : 'You’ll be matched with the next player who joins. The level is picked for you both.'}
         </p>
         <button className="ability-btn story-skip" onClick={leave}>
@@ -316,7 +357,7 @@ export default function PvpHub() {
             {challenges.map((c) => (
               <li key={c.id}>
                 <span>
-                  {c.opponent?.name ?? 'A player'} <small>{c.kind === 'arena' ? 'arena fight' : `live race on ${getLevel(c.levelId)?.name ?? 'a level'}`}</small>
+                  {c.opponent?.name ?? 'A player'} <small>{c.kind === 'arena' ? 'Player Fight' : `live race on ${getLevel(c.levelId)?.name ?? 'a level'}`}</small>
                 </span>
                 <button className="ability-btn" disabled={busy} onClick={() => acceptChallenge(c)}>
                   Accept
@@ -330,24 +371,24 @@ export default function PvpHub() {
         </>
       )}
 
-      <h2>⚡ Live race</h2>
+      <h2>⚡ Live time race</h2>
       <p>Get matched with another player right now. You each pick a hero, and the race starts when you’re both at the start. Win: +6 Emerald Shards.</p>
       <button className="event-play" disabled={busy} onClick={() => findLive('race')}>
         Find a race opponent
       </button>
 
-      <h2>⚔️ Arena fight</h2>
-      <p>A live 1v1 fight in a walled room. Dodge, fire, and land 5 hits before they do. Win: +6 Emerald Shards. Needs two players online at the same time.</p>
+      <h2>⚔️ Player Fight (PvP)</h2>
+      <p>Fight another player live in a 3D arena. Each of you picks a hero, aims with the crosshair, and fires. Your health slowly comes back when you stop getting hit. Win: +6 Emerald Shards. You can also challenge a friend below.</p>
       <button className="event-play" disabled={busy} onClick={() => findLive('arena')}>
-        Find an arena opponent
+        Find a fight
       </button>
 
       <h2>🤝 Challenge a friend</h2>
-      <p>Type a player’s username or #ID. They get a notification and 5 minutes to accept.</p>
+      <p>Type a player’s username or #ID. They see your challenge on any page, and you have 10 minutes to be accepted. You can close this window while you wait: when they accept you’re taken straight into the match.</p>
       <div className="event-code">
         <input value={friend} onChange={(e) => setFriend(e.target.value)} placeholder="Username or #ID" aria-label="Player to challenge" />
         <select value={friendKind} onChange={(e) => setFriendKind(e.target.value as 'race' | 'arena')} aria-label="Kind">
-          <option value="arena">Arena fight</option>
+          <option value="arena">Player Fight (PvP)</option>
           <option value="race">Race on level {levelId}</option>
         </select>
         <button className="ability-btn" disabled={busy || !friend.trim()} onClick={sendChallenge}>
@@ -355,7 +396,7 @@ export default function PvpHub() {
         </button>
       </div>
 
-      <h2>👻 Ghost race</h2>
+      <h2>👻 Ghost time race</h2>
       <p>Race the recorded best run of another player, any time. Win: +2 Emerald Shards (up to 5 rewarded wins a day), and half the rating.</p>
       <div className="craze-pick">
         {LEVELS.map((l) => (
