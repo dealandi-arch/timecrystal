@@ -41,6 +41,7 @@ export default function AdminPanel() {
   const [warnText, setWarnText] = useState('');
   const [giveId, setGiveId] = useState(GIVEABLE[0]?.id ?? '');
   const [giveDays, setGiveDays] = useState('3');
+  const [shardAmount, setShardAmount] = useState('10');
   const [newTier, setNewTier] = useState<AdminTier | 'none'>('admin');
 
   const open = useCallback(async (id: string) => {
@@ -227,8 +228,16 @@ export default function AdminPanel() {
             ))
           )}
 
-          {atLeast(myTier, 'ultra') && <h3>{atLeast(myTier, 'co') ? 'Give or remove a hero, or give a tryout' : 'Give a tryout'}</h3>}
-          {atLeast(myTier, 'ultra') && <div className="event-code admin-give">
+          {atLeast(myTier, 'ultra') && <h3>Shards{atLeast(myTier, 'co') ? ', tryouts and heroes' : ''}</h3>}
+          {atLeast(myTier, 'ultra') && (
+            <div className="event-code">
+              <input value={shardAmount} onChange={(e) => setShardAmount(e.target.value)} size={4} aria-label="Shards to give or take" />
+              <button className="ability-btn" onClick={() => act({ action: 'giveShards', amount: Number(shardAmount) }, 'Shards changed.')}>
+                💎 Give / take shards (use − to take)
+              </button>
+            </div>
+          )}
+          {atLeast(myTier, 'co') && <div className="event-code admin-give">
             <select value={giveId} onChange={(e) => setGiveId(e.target.value)} aria-label="Hero">
               {GIVEABLE.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -236,7 +245,7 @@ export default function AdminPanel() {
                 </option>
               ))}
             </select>
-            {atLeast(myTier, 'co') && (
+            {atLeast(myTier, 'godly') && (
               <button className="ability-btn" onClick={() => window.confirm(`Give ${GIVEABLE.find((c) => c.id === giveId)?.name} to ${detail.player.displayName} to keep?`) && act({ action: 'giveHero', heroId: giveId }, 'Hero given.')}>
                 🎁 Give hero
               </button>

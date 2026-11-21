@@ -6,7 +6,7 @@
 import { type Rarity, rarityOf } from './gacha';
 import { BASIC_GUN, type WeaponDef, getSignatureWeapon } from './weapons';
 
-export const MAX_HERO_LEVEL = 20;
+export const MAX_HERO_LEVEL = 30;
 
 export type UpgradeStat =
   | 'health' | 'speed' | 'invuln' | 'damage' | 'attackSpeed'
@@ -28,18 +28,19 @@ export const STAT_LABELS: Record<UpgradeStat, string> = {
 
 export const QUALITY_NAMES = ['Standard', 'Fine', 'Superior', 'Exquisite', 'Masterwork', 'Ascended'];
 
-// The levels at which each upgrade arrives. Every level from 2 to 20 raises at least one stat.
+// The levels at which each upgrade arrives. Every level from 2 to 30 raises at least one stat.
+// (Weapon quality tops out at level 20, the Ascended grade.)
 export const UPGRADE_LEVELS: Record<UpgradeStat, number[]> = {
-  health: [2, 7, 12, 17, 20],
-  damage: [3, 8, 13, 18, 20],
-  speed: [4, 10, 16],
-  attackSpeed: [5, 9, 14, 19],
-  invuln: [6, 11, 15],
+  health: [2, 7, 12, 17, 20, 22, 25, 28, 30],
+  damage: [3, 8, 13, 18, 20, 23, 26, 29, 30],
+  speed: [4, 10, 16, 21, 27],
+  attackSpeed: [5, 9, 14, 19, 24, 30],
+  invuln: [6, 11, 15, 25],
   quality: [4, 8, 12, 16, 20],
-  range: [3, 9, 15],
-  amount: [5, 11, 17],
-  bounce: [7, 13, 19],
-  pierce: [6, 10, 14],
+  range: [3, 9, 15, 21, 27],
+  amount: [5, 11, 17, 23],
+  bounce: [7, 13, 19, 25],
+  pierce: [6, 10, 14, 26],
 };
 export const STAT_ORDER: UpgradeStat[] = ['health', 'speed', 'invuln', 'damage', 'attackSpeed', 'quality', 'range', 'amount', 'bounce', 'pierce'];
 

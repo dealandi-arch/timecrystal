@@ -94,9 +94,11 @@ export function skillAmount(skill: SkillDef, heroLevel: number): number {
   return skill.base + (skill.area ? areaBonus(heroLevel) : 0);
 }
 
-// Cooldown shrinks by 2.5% per hero level: level 20 recharges in about half the time of level 1.
+// Cooldown shrinks by 2.5% per hero level up to level 20 (about half the time of level 1), then 1% per level after that.
 export function skillCooldown(skill: SkillDef, heroLevel: number): number {
-  return Math.round(skill.cooldown * (1 - 0.025 * (Math.max(1, heroLevel) - 1)) * 10) / 10;
+  const level = Math.max(1, heroLevel);
+  const cut = 0.025 * (Math.min(level, 20) - 1) + 0.01 * Math.max(0, level - 20);
+  return Math.round(skill.cooldown * (1 - cut) * 10) / 10;
 }
 
 export function describeSkill(skill: SkillDef, heroLevel = 1): string {

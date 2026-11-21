@@ -227,7 +227,7 @@ export default function LevelUpScreen() {
                 return (
                   <div key={sk.id} className="skill-card" style={{ borderColor: ELEMENT_INFO[el].color }}>
                     <h4>{sk.name}</h4>
-                    <p>{describeSkill(sk)} Cooldown {sk.cooldown}s at Lv 1, {skillCooldown(sk, 20)}s at Lv 20.</p>
+                    <p>{describeSkill(sk)} Cooldown {sk.cooldown}s at Lv 1, {skillCooldown(sk, 30)}s at Lv 30.</p>
                     <button className="ability-btn" disabled={owned || busy || !skillsReady || aizodon < sk.cost} onClick={() => skillAction(() => buySkill(sk.id))}>
                       {owned ? 'Owned' : `Buy ⬡ ${sk.cost}`}
                     </button>

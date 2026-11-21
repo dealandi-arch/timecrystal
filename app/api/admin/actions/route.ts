@@ -13,9 +13,10 @@ import { CHARACTERS } from '../../../../components/rpg/pixelArt';
 //   deleteCraze  { targetId, minutes }           remove a Craze score
 //   warn         { targetId, title, message }    send the player a warning notification
 //   setTier      { targetId, tier }              set someone's admin tier ('admin' | 'super' | 'ultra' | 'co') or 'none' to remove admin power
-//   giveHero     { targetId, heroId }            give a gacha or Secret hero to keep (Co-Godly and up)
-//   giveTrial    { targetId, heroId, days }      give a tryout of a hero for 1-30 days (Ultra and up)
-//   removeHero   { targetId, heroId }            take a hero (and any tryout of them) away (Co-Godly and up)
+//   giveHero     { targetId, heroId }            give a gacha or Secret hero to keep (Godly Admin only)
+//   giveTrial    { targetId, heroId, days }      give a tryout of a hero for 1-30 days (Co-Godly and up)
+//   removeHero   { targetId, heroId }            take a hero (and any tryout of them) away (Co-Godly and up, never from the Godly Admin)
+//   giveShards   { targetId, amount }            give or take 1-100 Emerald Shards (Ultra and up)
 // What each tier may do is in components/admin/tiers.ts.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -90,7 +91,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  if (action === 'giveShards') {
+    const amount = Math.round(Number(body?.amount));
+    if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > 100) return NextResponse.json({ error: 'Give or take between 1 and 100 shards at a time.' }, { status: 400 });
+    const { data: p } = await supabase.from('profiles').select('emerald_shards').eq('id', targetId).maybeSingle();
+    if (!p) return NextResponse.json({ error: 'Could not read that player.' }, { status: 500 });
+    const before = (p as { emerald_shards?: number | null }).emerald_shards ?? 0;
+    const after = Math.max(0, before + amount);
+    const { data: done, error } = await supabase.from('profiles').update({ emerald_shards: after }).eq('id', targetId).eq('emerald_shards', before).select('id');
+    if (error || !done?.length) return NextResponse.json({ error: 'Their shards changed at the same time. Try again.' }, { status: 409 });
+    await logAdmin(admin.adminId, targetId, 'giveShards', (amount > 0 ? '+' : '') + amount + ' shards (' + before + ' → ' + after + ')');
+    return NextResponse.json({ ok: true });
+  }
+
   if (action === 'removeHero') {
+    // The Godly Admin's heroes can't be touched by anyone.
+    if ((await adminTierOf(targetId)) === 'godly') return NextResponse.json({ error: 'You can’t remove heroes from the Godly Admin.' }, { status: 403 });
     const heroId = String(body?.heroId ?? '');
     const hero = CHARACTERS.find((c) => c.id === heroId);
     if (!hero || !UNLOCKABLE_CHARACTERS.includes(heroId)) return NextResponse.json({ error: 'Pick a gacha or Secret hero.' }, { status: 400 });
@@ -112,7 +128,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'giveHero' || action === 'giveTrial') {
-    if (action === 'giveHero' && admin.tier !== 'co' && admin.tier !== 'godly') return NextResponse.json({ error: 'Giving heroes needs a Co-Godly Admin or the Godly Admin.' }, { status: 403 });
     const heroId = String(body?.heroId ?? '');
     const hero = CHARACTERS.find((c) => c.id === heroId);
     if (!hero || !UNLOCKABLE_CHARACTERS.includes(heroId)) return NextResponse.json({ error: 'Pick a gacha or Secret hero.' }, { status: 400 });

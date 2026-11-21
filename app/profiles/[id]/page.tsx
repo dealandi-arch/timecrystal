@@ -89,6 +89,8 @@ export default function ProfileViewPage() {
         .sort((a, b) => b.ovrl - a.ovrl || b.level - a.level || a.hero.name.localeCompare(b.hero.name))
     : [];
   const best = heroes[0];
+  // Total power: every hero's OVRL added together (not just the best hero's).
+  const totalOvrl = heroes.reduce((sum, h) => sum + h.ovrl, 0);
   const recent = profile ? profile.recentCharacters.map((id) => heroes.find((h) => h.hero.id === id)).filter((h): h is (typeof heroes)[number] => !!h) : [];
 
   async function saveAvatar(pixels: string | null, color: string): Promise<string | null> {
@@ -143,9 +145,9 @@ export default function ProfileViewPage() {
               <strong className={lastOnline(profile.lastSeenAt) === 'Online now' ? 'profile-online' : ''}>{lastOnline(profile.lastSeenAt)}</strong>
             </div>
             <div>
-              <small>Best OVRL</small>
-              <strong>{best ? best.ovrl : '–'}</strong>
-              {best && <span>{best.hero.name} · Lv {best.level}</span>}
+              <small>Total OVRL</small>
+              <strong>{heroes.length ? totalOvrl.toLocaleString() : '–'}</strong>
+              {best && <span>Best: {best.hero.name} · Lv {best.level} · {best.ovrl}</span>}
             </div>
             <div>
               <small>Heroes</small>

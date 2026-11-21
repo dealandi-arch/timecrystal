@@ -5,12 +5,18 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '15';
+export const CURRENT_UPDATE = '15.1';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   // Newest first. Every update gets an entry here and a bump of CURRENT_UPDATE above.
+  {
+    icon: '⬆️',
+    title: 'Max level 30 and Total OVRL',
+    text: 'Heroes can now reach level 30, with new upgrades at every level from 21 to 30. On profiles, OVRL is now your Total OVRL: every hero’s power added together, not just your best hero’s.',
+    href: '/level-up',
+  },
   {
     icon: '📊',
     title: 'Average World Rank',

@@ -17,9 +17,9 @@ export interface TierInfo {
 export const TIERS: TierInfo[] = [
   { id: 'admin', name: 'Admin', icon: '🛡', level: 1, spots: 2, powers: 'Open the Admin panel and Admin chat, warn players, and review cheat reports.' },
   { id: 'super', name: 'Super Admin', icon: '⭐', level: 2, spots: 4, powers: 'Everything an Admin can, plus fixing records: change or delete World’s Best times and Craze scores.' },
-  { id: 'ultra', name: 'Ultra Admin', icon: '💫', level: 3, spots: 3, powers: 'Everything a Super Admin can, plus giving free hero tryouts. Can promote someone to Super Admin.' },
-  { id: 'co', name: 'Co-Godly Admin', icon: '🔱', level: 4, spots: 1, powers: 'Everything an Ultra Admin can, plus giving and removing heroes. Can promote someone to Ultra Admin.' },
-  { id: 'godly', name: 'Godly Admin', icon: '👑', level: 5, spots: 1, powers: 'Everything, and the only one who can promote anyone to any tier.' },
+  { id: 'ultra', name: 'Ultra Admin', icon: '💫', level: 3, spots: 3, powers: 'Everything a Super Admin can, plus giving or taking up to 100 Emerald Shards at a time. Can promote someone to Super Admin.' },
+  { id: 'co', name: 'Co-Godly Admin', icon: '🔱', level: 4, spots: 1, powers: 'Everything an Ultra Admin can, plus giving free hero tryouts and removing heroes (never from the Godly Admin). Can promote someone to Ultra Admin.' },
+  { id: 'godly', name: 'Godly Admin', icon: '👑', level: 5, spots: 1, powers: 'Everything, including giving heroes for keeps. The only one who can promote anyone to any tier.' },
 ];
 
 export const TIER_BY_ID: Record<AdminTier, TierInfo> = Object.fromEntries(TIERS.map((t) => [t.id, t])) as Record<AdminTier, TierInfo>;
@@ -32,8 +32,9 @@ export const MIN_TIER_FOR: Record<string, AdminTier> = {
   deleteRun: 'super',
   resetUnder: 'super',
   deleteCraze: 'super',
-  giveTrial: 'ultra',
-  giveHero: 'co',
+  giveShards: 'ultra',
+  giveTrial: 'co',
+  giveHero: 'godly',
   removeHero: 'co',
   setTier: 'admin', // the promotion rules below decide the rest
 };
