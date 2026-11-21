@@ -4,7 +4,7 @@ import { requireSession } from '../../../lib/collectionServer';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '../../../lib/session';
 import { LEVEL_COLUMNS, LEVEL_COLUMNS_NO_NAME, levelsStorageError, toInfo } from '../../../lib/customLevelsServer';
 import { selectWithFallback } from '../../../lib/profileFields';
-import { CUSTOM_LIMITS, validateCustomLevel } from '../../../components/rpg/customLevels';
+import { CUSTOM_ID_OFFSET, CUSTOM_LIMITS, validateCustomLevel } from '../../../components/rpg/customLevels';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,13 @@ export async function GET(req: NextRequest) {
     const info = toInfo(row as never);
     return { ...info, map: undefined, enemies: info.map.enemies.length };
   });
-  return NextResponse.json({ levels });
+  // Which of these has the signed-in player already cleared? (The rest get an "Unplayed" sign.)
+  let played = new Set<number>();
+  if (session && levels.length) {
+    const { data: runs } = await getSupabase().from('best_runs').select('level_id').eq('profile_id', session.id).in('level_id', levels.map((l) => CUSTOM_ID_OFFSET + l.id));
+    played = new Set(((runs ?? []) as { level_id: number }[]).map((r) => r.level_id - CUSTOM_ID_OFFSET));
+  }
+  return NextResponse.json({ levels: levels.map((l) => ({ ...l, played: played.has(l.id) })) });
 }
 
 // Publish a level (signed-in players). It stays hidden until its creator beats it once.

@@ -250,3 +250,11 @@ do $$ begin
   alter table pvp_matches add constraint pvp_matches_kind_check check (kind in ('race', 'arena'));
 exception when duplicate_object then null; end $$;
 create index if not exists pvp_matches_invite_idx on pvp_matches (b_id, status) where invite;
+
+-- Admin tiers (safe to re-run). 11 admin spots: 1 godly (lavatatorr), 1 co, 3 ultra, 4 super, 2 admin.
+alter table public.profiles add column if not exists admin_tier text;
+do $$ begin
+  alter table public.profiles add constraint profiles_admin_tier_check check (admin_tier is null or admin_tier in ('admin', 'super', 'ultra', 'co', 'godly'));
+exception when duplicate_object then null; end $$;
+update public.profiles set admin_tier = 'admin' where is_admin = true and admin_tier is null;
+update public.profiles set is_admin = true, admin_tier = 'godly' where lower(nickname) = 'lavatatorr';

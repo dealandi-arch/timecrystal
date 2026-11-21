@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TimeCrystalRPG from '../rpg/TimeCrystalRPG';
 import FightGame3D from './FightGame3D';
 import { CharacterSelectScreen } from '../rpg/TimeCrystalRPG';
-import { fightStatsOf } from './fightHeroes';
+import { abilityOf, fightStatsOf } from './fightHeroes';
 import { LEVELS, getLevel } from '../rpg/levels';
 import type { Replay } from '../rpg/replay';
 import type { RaceConfig } from '../rpg/race';
@@ -251,7 +251,7 @@ export default function PvpHub() {
         </p>
         <CharacterSelectScreen
           title="Pick your fighter"
-          subtitle="Every hero fights differently: sturdy heroes have more health and hit softer, quick heroes run faster. Your health comes back a few seconds after the last hit. The fight starts when you’ve both picked."
+          subtitle="Every hero fights differently: sturdy heroes have more health and hit softer, quick heroes run faster, and every hero has their own ability (their signature weapon). Your health comes back a few seconds after the last hit. The fight starts when you’ve both picked."
           onChoose={(id) => setFightHero(id)}
         />
       </div>
@@ -261,6 +261,7 @@ export default function PvpHub() {
   if (playing && view && view.kind === 'arena' && fightHero) {
     const draw = view.status === 'cancelled' && !view.finished;
     const stats = fightStatsOf(fightHero);
+    const heroAbility = abilityOf(fightHero);
     return (
       <div>
         <p>
@@ -287,7 +288,11 @@ export default function PvpHub() {
             <p>Time ran out with equal health. No rating change.</p>
           </div>
         )}
-        {stats && <p className="hero-pick-note">Your hero: {stats.hp} health · speed {stats.speed} · {stats.damage} damage per hit</p>}
+        {stats && (
+          <p className="hero-pick-note">
+            Your hero: {stats.hp} health · speed {stats.speed} · {stats.damage} damage per hit{heroAbility ? ` · ability: ${heroAbility.name} (${heroAbility.damage} damage, ${Math.round(heroAbility.cooldownMs / 1000)}s cooldown)` : ''}
+          </p>
+        )}
         <FightGame3D key={`${view.id}-${fightHero}`} matchId={view.id} side={view.side} heroId={fightHero} opponentName={view.opponent?.name ?? 'Opponent'} onMatch={apply} />
       </div>
     );

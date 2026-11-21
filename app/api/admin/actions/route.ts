@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
-import { isSuperAdmin, logAdmin, requireAdmin } from '../../../../lib/admin';
+import { MIN_TIER_FOR, adminTierOf, logAdmin, requireAdmin } from '../../../../lib/admin';
+import { TIERS, TIER_BY_ID, type AdminTier, parseTier, tierChangeProblem } from '../../../../components/admin/tiers';
 import { addNotification } from '../../../../lib/notify';
 import { UNLOCKABLE_CHARACTERS } from '../../../../components/rpg/gacha';
 import { CHARACTERS } from '../../../../components/rpg/pixelArt';
@@ -11,15 +12,16 @@ import { CHARACTERS } from '../../../../components/rpg/pixelArt';
 //   resetUnder   { targetId, timeMs }            every built-in level (1-11) faster than timeMs becomes timeMs
 //   deleteCraze  { targetId, minutes }           remove a Craze score
 //   warn         { targetId, title, message }    send the player a warning notification
-//   setAdmin     { targetId, isAdmin }           give or remove admin power (not your own)
-//   giveHero     { targetId, heroId }            give a gacha or Secret hero to keep
-//   giveTrial    { targetId, heroId, days }      give a tryout of a hero for 1-30 days
-//   removeHero   { targetId, heroId }            take a hero (and any tryout of them) away (super admin only)
+//   setTier      { targetId, tier }              set someone's admin tier ('admin' | 'super' | 'ultra' | 'co') or 'none' to remove admin power
+//   giveHero     { targetId, heroId }            give a gacha or Secret hero to keep (Co-Godly and up)
+//   giveTrial    { targetId, heroId, days }      give a tryout of a hero for 1-30 days (Ultra and up)
+//   removeHero   { targetId, heroId }            take a hero (and any tryout of them) away (Co-Godly and up)
+// What each tier may do is in components/admin/tiers.ts.
 export async function POST(req: NextRequest) {
-  const admin = await requireAdmin(req);
-  if (!admin.ok) return admin.response;
   const body = await req.json().catch(() => null);
   const action = String(body?.action ?? '');
+  const admin = await requireAdmin(req, MIN_TIER_FOR[action] ?? 'godly'); // unknown actions need the top tier, so nothing slips through
+  if (!admin.ok) return admin.response;
   const targetId = String(body?.targetId ?? '');
   if (!/^\d+$/.test(targetId)) return NextResponse.json({ error: 'Pick a player.' }, { status: 400 });
   const supabase = getSupabase();
@@ -61,18 +63,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  if (action === 'setAdmin') {
-    const makeAdmin = body?.isAdmin === true;
-    if (targetId === admin.adminId && !makeAdmin) return NextResponse.json({ error: 'You can’t remove your own admin power.' }, { status: 400 });
-    const { data, error } = await supabase.from('profiles').update({ is_admin: makeAdmin }).eq('id', targetId).select('nickname');
-    if (error || !data?.length) return NextResponse.json({ error: 'Could not change admin power.' }, { status: 500 });
-    await logAdmin(admin.adminId, targetId, makeAdmin ? 'makeAdmin' : 'removeAdmin', `${data[0].nickname} ${makeAdmin ? 'is now an admin' : 'is no longer an admin'}`);
-    if (makeAdmin) await addNotification(targetId, 'info', 'You’re now an admin', 'You can open the Admin panel and the Admin chat from the 🛡 Admin link next to your name.');
+  if (action === 'setTier') {
+    const wanted = String(body?.tier ?? '');
+    if (wanted !== 'none' && !TIERS.some((x) => x.id === wanted)) return NextResponse.json({ error: 'Pick a tier.' }, { status: 400 });
+    const next: AdminTier | 'none' = wanted === 'none' ? 'none' : parseTier(wanted);
+    if (targetId === admin.adminId) return NextResponse.json({ error: 'You can’t change your own tier.' }, { status: 400 });
+    const current = await adminTierOf(targetId);
+    const problem = tierChangeProblem(admin.tier, current, next);
+    if (problem) return NextResponse.json({ error: problem }, { status: 403 });
+    // Spots: each tier has a limited number of places.
+    if (next !== 'none' && current !== next) {
+      const { count } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_admin', true).eq('admin_tier', next).neq('nickname', 'lavatatorr');
+      const info = TIER_BY_ID[next];
+      if ((count ?? 0) >= info.spots) return NextResponse.json({ error: 'All ' + info.spots + ' ' + info.name + ' spot' + (info.spots === 1 ? ' is' : 's are') + ' taken. Move someone out of that tier first.' }, { status: 400 });
+    }
+    if (next === 'none') {
+      const { data, error } = await supabase.from('profiles').update({ is_admin: false, admin_tier: null }).eq('id', targetId).select('nickname');
+      if (error || !data?.length) return NextResponse.json({ error: 'Could not change admin power. (Run the latest supabase/schema.sql.)' }, { status: 500 });
+      await logAdmin(admin.adminId, targetId, 'removeAdmin', data[0].nickname + ' is no longer an admin');
+      return NextResponse.json({ ok: true });
+    }
+    const { data, error } = await supabase.from('profiles').update({ is_admin: true, admin_tier: next }).eq('id', targetId).select('nickname');
+    if (error || !data?.length) return NextResponse.json({ error: 'Could not change admin power. (Run the latest supabase/schema.sql.)' }, { status: 500 });
+    await logAdmin(admin.adminId, targetId, 'setTier', data[0].nickname + ' is now a ' + TIER_BY_ID[next].name);
+    await addNotification(targetId, 'info', 'You’re now a ' + TIER_BY_ID[next].name, TIER_BY_ID[next].powers + ' Open the Admin panel from the ' + TIER_BY_ID[next].icon + ' Admin link next to your name.');
     return NextResponse.json({ ok: true });
   }
 
   if (action === 'removeHero') {
-    if (!(await isSuperAdmin(admin.adminId))) return NextResponse.json({ error: 'Only the super admin can remove heroes.' }, { status: 403 });
     const heroId = String(body?.heroId ?? '');
     const hero = CHARACTERS.find((c) => c.id === heroId);
     if (!hero || !UNLOCKABLE_CHARACTERS.includes(heroId)) return NextResponse.json({ error: 'Pick a gacha or Secret hero.' }, { status: 400 });
@@ -94,7 +112,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'giveHero' || action === 'giveTrial') {
-    if (!(await isSuperAdmin(admin.adminId))) return NextResponse.json({ error: 'Only the super admin can give heroes or tryouts.' }, { status: 403 });
+    if (action === 'giveHero' && admin.tier !== 'co' && admin.tier !== 'godly') return NextResponse.json({ error: 'Giving heroes needs a Co-Godly Admin or the Godly Admin.' }, { status: 403 });
     const heroId = String(body?.heroId ?? '');
     const hero = CHARACTERS.find((c) => c.id === heroId);
     if (!hero || !UNLOCKABLE_CHARACTERS.includes(heroId)) return NextResponse.json({ error: 'Pick a gacha or Secret hero.' }, { status: 400 });

@@ -50,10 +50,10 @@ export const CHARACTER_RARITY: Record<string, GachaRarity> = {
   vector: 'mythic',
 };
 
-// Secret heroes: never in the gacha or the shop. Every level you clear has a 1% chance to give you
-// one you don't have yet; they stay hidden from the hero list until you've got one (or a trial).
+// Secret heroes: never in the gacha or the shop. Every level you clear gives each Secret hero you don't have
+// yet its own small chance; they stay hidden from the hero list until you've got one (or a trial).
 export const SECRET_CHARACTERS = ['bunny', 'nimbus', 'glitch'];
-export const SECRET_DROP_CHANCE = 0.01;
+export const SECRET_DROP_CHANCES: Record<string, number> = { bunny: 0.003, glitch: 0.007, nimbus: 0.001 }; // 0.3%, 0.7%, 0.1%
 
 export function isSecret(characterId: string): boolean {
   return SECRET_CHARACTERS.includes(characterId);
@@ -68,11 +68,12 @@ export const GACHA_CHARACTERS = Object.keys(CHARACTER_RARITY);
 // Everything that can be owned (and so saved on a profile).
 export const UNLOCKABLE_CHARACTERS = [...GACHA_CHARACTERS, ...SECRET_CHARACTERS];
 
-// After clearing a level: 1% chance of a Secret hero you don't have yet.
+// After clearing a level: each Secret hero you don't have yet rolls its own chance.
 export function rollSecret(owned: string[], random: () => number = Math.random): string | null {
-  const missing = SECRET_CHARACTERS.filter((id) => !owned.includes(id));
-  if (!missing.length || random() >= SECRET_DROP_CHANCE) return null;
-  return missing[Math.floor(random() * missing.length)];
+  for (const id of SECRET_CHARACTERS.filter((hero) => !owned.includes(hero))) {
+    if (random() < (SECRET_DROP_CHANCES[id] ?? 0)) return id;
+  }
+  return null;
 }
 
 // Card gacha: each draw gives a card for one gacha hero, every hero equally likely.

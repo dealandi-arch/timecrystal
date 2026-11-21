@@ -15,7 +15,7 @@ export const BULLET_R = 0.25;
 export const HIT_R_VICTIM = 0.85;
 export const HIT_R_ATTACKER = 1.3;
 
-export const MAX_SHOTS_SENT = 8;
+export const MAX_SHOTS_SENT = 12;
 export const MAX_HITS_SENT = 200;
 
 // Crates and pillars: centre x, centre z, width, depth, height. Nothing walks or shoots through them.
@@ -33,14 +33,19 @@ export const ARENA_BOXES: { x: number; z: number; w: number; d: number; h: numbe
 
 export const SPAWN = { a: { x: 4, z: 15, yaw: Math.PI / 2 }, b: { x: 40, z: 15, yaw: -Math.PI / 2 } };
 
+// Something a fighter did that can hurt the other one. The target's own screen works out whether it hits them.
+//   k 's': a shot (x, y, z = where it starts, dx, dy, dz = direction). 'm': a close strike. 'b': a beam.
+//   'a': an area (x, z = centre; it goes off after the hero's delay). ab 1 = the hero's ability, 0 = a normal shot.
 export interface ArenaShot {
-  n: number; // shot number (counts up per player)
+  n: number; // counts up per player
   x: number;
   y: number;
   z: number;
   dx: number;
   dy: number;
   dz: number;
+  k?: 's' | 'm' | 'b' | 'a';
+  ab?: 0 | 1;
 }
 
 // Does a circle at (x, z) with radius r touch a crate or the edge?

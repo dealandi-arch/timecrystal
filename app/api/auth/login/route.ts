@@ -4,6 +4,7 @@ import { getSupabase, isBackendConfigured } from '../../../../lib/supabase';
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE_S } from '../../../../lib/session';
 import { validateNickname, validatePassword } from '../../../../lib/profileValidation';
 import { selectWithFallback } from '../../../../lib/profileFields';
+import { adminTierOf } from '../../../../lib/admin';
 
 export async function POST(req: NextRequest) {
   if (!isBackendConfigured()) {
@@ -36,8 +37,9 @@ export async function POST(req: NextRequest) {
   if (upToDate || (profile && 'last_seen_at' in profile)) await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', profile.id);
 
   const token = createSessionToken({ id: profile.id, nickname: profile.nickname });
+  const tier = await adminTierOf(profile.id);
   const res = NextResponse.json({
-    profile: { id: profile.id, nickname: profile.nickname, displayName: profile.display_name?.trim() || profile.nickname, nameChangedAt: profile.display_name_changed_at ?? null, isAdmin: !!profile.is_admin, email: profile.email ?? null, avatarColor: profile.avatar_color, avatarPixels: profile.avatar_pixels ?? null }
+    profile: { id: profile.id, nickname: profile.nickname, displayName: profile.display_name?.trim() || profile.nickname, nameChangedAt: profile.display_name_changed_at ?? null, isAdmin: tier !== null, adminTier: tier, email: profile.email ?? null, avatarColor: profile.avatar_color, avatarPixels: profile.avatar_pixels ?? null }
   });
   res.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,

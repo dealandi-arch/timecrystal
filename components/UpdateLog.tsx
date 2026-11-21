@@ -5,12 +5,46 @@ import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, getCharacterLook, getSpriteCanvas } from './rpg/pixelArt';
 
 // What's new: pops up once per browser for each update, and can be reopened from the home page.
-export const CURRENT_UPDATE = '14';
+export const CURRENT_UPDATE = '15';
 const SEEN_KEY = 'timeCrystalSeenUpdate';
 export const SHOW_UPDATES_EVENT = 'timeCrystal:showUpdates';
 
 const NOTES: { icon: string; title: string; text: string; href?: string }[] = [
   // Newest first. Every update gets an entry here and a bump of CURRENT_UPDATE above.
+  {
+    icon: '📊',
+    title: 'Average World Rank',
+    text: 'A new rank for everyone: on every level you have played, take your place on that level’s World Record list, then average those places to 3 decimal places. The lowest average ranks first.',
+    href: '/rank',
+  },
+  {
+    icon: '✦',
+    title: 'Hero abilities in Player Fights',
+    text: 'Every hero now brings their own ability into a Player Fight: their signature weapon becomes a volley, a strike, a beam, a shockwave or a timed blast. Press E or right click (✦ on a phone) and wait out the cooldown.',
+    href: '/pvp',
+  },
+  {
+    icon: '🆕',
+    title: 'Unplayed sign on public levels',
+    text: 'Public levels you have not cleared yet now show an Unplayed sign, so you can find the ones you have not tried.',
+    href: '/levels',
+  },
+  {
+    icon: '🕹️',
+    title: 'Bigger jump button',
+    text: 'On phones the jump button is now as big as the attack button and sits right above it.',
+  },
+  {
+    icon: '🎁',
+    title: 'New Secret hero chances',
+    text: 'Each level you clear now gives Bunny a 0.3% chance, Glitch 0.7% and Nimbus 0.1%.',
+    href: '/events',
+  },
+  {
+    icon: '🛡',
+    title: 'Admin tiers',
+    text: 'Admins now have tiers: Admin, Super Admin, Ultra Admin, Co-Godly Admin and the Godly Admin, with 11 spots in all. Higher tiers can do more, and each tier can only promote to the tier directly below it. Only the Godly Admin can promote higher.',
+  },
   {
     icon: '🗺️',
     title: 'Six paths, six stories',

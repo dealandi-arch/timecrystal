@@ -8,6 +8,7 @@ export interface Profile {
   displayName?: string; // what everyone sees
   nameChangedAt?: string | null;
   isAdmin?: boolean; // can open /admin and the Admin chat
+  adminTier?: 'admin' | 'super' | 'ultra' | 'co' | 'godly' | null;
   email?: string | null; // optional, private: only shown to the player themselves
   avatarColor: string;
   avatarPixels?: string | null;

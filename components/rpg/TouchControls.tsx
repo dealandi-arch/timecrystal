@@ -208,15 +208,16 @@ export default function TouchControls({ onPress, onRelease, onToggleWeapon, weap
           <button type="button" className="touch-weapon" style={{ borderColor: weaponColor }} aria-label={`Switch weapon, current: ${weaponName}`} onClick={onToggleWeapon}>
             ⇄ {weaponName}
           </button>
-          {onJump && (
-            <button type="button" className="touch-jump" aria-label="Jump" onClick={onJump}>
-              ⤒ Jump
-            </button>
-          )}
           <button type="button" className={`touch-autofire${autoFire ? ' on' : ''}`} aria-pressed={autoFire} onClick={toggleAutoFire}>
             {autoFire ? '🔥 Auto-fire on (bullets)' : 'Auto-fire off'}
           </button>
         </div>
+        {onJump && (
+          <button type="button" className="touch-jump" aria-label="Jump" onClick={onJump}>
+            ⤒
+            <span>Jump</span>
+          </button>
+        )}
         <button type="button" className={`touch-attack ${firing ? 'on' : ''}`} aria-label="Attack (hold)" tabIndex={-1}>
           ⚔
         </button>

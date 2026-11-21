@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isBackendConfigured } from '../../../../lib/supabase';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '../../../../lib/session';
+import { adminTierOf } from '../../../../lib/admin';
 import { BASE_PUBLIC, LAST_SEEN_EVERY_MS, selectWithFallback, shownNameOf } from '../../../../lib/profileFields';
 
 export async function GET(req: NextRequest) {
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest) {
     await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', row.id);
   }
 
+  const tier = await adminTierOf(row.id);
   return NextResponse.json({
-    profile: { id: row.id, nickname: row.nickname, displayName: shownNameOf(row), nameChangedAt: row.display_name_changed_at ?? null, isAdmin: !!row.is_admin, email: row.email ?? null, avatarColor: row.avatar_color, avatarPixels: row.avatar_pixels ?? null }
+    profile: { id: row.id, nickname: row.nickname, displayName: shownNameOf(row), nameChangedAt: row.display_name_changed_at ?? null, isAdmin: tier !== null, adminTier: tier, email: row.email ?? null, avatarColor: row.avatar_color, avatarPixels: row.avatar_pixels ?? null }
   });
 }

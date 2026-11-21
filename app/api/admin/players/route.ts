@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
-import { requireAdmin } from '../../../../lib/admin';
+import { requireAdmin, tiersOf } from '../../../../lib/admin';
 import { selectWithFallback, shownNameOf } from '../../../../lib/profileFields';
 
 export const dynamic = 'force-dynamic';
@@ -21,5 +21,6 @@ export async function GET(req: NextRequest) {
     'id, nickname, is_admin'
   );
   const rows = (data ?? []) as unknown as { id: string; nickname: string; display_name?: string | null; is_admin?: boolean }[];
-  return NextResponse.json({ players: rows.map((p) => ({ id: p.id, nickname: p.nickname, displayName: shownNameOf(p), isAdmin: !!p.is_admin })) });
+  const tiers = await tiersOf(rows.map((p) => p.id));
+  return NextResponse.json({ players: rows.map((p) => ({ id: p.id, nickname: p.nickname, displayName: shownNameOf(p), isAdmin: tiers.get(p.id) !== null && tiers.has(p.id) ? true : !!p.is_admin, adminTier: tiers.get(p.id) ?? null })) });
 }

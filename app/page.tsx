@@ -18,6 +18,7 @@ const BUTTONS = [
   { href: '/level-up', icon: '⬆️', label: 'Level up' },
   { href: '/chat', icon: '💬', label: 'Chat' },
   { href: '/profiles', icon: '👥', label: 'Players' },
+  { href: '/rank', icon: '📊', label: 'Average World Rank' },
   { href: '/3d/rank', icon: '🏆', label: '3D World Rank' },
   { href: '/events/rank', icon: '🏅', label: 'Event Rank' },
   { href: '/levels/rank', icon: '🥇', label: 'Public Levels Rank' },

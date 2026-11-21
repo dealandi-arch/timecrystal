@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useCollection } from '../profile/CollectionContext';
 import { CHARACTERS } from '../rpg/pixelArt';
 import { PARKSTER_EVENT_LEVELS, PARKSTER_TRYOUT, TRIAL_DAYS, redeemCode } from '../rpg/events';
-import { RARITY_INFO, SECRET_CHARACTERS, SECRET_DROP_CHANCE, rarityOf } from '../rpg/gacha';
+import { RARITY_INFO, SECRET_CHARACTERS, SECRET_DROP_CHANCES, rarityOf } from '../rpg/gacha';
 import { formatTrialLeft } from '../rpg/TimeCrystalRPG';
 
 const heroName = (id: string) => CHARACTERS.find((c) => c.id === id)?.name ?? id;
@@ -84,8 +84,8 @@ export default function EventsHub() {
         <span className="rarity-badge" style={{ background: RARITY_INFO.secret.color }}>Secret heroes</span>
         <h2>🎁 Secret hero trial</h2>
         <p>
-          There are {SECRET_CHARACTERS.length} Secret heroes. They never appear in the Gacha or the Shop: every level you clear has a{' '}
-          {Math.round(SECRET_DROP_CHANCE * 100)}% chance to give you one you don’t have yet, and once you have one it’s yours to keep.
+          There are {SECRET_CHARACTERS.length} Secret heroes. They never appear in the Gacha or the Shop: every level you clear has a small
+          chance to give you one you don’t have yet (Bunny {(SECRET_DROP_CHANCES.bunny * 100).toFixed(1)}%, Glitch {(SECRET_DROP_CHANCES.glitch * 100).toFixed(1)}%, Nimbus {(SECRET_DROP_CHANCES.nimbus * 100).toFixed(1)}%), and once you have one it’s yours to keep.
         </p>
         <p>Got a code? Redeem it for a free {TRIAL_DAYS}-day trial of a Secret hero.</p>
         <form

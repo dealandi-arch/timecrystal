@@ -9,6 +9,7 @@ import { CUSTOM_ID_OFFSET } from '../rpg/customLevels';
 import CheatCatcher from './CheatCatcher';
 import { CHARACTERS } from '../rpg/pixelArt';
 import { RARITY_INFO, UNLOCKABLE_CHARACTERS, rarityOf } from '../rpg/gacha';
+import { type AdminTier, TIERS, TIER_BY_ID, atLeast, tierChangeProblem } from './tiers';
 
 const GIVEABLE = CHARACTERS.filter((c) => UNLOCKABLE_CHARACTERS.includes(c.id)).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -17,6 +18,7 @@ interface Found {
   nickname: string;
   displayName: string;
   isAdmin: boolean;
+  adminTier?: AdminTier | null;
 }
 interface Detail {
   player: Found & { aizodon: number; shards: number; lastSeenAt: string | null };
@@ -39,6 +41,7 @@ export default function AdminPanel() {
   const [warnText, setWarnText] = useState('');
   const [giveId, setGiveId] = useState(GIVEABLE[0]?.id ?? '');
   const [giveDays, setGiveDays] = useState('3');
+  const [newTier, setNewTier] = useState<AdminTier | 'none'>('admin');
 
   const open = useCallback(async (id: string) => {
     const res = await fetch(`/api/admin/players/${id}`, { cache: 'no-store' });
@@ -71,6 +74,7 @@ export default function AdminPanel() {
 
   if (loading) return <p>Loading…</p>;
   if (!profile?.isAdmin) return <p className="event-error">Admins only. Sign in with an admin account.</p>;
+  const myTier = profile.adminTier ?? 'admin';
 
   return (
     <div className="admin">
@@ -92,7 +96,7 @@ export default function AdminPanel() {
           {found.length === 0 && <p>No players found.</p>}
           {found.map((p) => (
             <button key={p.id} className={`admin-player${detail?.player.id === p.id ? ' on' : ''}`} onClick={() => open(p.id)}>
-              {p.displayName} <small>@{p.nickname} · #{p.id}</small> {p.isAdmin && <span className="verified-badge">🛡 Admin</span>}
+              {p.displayName} <small>@{p.nickname} · #{p.id}</small> {p.adminTier && <span className="verified-badge">{TIER_BY_ID[p.adminTier].icon} {TIER_BY_ID[p.adminTier].name}</span>}
             </button>
           ))}
         </div>
@@ -107,17 +111,54 @@ export default function AdminPanel() {
           <p className="gacha-fine">
             ⬡ {detail.player.aizodon} Aizodon · 💎 {detail.player.shards} shards · last online {detail.player.lastSeenAt ? new Date(detail.player.lastSeenAt).toLocaleString() : 'unknown'}
           </p>
-          <p>
-            {detail.player.isAdmin ? (
-              <button className="ability-btn story-skip" disabled={detail.player.id === profile.id} onClick={() => window.confirm(`Remove ${detail.player.displayName}’s admin power?`) && act({ action: 'setAdmin', isAdmin: false }, 'Admin power removed.')}>
-                Remove admin power
-              </button>
-            ) : (
-              <button className="ability-btn" onClick={() => window.confirm(`Make ${detail.player.displayName} an admin? They’ll be able to change records and warn players.`) && act({ action: 'setAdmin', isAdmin: true }, 'They’re an admin now.')}>
-                🛡 Make admin
-              </button>
+          <div className="admin-tier">
+            <p>
+              {detail.player.adminTier ? (
+                <span className="verified-badge">
+                  {TIER_BY_ID[detail.player.adminTier].icon} {TIER_BY_ID[detail.player.adminTier].name}
+                </span>
+              ) : (
+                <span className="gacha-fine">Not an admin.</span>
+              )}
+            </p>
+            {myTier && detail.player.id !== profile.id && detail.player.adminTier !== 'godly' && (
+              <div className="event-code">
+                <select value={newTier} onChange={(e) => setNewTier(e.target.value as AdminTier | 'none')} aria-label="New tier">
+                  {TIERS.filter((x) => x.id !== 'godly').map((x) => (
+                    <option key={x.id} value={x.id} disabled={!!tierChangeProblem(myTier, detail.player.adminTier ?? null, x.id)}>
+                      {x.icon} {x.name} ({x.spots} spot{x.spots === 1 ? '' : 's'})
+                    </option>
+                  ))}
+                  <option value="none" disabled={!!tierChangeProblem(myTier, detail.player.adminTier ?? null, 'none')}>
+                    Remove admin power
+                  </option>
+                </select>
+                <button
+                  className="ability-btn"
+                  disabled={!!tierChangeProblem(myTier, detail.player.adminTier ?? null, newTier)}
+                  onClick={() =>
+                    window.confirm(newTier === 'none' ? 'Remove ' + detail.player.displayName + '’s admin power?' : 'Set ' + detail.player.displayName + ' to ' + TIER_BY_ID[newTier].name + '?') &&
+                    act({ action: 'setTier', tier: newTier }, newTier === 'none' ? 'Admin power removed.' : 'Their tier is now ' + TIER_BY_ID[newTier].name + '.')
+                  }
+                >
+                  Set tier
+                </button>
+              </div>
             )}
-          </p>
+            {myTier && (
+              <details className="gacha-fine">
+                <summary>What each tier can do (11 admin spots)</summary>
+                <ul>
+                  {[...TIERS].reverse().map((x) => (
+                    <li key={x.id}>
+                      {x.icon} <strong>{x.name}</strong> ({x.spots}): {x.powers}
+                    </li>
+                  ))}
+                </ul>
+                <p>Everyone can promote only to the tier directly below their own. Only the Godly Admin can promote higher.</p>
+              </details>
+            )}
+          </div>
 
           <h3>World’s Best times</h3>
           {detail.runs.length === 0 ? (
@@ -186,8 +227,8 @@ export default function AdminPanel() {
             ))
           )}
 
-          {profile.nickname.toLowerCase() === 'lavatatorr' && <h3>Give a hero or a tryout</h3>}
-          {profile.nickname.toLowerCase() === 'lavatatorr' && <div className="event-code admin-give">
+          {atLeast(myTier, 'ultra') && <h3>{atLeast(myTier, 'co') ? 'Give or remove a hero, or give a tryout' : 'Give a tryout'}</h3>}
+          {atLeast(myTier, 'ultra') && <div className="event-code admin-give">
             <select value={giveId} onChange={(e) => setGiveId(e.target.value)} aria-label="Hero">
               {GIVEABLE.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -195,17 +236,21 @@ export default function AdminPanel() {
                 </option>
               ))}
             </select>
-            <button className="ability-btn" onClick={() => window.confirm(`Give ${GIVEABLE.find((c) => c.id === giveId)?.name} to ${detail.player.displayName} to keep?`) && act({ action: 'giveHero', heroId: giveId }, 'Hero given.')}>
-              🎁 Give hero
-            </button>
+            {atLeast(myTier, 'co') && (
+              <button className="ability-btn" onClick={() => window.confirm(`Give ${GIVEABLE.find((c) => c.id === giveId)?.name} to ${detail.player.displayName} to keep?`) && act({ action: 'giveHero', heroId: giveId }, 'Hero given.')}>
+                🎁 Give hero
+              </button>
+            )}
             <input value={giveDays} onChange={(e) => setGiveDays(e.target.value)} size={3} aria-label="Tryout days" />
             <span>days</span>
             <button className="ability-btn" onClick={() => act({ action: 'giveTrial', heroId: giveId, days: Number(giveDays) }, `${giveDays}-day tryout given.`)}>
               ⏳ Give tryout
             </button>
-            <button className="ability-btn story-skip" onClick={() => window.confirm(`Remove ${GIVEABLE.find((c) => c.id === giveId)?.name} from ${detail.player.displayName}?`) && act({ action: 'removeHero', heroId: giveId }, 'Hero removed.')}>
-              🗑 Remove hero
-            </button>
+            {atLeast(myTier, 'co') && (
+              <button className="ability-btn story-skip" onClick={() => window.confirm(`Remove ${GIVEABLE.find((c) => c.id === giveId)?.name} from ${detail.player.displayName}?`) && act({ action: 'removeHero', heroId: giveId }, 'Hero removed.')}>
+                🗑 Remove hero
+              </button>
+            )}
           </div>}
 
           <h3>Send a warning</h3>

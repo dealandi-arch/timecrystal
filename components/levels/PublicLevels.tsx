@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useProfile } from '../profile/ProfileContext';
 import { formatTime } from '../profile/formatTime';
+import { CUSTOM_ID_OFFSET } from '../rpg/customLevels';
+import { getLocalBest } from '../rpg/runStats';
 
 interface ListedLevel {
   id: number;
@@ -16,6 +18,7 @@ interface ListedLevel {
   createdAt: string;
   verifiedAt: string | null;
   verifyTimeMs: number | null;
+  played?: boolean; // cleared by the signed-in player
 }
 
 type Tab = 'new' | 'popular' | 'mine';
@@ -38,6 +41,9 @@ export default function PublicLevels() {
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load levels.'));
   }, [tab]);
+
+  // Cleared on your account, or on this device (guests and runs not saved to a profile).
+  const isUnplayed = (l: ListedLevel) => !l.played && !getLocalBest(CUSTOM_ID_OFFSET + l.id);
 
   return (
     <div className="public-levels">
@@ -67,9 +73,10 @@ export default function PublicLevels() {
       {levels && levels.length > 0 && (
         <div className="public-level-list">
           {levels.map((l) => (
-            <Link key={l.id} href={`/levels/${l.id}`} className="public-level">
+            <Link key={l.id} href={`/levels/${l.id}`} className={`public-level${isUnplayed(l) ? ' unplayed' : ''}`}>
               <span className="view3d-tag">{l.mode.toUpperCase()}</span>
               <strong>{l.name}</strong>
+              {isUnplayed(l) && <span className="unplayed-badge">🆕 Unplayed</span>}
               {l.verifiedAt ? <span className="verified-badge">✔ Verified</span> : <span className="unverified-badge">Needs verifying: beat it once</span>}
               <span className="gacha-fine">
                 by {l.author} · {l.enemies} enem{l.enemies === 1 ? 'y' : 'ies'} · {l.plays} play{l.plays === 1 ? '' : 's'}
